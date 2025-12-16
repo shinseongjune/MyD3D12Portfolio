@@ -129,11 +129,13 @@
   <ItemGroup>
     <ClInclude Include="CubeTest.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="D3D12Renderer.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CubeTest.cpp" />
+    <ClCompile Include="D3D12Renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CubeTest.rc" />
