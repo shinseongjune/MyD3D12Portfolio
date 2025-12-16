@@ -34,9 +34,31 @@ private:
     HWND m_hwnd = nullptr;
     UINT m_width = 0, m_height = 0;
 
+    // --- Draw resources (cube) ---
+    D3D12_VIEWPORT m_viewport = {};
+    D3D12_RECT     m_scissorRect = {};
+
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipelineState;
+
+    // Geometry
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView = {};
+    D3D12_INDEX_BUFFER_VIEW  m_indexBufferView = {};
+
+    // Constant buffer (WVP)
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_constantBuffer;
+    UINT8* m_cbvMappedData = nullptr;
+
+    // (단순화를 위해) Root CBV로 바인딩: GPU handle heap 불필요
+    // 즉 m_cbvSrvHeap, m_cbvGpuHandle도 안 씀
+
 private:
     void CreateDeviceAndSwapChain();
     void CreateRtvHeapAndViews();
     void CreateCommands();
     void CreateSyncObjects();
+
+    void LoadAssets();
 };
