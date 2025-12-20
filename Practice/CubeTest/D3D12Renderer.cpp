@@ -73,9 +73,7 @@ void D3D12Renderer::Init(HWND hwnd, UINT width, UINT height)
     CreateCommands();
     CreateSyncObjects();
 
-    CreatePipeline();
-    CreateMesh();
-    CreateConstantBuffer();
+    CreateDemoResources();
 }
 
 void D3D12Renderer::CreateDeviceAndSwapChain()
@@ -290,47 +288,17 @@ void D3D12Renderer::CreateMesh()
     const UINT vbSize = (UINT)sizeof(kCubeVerts);
     const UINT ibSize = (UINT)sizeof(kCubeIndices);
 
-    // VB (upload)
-    {
-        D3D12_HEAP_PROPERTIES hp{}; hp.Type = D3D12_HEAP_TYPE_UPLOAD;
-        D3D12_RESOURCE_DESC rd{}; rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        rd.Width = vbSize; rd.Height = 1; rd.DepthOrArraySize = 1; rd.MipLevels = 1;
-        rd.SampleDesc.Count = 1; rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    // VB
+    CreateUploadBufferAndCopy(kCubeVerts, vbSize, m_vertexBuffer);
+    m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+    m_vertexBufferView.SizeInBytes = vbSize;
+    m_vertexBufferView.StrideInBytes = sizeof(Vertex);
 
-        ThrowIfFailed(m_device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
-            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_vertexBuffer)));
-
-        void* p = nullptr;
-        D3D12_RANGE r{ 0,0 };
-        ThrowIfFailed(m_vertexBuffer->Map(0, &r, &p));
-        std::memcpy(p, kCubeVerts, vbSize);
-        m_vertexBuffer->Unmap(0, nullptr);
-
-        m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-        m_vertexBufferView.SizeInBytes = vbSize;
-        m_vertexBufferView.StrideInBytes = sizeof(Vertex);
-    }
-
-    // IB (upload)
-    {
-        D3D12_HEAP_PROPERTIES hp{}; hp.Type = D3D12_HEAP_TYPE_UPLOAD;
-        D3D12_RESOURCE_DESC rd{}; rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        rd.Width = ibSize; rd.Height = 1; rd.DepthOrArraySize = 1; rd.MipLevels = 1;
-        rd.SampleDesc.Count = 1; rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        ThrowIfFailed(m_device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
-            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_indexBuffer)));
-
-        void* p = nullptr;
-        D3D12_RANGE r{ 0,0 };
-        ThrowIfFailed(m_indexBuffer->Map(0, &r, &p));
-        std::memcpy(p, kCubeIndices, ibSize);
-        m_indexBuffer->Unmap(0, nullptr);
-
-        m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-        m_indexBufferView.SizeInBytes = ibSize;
-        m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
-    }
+    // IB
+    CreateUploadBufferAndCopy(kCubeIndices, ibSize, m_indexBuffer);
+    m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+    m_indexBufferView.SizeInBytes = ibSize;
+    m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 }
 
 void D3D12Renderer::CreateConstantBuffer()
@@ -348,6 +316,26 @@ void D3D12Renderer::CreateConstantBuffer()
 
     D3D12_RANGE r{ 0,0 };
     ThrowIfFailed(m_constantBuffer->Map(0, &r, (void**)&m_cbMapped));
+}
+
+void D3D12Renderer::CreateDemoResources()
+{
+    // “화면에 그리기 위해 필요한 것들”을 한 곳에 모아둠
+    // 1) 파이프라인(루트시그니처/PSO/셰이더)
+    CreatePipeline();
+
+    // 2) 메쉬(버텍스/인덱스 버퍼)
+    CreateMesh();
+
+    // 3) 상수버퍼(프레임마다 MVP 쓸 공간)
+    CreateConstantBuffer();
+}
+
+void D3D12Renderer::RecordAndSubmitFrame()
+{
+    BeginFrame();
+    DrawCube();
+    EndFrame();
 }
 
 void D3D12Renderer::UpdateInput()
@@ -380,6 +368,33 @@ void D3D12Renderer::UpdateConstants()
 
     uint8_t* dst = m_cbMapped + (size_t)m_cbStride * m_frameIndex;
     std::memcpy(dst, &cb, sizeof(cb));
+}
+
+void D3D12Renderer::CreateUploadBufferAndCopy(const void* srcData, UINT64 byteSize, Microsoft::WRL::ComPtr<ID3D12Resource>& outBuffer)
+{
+    // Upload heap = CPU에서 Map해서 GPU가 읽는 메모리(연습용으로 편함)
+    D3D12_HEAP_PROPERTIES hp{};
+    hp.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC rd{};
+    rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    rd.Width = byteSize;
+    rd.Height = 1;
+    rd.DepthOrArraySize = 1;
+    rd.MipLevels = 1;
+    rd.SampleDesc.Count = 1;
+    rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &hp, D3D12_HEAP_FLAG_NONE, &rd,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+        IID_PPV_ARGS(&outBuffer)));
+
+    void* mapped = nullptr;
+    D3D12_RANGE range{ 0,0 }; // CPU가 읽지 않음(쓰기만 함)
+    ThrowIfFailed(outBuffer->Map(0, &range, &mapped));
+    std::memcpy(mapped, srcData, (size_t)byteSize);
+    outBuffer->Unmap(0, nullptr);
 }
 
 void D3D12Renderer::BeginFrame()
@@ -460,9 +475,7 @@ void D3D12Renderer::Render()
     UpdateInput();
     UpdateConstants();
 
-    BeginFrame();
-    DrawCube();
-    EndFrame();
+    RecordAndSubmitFrame();
 }
 
 void D3D12Renderer::WaitForGpu()

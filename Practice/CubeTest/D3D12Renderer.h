@@ -79,6 +79,14 @@ private:
     void CreateMesh();
     void CreateConstantBuffer();
 
+    // === Demo resource bundle ===
+    void CreateDemoResources();     // 파이프라인 + 메쉬 + 상수버퍼를 한 번에 준비
+    void RecordAndSubmitFrame();    // 커맨드 기록/제출(+ present, fence 포함)
+
+    // === Helper (중복 제거) ===
+    void CreateUploadBufferAndCopy(const void* srcData, UINT64 byteSize,
+        Microsoft::WRL::ComPtr<ID3D12Resource>& outBuffer);
+
     void BeginFrame();
     void DrawCube();
     void EndFrame();
