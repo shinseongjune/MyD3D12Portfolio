@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 #include <wrl.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -48,22 +48,28 @@ private:
 
 public:
     // Mesh
-    struct Vertex { float pos[3]; float color[3]; };
+    struct Vertex { float pos[3]; float uv[2]; };
+
     Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
     Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView = {};
     D3D12_INDEX_BUFFER_VIEW  m_indexBufferView = {};
 
+    // âœ… Texture + SRV heap (ìµœì†Œ)
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_srvHeap;     // shader-visible SRV heap
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_texture;           // default heap texture
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_textureUpload;     // upload heap for texture copy
+
     // Constants (per-frame ring)
     struct alignas(256) PerFrameCB
     {
-        DirectX::XMFLOAT4X4 mvp; // row-major·Î ÀúÀåÇÒ °Å¶ó¼­ ÀüÄ¡ ¾È ÇÔ
+        DirectX::XMFLOAT4X4 mvp; // row-majorë¡œ ì €ì¥í•  ê±°ë¼ì„œ ì „ì¹˜ ì•ˆ í•¨
     };
     Microsoft::WRL::ComPtr<ID3D12Resource> m_constantBuffer;
     uint8_t* m_cbMapped = nullptr;
     UINT m_cbStride = 0; // 256 aligned
 
-    // ¡°À¯´ÏÆ¼Ã³·³ ¸¸Áú °ª¡±
+    // â€œìœ ë‹ˆí‹°ì²˜ëŸ¼ ë§Œì§ˆ ê°’â€
     float m_cubeX = 0.0f;
     float m_cubeZ = 0.0f;
 
@@ -80,10 +86,12 @@ private:
     void CreateConstantBuffer();
 
     // === Demo resource bundle ===
-    void CreateDemoResources();     // ÆÄÀÌÇÁ¶óÀÎ + ¸Ş½¬ + »ó¼ö¹öÆÛ¸¦ ÇÑ ¹ø¿¡ ÁØºñ
-    void RecordAndSubmitFrame();    // Ä¿¸Çµå ±â·Ï/Á¦Ãâ(+ present, fence Æ÷ÇÔ)
+    void CreateDemoResources();     // íŒŒì´í”„ë¼ì¸ + ë©”ì‰¬ + ìƒìˆ˜ë²„í¼ë¥¼ í•œ ë²ˆì— ì¤€ë¹„
+    void RecordAndSubmitFrame();    // ì»¤ë§¨ë“œ ê¸°ë¡/ì œì¶œ(+ present, fence í¬í•¨)
 
-    // === Helper (Áßº¹ Á¦°Å) ===
+    void CreateTexture_Checkerboard(); // ì„ì‹œ í…ìŠ¤ì³ ìƒì„±+ì—…ë¡œë“œ+SRVê¹Œì§€
+
+    // === Helper (ì¤‘ë³µ ì œê±°) ===
     void CreateUploadBufferAndCopy(const void* srcData, UINT64 byteSize,
         Microsoft::WRL::ComPtr<ID3D12Resource>& outBuffer);
 
@@ -92,7 +100,7 @@ private:
     void EndFrame();
 
     void UpdateInput();       // WASD
-    void UpdateConstants();   // ¸Å ÇÁ·¹ÀÓ MVP °»½Å
+    void UpdateConstants();   // ë§¤ í”„ë ˆì„ MVP ê°±ì‹ 
 
     void WaitForGpu();
 };
