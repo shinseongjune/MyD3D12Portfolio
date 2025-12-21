@@ -152,6 +152,84 @@ static inline bool ParseFaceToken_V_VT(std::string_view tok, int& outV, int& out
     return true;
 }
 
+void D3D12Renderer::CreateMeshFromCpu_DefaultHeap(const CpuMesh& mesh)
+{
+    // VB 업로드
+    const UINT64 vbBytes = (UINT64)mesh.vertices.size() * sizeof(Vertex);
+    ComPtr<ID3D12Resource> vbUpload;
+    UploadBufferToDefault(mesh.vertices.data(), vbBytes,
+        m_vertexBuffer, vbUpload,
+        D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+
+    m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+    m_vertexBufferView.SizeInBytes = (UINT)vbBytes;
+    m_vertexBufferView.StrideInBytes = sizeof(Vertex);
+
+    // IB 업로드 (uint32_t)
+    const UINT64 ibBytes = (UINT64)mesh.indices.size() * sizeof(uint32_t);
+    ComPtr<ID3D12Resource> ibUpload;
+    UploadBufferToDefault(mesh.indices.data(), ibBytes,
+        m_indexBuffer, ibUpload,
+        D3D12_RESOURCE_STATE_INDEX_BUFFER);
+
+    m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+    m_indexBufferView.SizeInBytes = (UINT)ibBytes;
+    m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+
+    m_indexCount = (UINT)mesh.indices.size();
+
+    // ※ vbUpload/ibUpload은 함수 끝나면 Release되는데,
+    // WaitForGpu()로 이미 복사 완료를 보장했으니 괜찮음.
+}
+
+void D3D12Renderer::UploadBufferToDefault(const void* srcData, UINT64 byteSize, Microsoft::WRL::ComPtr<ID3D12Resource>& outDefault, Microsoft::WRL::ComPtr<ID3D12Resource>& outUpload, D3D12_RESOURCE_STATES finalState)
+{
+    // 1) Default buffer
+    D3D12_HEAP_PROPERTIES hpDef{}; hpDef.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_DESC rd{}; rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    rd.Width = byteSize; rd.Height = 1; rd.DepthOrArraySize = 1; rd.MipLevels = 1;
+    rd.SampleDesc.Count = 1; rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &hpDef, D3D12_HEAP_FLAG_NONE, &rd,
+        D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+        IID_PPV_ARGS(&outDefault)));
+
+    // 2) Upload buffer
+    D3D12_HEAP_PROPERTIES hpUp{}; hpUp.Type = D3D12_HEAP_TYPE_UPLOAD;
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &hpUp, D3D12_HEAP_FLAG_NONE, &rd,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+        IID_PPV_ARGS(&outUpload)));
+
+    // 3) Upload에 memcpy
+    void* mapped = nullptr;
+    D3D12_RANGE range{ 0,0 };
+    ThrowIfFailed(outUpload->Map(0, &range, &mapped));
+    std::memcpy(mapped, srcData, (size_t)byteSize);
+    outUpload->Unmap(0, nullptr);
+
+    // 4) Copy + barrier 기록 (여기서는 Init 시점 1회라 단순하게 Reset해서 사용)
+    ThrowIfFailed(m_commandAllocator->Reset());
+    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
+
+    m_commandList->CopyBufferRegion(outDefault.Get(), 0, outUpload.Get(), 0, byteSize);
+
+    D3D12_RESOURCE_BARRIER b{};
+    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource = outDefault.Get();
+    b.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    b.Transition.StateAfter = finalState;
+    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    m_commandList->ResourceBarrier(1, &b);
+
+    ThrowIfFailed(m_commandList->Close());
+    ID3D12CommandList* lists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(1, lists);
+
+    WaitForGpu(); // 연습용 단순 대기
+}
+
 bool D3D12Renderer::ReadTextFileUTF8(const wchar_t* path, std::string& outText)
 {
     outText.clear();
@@ -417,41 +495,44 @@ void D3D12Renderer::CreatePipeline()
 {
     // Root Parameters:
     // 0) CBV(b0)
-    D3D12_ROOT_PARAMETER params[2]{};
+    //D3D12_ROOT_PARAMETER params[2]{};
+    D3D12_ROOT_PARAMETER params[1]{};
 
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[0].Descriptor.ShaderRegister = 0;
     params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
-    // 1) DescriptorTable(SRV t0)
-    D3D12_DESCRIPTOR_RANGE range{};
-    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    range.NumDescriptors = 1;
-    range.BaseShaderRegister = 0; // t0
-    range.RegisterSpace = 0;
-    range.OffsetInDescriptorsFromTableStart = 0;
-
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[1].DescriptorTable.NumDescriptorRanges = 1;
-    params[1].DescriptorTable.pDescriptorRanges = &range;
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    // Static Sampler(s0)
-    D3D12_STATIC_SAMPLER_DESC samp{};
-    samp.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    samp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    samp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    samp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    samp.ShaderRegister = 0; // s0
-    samp.RegisterSpace = 0;
-    samp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    samp.MaxLOD = D3D12_FLOAT32_MAX;
+    //// 1) DescriptorTable(SRV t0)
+    //D3D12_DESCRIPTOR_RANGE range{};
+    //range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    //range.NumDescriptors = 1;
+    //range.BaseShaderRegister = 0; // t0
+    //range.RegisterSpace = 0;
+    //range.OffsetInDescriptorsFromTableStart = 0;
+    //
+    //params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    //params[1].DescriptorTable.NumDescriptorRanges = 1;
+    //params[1].DescriptorTable.pDescriptorRanges = &range;
+    //params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    //
+    //// Static Sampler(s0)
+    //D3D12_STATIC_SAMPLER_DESC samp{};
+    //samp.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    //samp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    //samp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    //samp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    //samp.ShaderRegister = 0; // s0
+    //samp.RegisterSpace = 0;
+    //samp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    //samp.MaxLOD = D3D12_FLOAT32_MAX;
 
     D3D12_ROOT_SIGNATURE_DESC rs{};
     rs.NumParameters = _countof(params);
     rs.pParameters = params;
-    rs.NumStaticSamplers = 1;
-    rs.pStaticSamplers = &samp;
+    //rs.NumStaticSamplers = 1;
+    rs.NumStaticSamplers = 0;
+    //rs.pStaticSamplers = &samp;
+    rs.pStaticSamplers = nullptr;
     rs.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     ComPtr<ID3DBlob> sig, err;
@@ -459,29 +540,50 @@ void D3D12Renderer::CreatePipeline()
     ThrowIfFailed(m_device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
     // HLSL: pos+uv, sample texture
+    //const char* hlsl = R"(
+    //cbuffer PerFrame : register(b0)
+    //{
+    //    row_major float4x4 mvp;
+    //};
+    //
+    //Texture2D    gTex  : register(t0);
+    //SamplerState gSamp : register(s0);
+    //
+    //struct VSIn { float3 pos : POSITION; float2 uv : TEXCOORD0; };
+    //struct PSIn { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
+    //
+    //PSIn VSMain(VSIn i)
+    //{
+    //    PSIn o;
+    //    o.pos = mul(float4(i.pos, 1.0), mvp);
+    //    o.uv  = i.uv;
+    //    return o;
+    //}
+    //
+    //float4 PSMain(PSIn i) : SV_TARGET
+    //{
+    //    return gTex.Sample(gSamp, i.uv);
+    //}
+    //)";
     const char* hlsl = R"(
     cbuffer PerFrame : register(b0)
     {
-        row_major float4x4 mvp;
+        float4x4 mvp;
     };
 
-    Texture2D    gTex  : register(t0);
-    SamplerState gSamp : register(s0);
-
     struct VSIn { float3 pos : POSITION; float2 uv : TEXCOORD0; };
-    struct PSIn { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
+    struct PSIn { float4 pos : SV_POSITION; };
 
     PSIn VSMain(VSIn i)
     {
         PSIn o;
-        o.pos = mul(float4(i.pos, 1.0), mvp);
-        o.uv  = i.uv;
+        o.pos = mul(mvp, float4(i.pos, 1.0));
         return o;
     }
 
     float4 PSMain(PSIn i) : SV_TARGET
     {
-        return gTex.Sample(gSamp, i.uv);
+        return float4(0.9, 0.9, 0.9, 1.0); // 단색
     }
     )";
 
@@ -605,10 +707,28 @@ void D3D12Renderer::CreateDemoResources()
     CreatePipeline();
 
     // 2) 메쉬(버텍스/인덱스 버퍼)
-    CreateMesh();
+    //CreateMesh();
 
     // 3) 상수버퍼(프레임마다 MVP 쓸 공간)
     CreateConstantBuffer();
+
+    // 기본 메쉬(혹시 OBJ 실패 대비)를 남기고 싶으면 CreateMesh()를 유지해도 됨
+    // CreateMesh();
+
+    CpuMesh cpu;
+    std::string err;
+    if (LoadObjToCpuMesh(L"assets\\cube.obj", cpu, &err))
+    {
+        CreateMeshFromCpu_DefaultHeap(cpu);
+        OutputDebugStringA("OBJ mesh uploaded to GPU (Default heap).\n");
+    }
+    else
+    {
+        OutputDebugStringA(("OBJ FAIL: " + err + "\n").c_str());
+        // 실패 시 예전 쿼드라도 보이게 하려면 CreateMesh() 호출
+        CreateMesh();
+        m_indexCount = 6;
+    }
 }
 
 void D3D12Renderer::RecordAndSubmitFrame()
@@ -767,11 +887,34 @@ void D3D12Renderer::UpdateInput()
 void D3D12Renderer::UpdateConstants()
 {
     // 텍스쳐 표시 확인용: 그냥 identity MVP
-    XMMATRIX mvp = XMMatrixIdentity();
+    //XMMATRIX mvp = XMMatrixIdentity();
+    //
+    //PerFrameCB cb{};
+    //XMStoreFloat4x4(&cb.mvp, mvp);
+    //
+    //uint8_t* dst = m_cbMapped + (size_t)m_cbStride * m_frameIndex;
+    //std::memcpy(dst, &cb, sizeof(cb));
+    
+    // 1) 큐브를 살짝 회전시키면 깊이감이 확 살아남
+    XMMATRIX rotY = XMMatrixRotationY(XMConvertToRadians(35.0f));
+    XMMATRIX rotX = XMMatrixRotationX(XMConvertToRadians(-20.0f));
+    XMMATRIX trans = XMMatrixTranslation(m_cubeX, 0.0f, m_cubeZ);
+    XMMATRIX world = rotX * rotY * trans;
+
+    // 2) 카메라: 오른쪽 위 뒤에서 원점을 바라보게
+    XMVECTOR eye = XMVectorSet(3.0f, 3.0f, -3.0f, 1.0f); // 오른쪽(+X), 위(+Y), 앞쪽(-Z)에서 내려다봄
+    XMVECTOR at = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f); // 원점
+    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); // 위쪽
+    XMMATRIX view = XMMatrixLookAtLH(eye, at, up);
+
+    // 3) 퍼스펙티브: FOV를 조금 넓혀서 입체감 강조
+    float aspect = (m_height != 0) ? (float)m_width / (float)m_height : 1.0f;
+    XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(70.0f), aspect, 0.1f, 100.0f);
+
+    XMMATRIX mvp = world * view * proj;
 
     PerFrameCB cb{};
-    XMStoreFloat4x4(&cb.mvp, mvp);
-
+    XMStoreFloat4x4(&cb.mvp, mvp); // (네 코드 흐름 그대로)
     uint8_t* dst = m_cbMapped + (size_t)m_cbStride * m_frameIndex;
     std::memcpy(dst, &cb, sizeof(cb));
 }
@@ -833,25 +976,36 @@ void D3D12Renderer::BeginFrame()
 
 void D3D12Renderer::DrawCube()
 {
-    // ✅ SRV heap 바인딩 (shader-visible heap)
-    ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
-    m_commandList->SetDescriptorHeaps(1, heaps);
+    //// ✅ SRV heap 바인딩 (shader-visible heap)
+    //ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+    //m_commandList->SetDescriptorHeaps(1, heaps);
+    //
+    //m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    //m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    //m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    //m_commandList->IASetIndexBuffer(&m_indexBufferView);
+    //
+    //// Root CBV = 현재 프레임 CB 주소
+    //D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
+    //    m_constantBuffer->GetGPUVirtualAddress() + (UINT64)m_cbStride * m_frameIndex;
+    //m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
+    //
+    //// ✅ Root SRV table = t0
+    //m_commandList->SetGraphicsRootDescriptorTable(1, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+    //
+    //// 쿼드 인덱스: 6
+    //m_commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
     m_commandList->IASetIndexBuffer(&m_indexBufferView);
 
-    // Root CBV = 현재 프레임 CB 주소
     D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
         m_constantBuffer->GetGPUVirtualAddress() + (UINT64)m_cbStride * m_frameIndex;
     m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
 
-    // ✅ Root SRV table = t0
-    m_commandList->SetGraphicsRootDescriptorTable(1, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
-
-    // 쿼드 인덱스: 6
-    m_commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+    m_commandList->DrawIndexedInstanced(m_indexCount, 1, 0, 0, 0);
 }
 
 void D3D12Renderer::EndFrame()

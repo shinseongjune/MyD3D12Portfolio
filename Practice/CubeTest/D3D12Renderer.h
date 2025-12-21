@@ -82,7 +82,18 @@ public:
     float m_cubeX = 0.0f;
     float m_cubeZ = 0.0f;
 
+    UINT m_indexCount = 0;
+
 private:
+    // === GPU upload (Default heap) ===
+    void CreateMeshFromCpu_DefaultHeap(const CpuMesh& mesh);
+
+    void UploadBufferToDefault(
+        const void* srcData, UINT64 byteSize,
+        Microsoft::WRL::ComPtr<ID3D12Resource>& outDefault,
+        Microsoft::WRL::ComPtr<ID3D12Resource>& outUpload,
+        D3D12_RESOURCE_STATES finalState);
+
     // === File I/O helpers ===
     static bool ReadTextFileUTF8(const wchar_t* path, std::string& outText);
 
