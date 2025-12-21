@@ -30,6 +30,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_commandAllocator;
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_commandList;
 
+    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_uploadAllocator;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> m_uploadList;
+
     Microsoft::WRL::ComPtr<ID3D12Fence> m_fence;
     UINT64 m_fenceValue = 0;
     HANDLE m_fenceEvent = nullptr;

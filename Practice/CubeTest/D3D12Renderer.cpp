@@ -8,6 +8,7 @@
 #include <fstream>
 #include <cctype>
 #include <cstdio>
+#include <filesystem>
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -70,25 +71,13 @@ void D3D12Renderer::Init(HWND hwnd, UINT width, UINT height)
     CreateCommands();
     CreateSyncObjects();
 
+    ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_uploadAllocator)));
+    ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_uploadAllocator.Get(), nullptr, IID_PPV_ARGS(&m_uploadList)));
+    ThrowIfFailed(m_uploadList->Close());
+
     CreateDemoResources();
 
     CreateTexture_Checkerboard();
-
-    // === TEMP: OBJ CPU parse test ===
-    {
-        CpuMesh cpu;
-        std::string err;
-        if (LoadObjToCpuMesh(L"assets\\cube.obj", cpu, &err))
-        {
-            char buf[256];
-            sprintf_s(buf, "OBJ OK: verts=%zu, indices=%zu\n", cpu.vertices.size(), cpu.indices.size());
-            OutputDebugStringA(buf);
-        }
-        else
-        {
-            OutputDebugStringA(("OBJ FAIL: " + err + "\n").c_str());
-        }
-    }
 }
 
 static inline void TrimLeft(std::string& s)
@@ -133,23 +122,69 @@ static inline bool ParseFloat(std::string_view sv, float& out)
     catch (...) { return false; }
 }
 
-// token이 "v/vt" 형태인지 파싱 (최소 지원)
-// outV, outVT 는 OBJ의 "1-based index"
-static inline bool ParseFaceToken_V_VT(std::string_view tok, int& outV, int& outVT)
+// OBJ index -> 0-based index
+// idx > 0 : idx-1
+// idx < 0 : count + idx (idx is negative)
+// idx == 0 : invalid
+static inline int ToZeroBased(int idx, int count)
 {
-    auto slash = tok.find('/');
-    if (slash == std::string_view::npos) return false;
+    if (idx > 0) return idx - 1;
+    if (idx < 0) return count + idx;
+    return -1;
+}
 
-    auto a = tok.substr(0, slash);
-    auto b = tok.substr(slash + 1);
+// token formats:
+//  "v"
+//  "v/vt"
+//  "v//vn"
+//  "v/vt/vn"
+struct ObjCorner
+{
+    int v = 0;
+    int vt = 0;
+    int vn = 0; // parsed but ignored in this learning step
+};
 
-    // "v//vn" 같은 건 여기선 거절
-    if (b.empty()) return false;
-    if (b.find('/') != std::string_view::npos) return false;
+static inline bool ParseFaceToken(std::string_view tok, ObjCorner& out)
+{
+    out = {};
 
-    if (!ParseInt(a, outV)) return false;
-    if (!ParseInt(b, outVT)) return false;
-    return true;
+    // Split by '/'
+    // We allow empty fields (e.g., v//vn)
+    int vals[3] = { 0,0,0 };
+    int which = 0;
+
+    size_t start = 0;
+    for (size_t i = 0; i <= tok.size(); ++i)
+    {
+        if (i == tok.size() || tok[i] == '/')
+        {
+            if (which >= 3) break;
+
+            if (i > start)
+            {
+                int tmp = 0;
+                if (!ParseInt(tok.substr(start, i - start), tmp))
+                    return false;
+                vals[which] = tmp;
+            }
+            else
+            {
+                // empty => 0
+                vals[which] = 0;
+            }
+
+            which++;
+            start = i + 1;
+        }
+    }
+
+    out.v = vals[0];
+    out.vt = vals[1];
+    out.vn = vals[2];
+
+    // v is required
+    return (out.v != 0);
 }
 
 void D3D12Renderer::CreateMeshFromCpu_DefaultHeap(const CpuMesh& mesh)
@@ -210,10 +245,10 @@ void D3D12Renderer::UploadBufferToDefault(const void* srcData, UINT64 byteSize, 
     outUpload->Unmap(0, nullptr);
 
     // 4) Copy + barrier 기록 (여기서는 Init 시점 1회라 단순하게 Reset해서 사용)
-    ThrowIfFailed(m_commandAllocator->Reset());
-    ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
+    ThrowIfFailed(m_uploadAllocator->Reset());
+    ThrowIfFailed(m_uploadList->Reset(m_uploadAllocator.Get(), nullptr));
 
-    m_commandList->CopyBufferRegion(outDefault.Get(), 0, outUpload.Get(), 0, byteSize);
+    m_uploadList->CopyBufferRegion(outDefault.Get(), 0, outUpload.Get(), 0, byteSize);
 
     D3D12_RESOURCE_BARRIER b{};
     b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -221,10 +256,10 @@ void D3D12Renderer::UploadBufferToDefault(const void* srcData, UINT64 byteSize, 
     b.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
     b.Transition.StateAfter = finalState;
     b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    m_commandList->ResourceBarrier(1, &b);
+    m_uploadList->ResourceBarrier(1, &b);
 
-    ThrowIfFailed(m_commandList->Close());
-    ID3D12CommandList* lists[] = { m_commandList.Get() };
+    ThrowIfFailed(m_uploadList->Close());
+    ID3D12CommandList* lists[] = { m_uploadList.Get() };
     m_commandQueue->ExecuteCommandLists(1, lists);
 
     WaitForGpu(); // 연습용 단순 대기
@@ -234,9 +269,8 @@ bool D3D12Renderer::ReadTextFileUTF8(const wchar_t* path, std::string& outText)
 {
     outText.clear();
 
-    // Windows에서 wide path를 받으니 wifstream이 편하지만,
-    // 여기선 "바이너리로 읽고 string에 담기"로 단순화.
-    std::ifstream f(path, std::ios::binary);
+    std::filesystem::path p(path);
+    std::ifstream f(p, std::ios::binary);
     if (!f) return false;
 
     std::ostringstream ss;
@@ -258,9 +292,10 @@ bool D3D12Renderer::LoadObjToCpuMesh(const wchar_t* path, CpuMesh& outMesh, std:
         return false;
     }
 
-    // OBJ pools
-    std::vector<XMFLOAT3> positions;
-    std::vector<XMFLOAT2> uvs;
+    std::vector<DirectX::XMFLOAT3> positions;
+    std::vector<DirectX::XMFLOAT2> uvs;
+    // normals are not used for now, but we could store them later:
+    // std::vector<DirectX::XMFLOAT3> normals;
 
     std::istringstream iss(text);
     std::string line;
@@ -285,63 +320,73 @@ bool D3D12Renderer::LoadObjToCpuMesh(const wchar_t* path, CpuMesh& outMesh, std:
         }
         else if (parts[0] == "vt")
         {
+            // vt u v [w]  (w는 무시)
             if (parts.size() < 3) continue;
             float u, v;
             if (!ParseFloat(parts[1], u) || !ParseFloat(parts[2], v))
                 continue;
 
-            // D3D 텍스처 좌표가 보통 위아래가 뒤집혀 보이는 경우가 많아서:
-            // OBJ의 vt는 (0,0)이 아래인 경우가 많음 → 일단 v를 뒤집어준다(필요 없으면 나중에 제거)
+            // OBJ의 v축(상하)이 도구마다 달라서, 일단 기존처럼 뒤집는 버전을 유지
             v = 1.0f - v;
 
             uvs.push_back({ u, v });
         }
+        else if (parts[0] == "vn")
+        {
+            // 지금은 조명 안 쓰니까 무시(파싱만 하고 저장 안 해도 됨)
+            // 나중에 필요하면 normals.push_back(...) 추가
+            continue;
+        }
         else if (parts[0] == "f")
         {
-            // 최소: f v/vt v/vt v/vt ... (폴리곤도 허용 -> fan triangulation)
-            if (parts.size() < 4) continue; // 최소 삼각형
+            // f <t0> <t1> <t2> ... (polygon allowed)
+            if (parts.size() < 4) continue;
 
-            // face 코너들(각 코너는 v/vt)
-            struct Corner { int v; int vt; };
-            std::vector<Corner> corners;
+            std::vector<ObjCorner> corners;
             corners.reserve(parts.size() - 1);
 
-            bool ok = true;
             for (size_t i = 1; i < parts.size(); ++i)
             {
-                int vi = 0, vti = 0;
-                if (!ParseFaceToken_V_VT(parts[i], vi, vti))
+                ObjCorner c{};
+                if (!ParseFaceToken(parts[i], c))
                 {
-                    ok = false;
-                    break;
+                    if (outError) *outError = "Failed to parse face token.";
+                    return false;
                 }
-                if (vi <= 0 || vti <= 0) { ok = false; break; } // 음수/0 미지원
-                corners.push_back({ vi, vti });
-            }
-            if (!ok)
-            {
-                if (outError) *outError = "Unsupported face format. Only 'f v/vt ...' with positive indices is supported for now.";
-                return false;
+                corners.push_back(c);
             }
 
-            auto emitCorner = [&](const Corner& c)
+            auto emitCorner = [&](const ObjCorner& c) -> bool
                 {
-                    const int vIndex = c.v - 1;   // to 0-based
-                    const int vtIndex = c.vt - 1;
+                    const int vi = ToZeroBased(c.v, (int)positions.size());
+                    const int vti = (c.vt != 0) ? ToZeroBased(c.vt, (int)uvs.size()) : -1;
 
-                    if (vIndex < 0 || vIndex >= (int)positions.size() ||
-                        vtIndex < 0 || vtIndex >= (int)uvs.size())
+                    if (vi < 0 || vi >= (int)positions.size())
                     {
-                        if (outError) *outError = "OBJ index out of range.";
+                        if (outError) *outError = "Position index out of range.";
+                        return false;
+                    }
+                    if (c.vt != 0 && (vti < 0 || vti >= (int)uvs.size()))
+                    {
+                        if (outError) *outError = "UV index out of range.";
                         return false;
                     }
 
                     Vertex vx{};
-                    vx.pos[0] = positions[vIndex].x;
-                    vx.pos[1] = positions[vIndex].y;
-                    vx.pos[2] = positions[vIndex].z;
-                    vx.uv[0] = uvs[vtIndex].x;
-                    vx.uv[1] = uvs[vtIndex].y;
+                    vx.pos[0] = positions[vi].x;
+                    vx.pos[1] = positions[vi].y;
+                    vx.pos[2] = positions[vi].z;
+
+                    if (vti >= 0)
+                    {
+                        vx.uv[0] = uvs[vti].x;
+                        vx.uv[1] = uvs[vti].y;
+                    }
+                    else
+                    {
+                        vx.uv[0] = 0.0f;
+                        vx.uv[1] = 0.0f;
+                    }
 
                     outMesh.vertices.push_back(vx);
                     outMesh.indices.push_back(runningIndex++);
@@ -349,7 +394,6 @@ bool D3D12Renderer::LoadObjToCpuMesh(const wchar_t* path, CpuMesh& outMesh, std:
                 };
 
             // fan triangulation: (0, i, i+1)
-            // corners[0] 고정, i=1..n-2
             for (size_t i = 1; i + 1 < corners.size(); ++i)
             {
                 if (!emitCorner(corners[0])) return false;
@@ -359,14 +403,14 @@ bool D3D12Renderer::LoadObjToCpuMesh(const wchar_t* path, CpuMesh& outMesh, std:
         }
         else
         {
-            // vn, mtllib, usemtl, o, g ... 는 나중 단계
+            // o, g, s, usemtl, mtllib ...는 지금 단계에서는 무시
             continue;
         }
     }
 
     if (outMesh.vertices.empty() || outMesh.indices.empty())
     {
-        if (outError) *outError = "OBJ loaded but produced empty mesh (no supported faces).";
+        if (outError) *outError = "OBJ loaded but produced empty mesh (no faces parsed).";
         return false;
     }
 
@@ -717,7 +761,7 @@ void D3D12Renderer::CreateDemoResources()
 
     CpuMesh cpu;
     std::string err;
-    if (LoadObjToCpuMesh(L"assets\\cube.obj", cpu, &err))
+    if (LoadObjToCpuMesh(L"assets\\Alien Animal.obj", cpu, &err))
     {
         CreateMeshFromCpu_DefaultHeap(cpu);
         OutputDebugStringA("OBJ mesh uploaded to GPU (Default heap).\n");
@@ -901,15 +945,15 @@ void D3D12Renderer::UpdateConstants()
     XMMATRIX trans = XMMatrixTranslation(m_cubeX, 0.0f, m_cubeZ);
     XMMATRIX world = rotX * rotY * trans;
 
-    // 2) 카메라: 오른쪽 위 뒤에서 원점을 바라보게
-    XMVECTOR eye = XMVectorSet(3.0f, 3.0f, -3.0f, 1.0f); // 오른쪽(+X), 위(+Y), 앞쪽(-Z)에서 내려다봄
-    XMVECTOR at = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f); // 원점
-    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f); // 위쪽
+    // 2) 카메라: 더 멀리
+    XMVECTOR eye = XMVectorSet(80.0f, 60.0f, -80.0f, 1.0f);
+    XMVECTOR at = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
     XMMATRIX view = XMMatrixLookAtLH(eye, at, up);
 
-    // 3) 퍼스펙티브: FOV를 조금 넓혀서 입체감 강조
+    // 3) proj: far를 크게
     float aspect = (m_height != 0) ? (float)m_width / (float)m_height : 1.0f;
-    XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(70.0f), aspect, 0.1f, 100.0f);
+    XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), aspect, 0.1f, 10000.0f);
 
     XMMATRIX mvp = world * view * proj;
 
