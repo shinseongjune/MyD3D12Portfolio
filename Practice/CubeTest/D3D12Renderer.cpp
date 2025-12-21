@@ -3,7 +3,11 @@
 #include <d3dcompiler.h>
 #include <Windows.h>
 #include <cstring>
-#include <vector>
+#include <ios>
+#include <sstream>
+#include <fstream>
+#include <cctype>
+#include <cstdio>
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -69,6 +73,226 @@ void D3D12Renderer::Init(HWND hwnd, UINT width, UINT height)
     CreateDemoResources();
 
     CreateTexture_Checkerboard();
+
+    // === TEMP: OBJ CPU parse test ===
+    {
+        CpuMesh cpu;
+        std::string err;
+        if (LoadObjToCpuMesh(L"assets\\cube.obj", cpu, &err))
+        {
+            char buf[256];
+            sprintf_s(buf, "OBJ OK: verts=%zu, indices=%zu\n", cpu.vertices.size(), cpu.indices.size());
+            OutputDebugStringA(buf);
+        }
+        else
+        {
+            OutputDebugStringA(("OBJ FAIL: " + err + "\n").c_str());
+        }
+    }
+}
+
+static inline void TrimLeft(std::string& s)
+{
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char c) { return !std::isspace(c); }));
+}
+
+static inline std::vector<std::string_view> SplitWS(std::string_view line)
+{
+    std::vector<std::string_view> out;
+    size_t i = 0;
+    while (i < line.size())
+    {
+        while (i < line.size() && std::isspace((unsigned char)line[i])) ++i;
+        size_t start = i;
+        while (i < line.size() && !std::isspace((unsigned char)line[i])) ++i;
+        if (start < i) out.push_back(line.substr(start, i - start));
+    }
+    return out;
+}
+
+// OBJ 인덱스는 1-based, 음수도 가능(뒤에서부터). 여기선 최소 지원: 양수만.
+static inline bool ParseInt(std::string_view sv, int& out)
+{
+    try
+    {
+        std::string tmp(sv);
+        out = std::stoi(tmp);
+        return true;
+    }
+    catch (...) { return false; }
+}
+
+static inline bool ParseFloat(std::string_view sv, float& out)
+{
+    try
+    {
+        std::string tmp(sv);
+        out = std::stof(tmp);
+        return true;
+    }
+    catch (...) { return false; }
+}
+
+// token이 "v/vt" 형태인지 파싱 (최소 지원)
+// outV, outVT 는 OBJ의 "1-based index"
+static inline bool ParseFaceToken_V_VT(std::string_view tok, int& outV, int& outVT)
+{
+    auto slash = tok.find('/');
+    if (slash == std::string_view::npos) return false;
+
+    auto a = tok.substr(0, slash);
+    auto b = tok.substr(slash + 1);
+
+    // "v//vn" 같은 건 여기선 거절
+    if (b.empty()) return false;
+    if (b.find('/') != std::string_view::npos) return false;
+
+    if (!ParseInt(a, outV)) return false;
+    if (!ParseInt(b, outVT)) return false;
+    return true;
+}
+
+bool D3D12Renderer::ReadTextFileUTF8(const wchar_t* path, std::string& outText)
+{
+    outText.clear();
+
+    // Windows에서 wide path를 받으니 wifstream이 편하지만,
+    // 여기선 "바이너리로 읽고 string에 담기"로 단순화.
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return false;
+
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    outText = ss.str();
+    return true;
+}
+
+bool D3D12Renderer::LoadObjToCpuMesh(const wchar_t* path, CpuMesh& outMesh, std::string* outError)
+{
+    outMesh.vertices.clear();
+    outMesh.indices.clear();
+    if (outError) outError->clear();
+
+    std::string text;
+    if (!ReadTextFileUTF8(path, text))
+    {
+        if (outError) *outError = "Failed to open OBJ file.";
+        return false;
+    }
+
+    // OBJ pools
+    std::vector<XMFLOAT3> positions;
+    std::vector<XMFLOAT2> uvs;
+
+    std::istringstream iss(text);
+    std::string line;
+    uint32_t runningIndex = 0;
+
+    while (std::getline(iss, line))
+    {
+        TrimLeft(line);
+        if (line.empty() || line[0] == '#') continue;
+
+        std::string_view sv(line);
+        auto parts = SplitWS(sv);
+        if (parts.empty()) continue;
+
+        if (parts[0] == "v")
+        {
+            if (parts.size() < 4) continue;
+            float x, y, z;
+            if (!ParseFloat(parts[1], x) || !ParseFloat(parts[2], y) || !ParseFloat(parts[3], z))
+                continue;
+            positions.push_back({ x, y, z });
+        }
+        else if (parts[0] == "vt")
+        {
+            if (parts.size() < 3) continue;
+            float u, v;
+            if (!ParseFloat(parts[1], u) || !ParseFloat(parts[2], v))
+                continue;
+
+            // D3D 텍스처 좌표가 보통 위아래가 뒤집혀 보이는 경우가 많아서:
+            // OBJ의 vt는 (0,0)이 아래인 경우가 많음 → 일단 v를 뒤집어준다(필요 없으면 나중에 제거)
+            v = 1.0f - v;
+
+            uvs.push_back({ u, v });
+        }
+        else if (parts[0] == "f")
+        {
+            // 최소: f v/vt v/vt v/vt ... (폴리곤도 허용 -> fan triangulation)
+            if (parts.size() < 4) continue; // 최소 삼각형
+
+            // face 코너들(각 코너는 v/vt)
+            struct Corner { int v; int vt; };
+            std::vector<Corner> corners;
+            corners.reserve(parts.size() - 1);
+
+            bool ok = true;
+            for (size_t i = 1; i < parts.size(); ++i)
+            {
+                int vi = 0, vti = 0;
+                if (!ParseFaceToken_V_VT(parts[i], vi, vti))
+                {
+                    ok = false;
+                    break;
+                }
+                if (vi <= 0 || vti <= 0) { ok = false; break; } // 음수/0 미지원
+                corners.push_back({ vi, vti });
+            }
+            if (!ok)
+            {
+                if (outError) *outError = "Unsupported face format. Only 'f v/vt ...' with positive indices is supported for now.";
+                return false;
+            }
+
+            auto emitCorner = [&](const Corner& c)
+                {
+                    const int vIndex = c.v - 1;   // to 0-based
+                    const int vtIndex = c.vt - 1;
+
+                    if (vIndex < 0 || vIndex >= (int)positions.size() ||
+                        vtIndex < 0 || vtIndex >= (int)uvs.size())
+                    {
+                        if (outError) *outError = "OBJ index out of range.";
+                        return false;
+                    }
+
+                    Vertex vx{};
+                    vx.pos[0] = positions[vIndex].x;
+                    vx.pos[1] = positions[vIndex].y;
+                    vx.pos[2] = positions[vIndex].z;
+                    vx.uv[0] = uvs[vtIndex].x;
+                    vx.uv[1] = uvs[vtIndex].y;
+
+                    outMesh.vertices.push_back(vx);
+                    outMesh.indices.push_back(runningIndex++);
+                    return true;
+                };
+
+            // fan triangulation: (0, i, i+1)
+            // corners[0] 고정, i=1..n-2
+            for (size_t i = 1; i + 1 < corners.size(); ++i)
+            {
+                if (!emitCorner(corners[0])) return false;
+                if (!emitCorner(corners[i])) return false;
+                if (!emitCorner(corners[i + 1])) return false;
+            }
+        }
+        else
+        {
+            // vn, mtllib, usemtl, o, g ... 는 나중 단계
+            continue;
+        }
+    }
+
+    if (outMesh.vertices.empty() || outMesh.indices.empty())
+    {
+        if (outError) *outError = "OBJ loaded but produced empty mesh (no supported faces).";
+        return false;
+    }
+
+    return true;
 }
 
 void D3D12Renderer::CreateDeviceAndSwapChain()

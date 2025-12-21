@@ -4,6 +4,8 @@
 #include <dxgi1_6.h>
 #include <DirectXMath.h>
 #include <cstdint>
+#include <vector>
+#include <string>
 
 class D3D12Renderer
 {
@@ -50,6 +52,13 @@ public:
     // Mesh
     struct Vertex { float pos[3]; float uv[2]; };
 
+    // === CPU-side mesh container ===
+    struct CpuMesh
+    {
+        std::vector<Vertex>    vertices; // pos + uv
+        std::vector<uint32_t>  indices;  // 32-bit
+    };
+
     Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
     Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
     D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView = {};
@@ -74,6 +83,12 @@ public:
     float m_cubeZ = 0.0f;
 
 private:
+    // === File I/O helpers ===
+    static bool ReadTextFileUTF8(const wchar_t* path, std::string& outText);
+
+    // === OBJ (CPU parse only) ===
+    static bool LoadObjToCpuMesh(const wchar_t* path, CpuMesh& outMesh, std::string* outError = nullptr);
+
     void CreateDeviceAndSwapChain();
     void CreateRtvHeapAndViews();
     void CreateCommands();
