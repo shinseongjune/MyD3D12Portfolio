@@ -17,6 +17,7 @@ public:
 
 private:
     static constexpr UINT FrameCount = 2;
+    static constexpr UINT DrawsPerFrame = 2; // 0:Grid, 1:Cube
 
     // Core
     Microsoft::WRL::ComPtr<ID3D12Device> m_device;
@@ -53,6 +54,7 @@ private:
 
 public:
     // Mesh
+    struct VertexPC { float pos[3]; uint32_t color; }; // RGBA8 packed
     struct Vertex { float pos[3]; float uv[2]; };
 
     // === CPU-side mesh container ===
@@ -88,6 +90,17 @@ public:
     UINT m_indexCount = 0;
 
 private:
+    // Grid pipeline
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> m_gridRootSignature;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_gridPSO;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_gridVB;
+    D3D12_VERTEX_BUFFER_VIEW m_gridVBV = {};
+    UINT m_gridVertexCount = 0;
+
+    void CreateGridResources(); // VB + PSO/RS
+    void DrawGrid();
+
     // === GPU upload (Default heap) ===
     void CreateMeshFromCpu_DefaultHeap(const CpuMesh& mesh);
 

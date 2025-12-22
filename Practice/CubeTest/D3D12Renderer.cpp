@@ -19,6 +19,11 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
+static uint32_t RGBA8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255)
+{
+    return (uint32_t)r | ((uint32_t)g << 8) | ((uint32_t)b << 16) | ((uint32_t)a << 24);
+}
+
 static bool LoadImageRGBA8_WIC(const wchar_t* path, UINT& outW, UINT& outH, std::vector<uint8_t>& outRGBA)
 {
     outW = outH = 0;
@@ -247,6 +252,163 @@ static inline bool ParseFaceToken(std::string_view tok, ObjCorner& out)
 
     // v is required
     return (out.v != 0);
+}
+
+void D3D12Renderer::CreateGridResources()
+{
+    // ---- 1) CPU에서 라인 버텍스 생성 ----
+    const int half = 50;      // -50..+50
+    const float step = 1.0f;
+
+    std::vector<VertexPC> v;
+    v.reserve((half * 2 + 1) * 4);
+
+    auto minor = RGBA8(70, 90, 120, 255);
+    auto major = RGBA8(110, 140, 190, 255);
+    auto axisX = RGBA8(220, 80, 80, 255);
+    auto axisZ = RGBA8(80, 160, 220, 255);
+
+    for (int i = -half; i <= half; ++i)
+    {
+        float t = i * step;
+
+        bool isMajor = (i % 10) == 0;
+        uint32_t c = isMajor ? major : minor;
+
+        // Z 방향 라인 (X = t, Z: -half..+half)
+        uint32_t cx = (i == 0) ? axisX : c;
+        v.push_back({ { t, 0.0f, -half * step }, cx });
+        v.push_back({ { t, 0.0f, +half * step }, cx });
+
+        // X 방향 라인 (Z = t, X: -half..+half)
+        uint32_t cz = (i == 0) ? axisZ : c;
+        v.push_back({ { -half * step, 0.0f, t }, cz });
+        v.push_back({ { +half * step, 0.0f, t }, cz });
+    }
+
+    m_gridVertexCount = (UINT)v.size();
+
+    // ---- 2) VB 업로드 (연습용: upload heap로도 OK) ----
+    const UINT vbBytes = (UINT)(v.size() * sizeof(VertexPC));
+
+    D3D12_HEAP_PROPERTIES hp{}; hp.Type = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12_RESOURCE_DESC rd{}; rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    rd.Width = vbBytes; rd.Height = 1; rd.DepthOrArraySize = 1; rd.MipLevels = 1;
+    rd.SampleDesc.Count = 1; rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_gridVB)));
+
+    void* mapped = nullptr;
+    D3D12_RANGE r{ 0,0 };
+    ThrowIfFailed(m_gridVB->Map(0, &r, &mapped));
+    std::memcpy(mapped, v.data(), vbBytes);
+    m_gridVB->Unmap(0, nullptr);
+
+    m_gridVBV.BufferLocation = m_gridVB->GetGPUVirtualAddress();
+    m_gridVBV.SizeInBytes = vbBytes;
+    m_gridVBV.StrideInBytes = sizeof(VertexPC);
+
+    // ---- 3) Grid RootSig: CBV(b0)만 ----
+    D3D12_ROOT_PARAMETER p0{};
+    p0.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    p0.Descriptor.ShaderRegister = 0;
+    p0.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    D3D12_ROOT_SIGNATURE_DESC rs{};
+    rs.NumParameters = 1;
+    rs.pParameters = &p0;
+    rs.NumStaticSamplers = 0;
+    rs.pStaticSamplers = nullptr;
+    rs.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+    ComPtr<ID3DBlob> sig, err;
+    ThrowIfFailed(D3D12SerializeRootSignature(&rs, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err));
+    ThrowIfFailed(m_device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(),
+        IID_PPV_ARGS(&m_gridRootSignature)));
+
+    // ---- 4) Grid PSO: LINE, 컬러 출력 ----
+    const char* hlsl = R"(
+    cbuffer PerFrame : register(b0) { float4x4 mvp; };
+
+    struct VSIn { float3 pos:POSITION; uint col:COLOR0; };
+    struct PSIn { float4 pos:SV_POSITION; float4 col:COLOR0; };
+
+    float4 UnpackRGBA8(uint c)
+    {
+        float4 o;
+        o.r = (c & 255) / 255.0;
+        o.g = ((c >> 8) & 255) / 255.0;
+        o.b = ((c >> 16) & 255) / 255.0;
+        o.a = ((c >> 24) & 255) / 255.0;
+        return o;
+    }
+
+    PSIn VSMain(VSIn i)
+    {
+        PSIn o;
+        o.pos = mul(mvp, float4(i.pos, 1));
+        o.col = UnpackRGBA8(i.col);
+        return o;
+    }
+
+    float4 PSMain(PSIn i) : SV_TARGET { return i.col; }
+    )";
+
+    auto vs = CompileShader("VSMain", "vs_5_0", hlsl);
+    auto ps = CompileShader("PSMain", "ps_5_0", hlsl);
+
+    D3D12_INPUT_ELEMENT_DESC layout[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "COLOR",    0, DXGI_FORMAT_R8G8B8A8_UNORM,  0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+    pso.InputLayout = { layout, _countof(layout) };
+    pso.pRootSignature = m_gridRootSignature.Get();
+    pso.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+    pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+
+    pso.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // 라인은 컬 무시 편함
+    pso.RasterizerState.DepthClipEnable = TRUE;
+
+    pso.BlendState.AlphaToCoverageEnable = FALSE;
+    pso.BlendState.IndependentBlendEnable = FALSE;
+    for (int i = 0; i < 8; ++i)
+        pso.BlendState.RenderTarget[i].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+    // Depth: 테스트는 하되, 그리드가 깊이를 "써버리면" 오브젝트가 가려질 수 있어서 Write OFF 추천
+    pso.DepthStencilState.DepthEnable = TRUE;
+    pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    pso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    pso.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+
+    pso.SampleMask = UINT_MAX;
+    pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    pso.NumRenderTargets = 1;
+    pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pso.SampleDesc.Count = 1;
+
+    ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_gridPSO)));
+}
+
+void D3D12Renderer::DrawGrid()
+{
+    m_commandList->SetPipelineState(m_gridPSO.Get());
+    m_commandList->SetGraphicsRootSignature(m_gridRootSignature.Get());
+
+    const UINT gridSlot = 0;
+    D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
+        m_constantBuffer->GetGPUVirtualAddress() +
+        (UINT64)m_cbStride * (m_frameIndex * DrawsPerFrame + gridSlot);
+
+    m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
+
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+    m_commandList->IASetVertexBuffers(0, 1, &m_gridVBV);
+    m_commandList->DrawInstanced(m_gridVertexCount, 1, 0, 0);
 }
 
 void D3D12Renderer::CreateMeshFromCpu_DefaultHeap(const CpuMesh& mesh)
@@ -792,7 +954,7 @@ void D3D12Renderer::CreateMesh()
 void D3D12Renderer::CreateConstantBuffer()
 {
     m_cbStride = (UINT)((sizeof(PerFrameCB) + 255) & ~255u);
-    UINT totalSize = m_cbStride * FrameCount;
+    UINT totalSize = m_cbStride * FrameCount * DrawsPerFrame;
 
     D3D12_HEAP_PROPERTIES hp{}; hp.Type = D3D12_HEAP_TYPE_UPLOAD;
     D3D12_RESOURCE_DESC rd{}; rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -835,11 +997,14 @@ void D3D12Renderer::CreateDemoResources()
         CreateMesh();
         m_indexCount = 6;
     }
+
+    CreateGridResources();
 }
 
 void D3D12Renderer::RecordAndSubmitFrame()
 {
     BeginFrame();
+    DrawGrid();
     DrawCube();
     EndFrame();
 }
@@ -972,37 +1137,41 @@ void D3D12Renderer::UpdateInput()
 
 void D3D12Renderer::UpdateConstants()
 {
-    // 텍스쳐 표시 확인용: 그냥 identity MVP
-    //XMMATRIX mvp = XMMatrixIdentity();
-    //
-    //PerFrameCB cb{};
-    //XMStoreFloat4x4(&cb.mvp, mvp);
-    //
-    //uint8_t* dst = m_cbMapped + (size_t)m_cbStride * m_frameIndex;
-    //std::memcpy(dst, &cb, sizeof(cb));
-    
-    // 1) 큐브를 살짝 회전시키면 깊이감이 확 살아남
-    XMMATRIX rotY = XMMatrixRotationY(XMConvertToRadians(35.0f));
-    XMMATRIX rotX = XMMatrixRotationX(XMConvertToRadians(-20.0f));
-    XMMATRIX trans = XMMatrixTranslation(m_cubeX, 0.0f, m_cubeZ);
-    XMMATRIX world = rotX * rotY * trans;
-
-    // 2) 카메라: 더 멀리
+    // --- Camera ---
     XMVECTOR eye = XMVectorSet(80.0f, 60.0f, -80.0f, 1.0f);
     XMVECTOR at = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
     XMMATRIX view = XMMatrixLookAtLH(eye, at, up);
 
-    // 3) proj: far를 크게
     float aspect = (m_height != 0) ? (float)m_width / (float)m_height : 1.0f;
     XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f), aspect, 0.1f, 10000.0f);
 
-    XMMATRIX mvp = world * view * proj;
+    // --- Grid MVP: world = Identity (혹은 살짝 아래로) ---
+    // z-fighting 싫으면 y = -0.01로 깔아줘도 됨
+    XMMATRIX gridWorld = XMMatrixTranslation(0.0f, -0.01f, 0.0f);
+    XMMATRIX gridMVP = gridWorld * view * proj;
 
-    PerFrameCB cb{};
-    XMStoreFloat4x4(&cb.mvp, mvp); // (네 코드 흐름 그대로)
-    uint8_t* dst = m_cbMapped + (size_t)m_cbStride * m_frameIndex;
-    std::memcpy(dst, &cb, sizeof(cb));
+    PerFrameCB cbGrid{};
+    XMStoreFloat4x4(&cbGrid.mvp, gridMVP);
+
+    const UINT gridSlot = 0;
+    uint8_t* dstGrid = m_cbMapped + (size_t)m_cbStride * (m_frameIndex * DrawsPerFrame + gridSlot);
+    std::memcpy(dstGrid, &cbGrid, sizeof(cbGrid));
+
+    // --- Cube MVP ---
+    XMMATRIX rotY = XMMatrixRotationY(XMConvertToRadians(35.0f));
+    XMMATRIX rotX = XMMatrixRotationX(XMConvertToRadians(-20.0f));
+    XMMATRIX trans = XMMatrixTranslation(m_cubeX, 0.0f, m_cubeZ);
+    XMMATRIX world = rotX * rotY * trans;
+
+    XMMATRIX cubeMVP = world * view * proj;
+
+    PerFrameCB cbCube{};
+    XMStoreFloat4x4(&cbCube.mvp, cubeMVP);
+
+    const UINT cubeSlot = 1;
+    uint8_t* dstCube = m_cbMapped + (size_t)m_cbStride * (m_frameIndex * DrawsPerFrame + cubeSlot);
+    std::memcpy(dstCube, &cbCube, sizeof(cbCube));
 }
 
 void D3D12Renderer::CreateUploadBufferAndCopy(const void* srcData, UINT64 byteSize, Microsoft::WRL::ComPtr<ID3D12Resource>& outBuffer)
@@ -1062,20 +1231,27 @@ void D3D12Renderer::BeginFrame()
 
 void D3D12Renderer::DrawCube()
 {
+    // 그리드에서 바꾼 상태를 큐브용으로 되돌리기
+    m_commandList->SetPipelineState(m_pipelineState.Get());
+    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
     ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
     m_commandList->SetDescriptorHeaps(1, heaps);
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
     // CBV 먼저 세팅(0번)
+    const UINT cubeSlot = 1; // 0:Grid, 1:Cube
     D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
-        m_constantBuffer->GetGPUVirtualAddress() + (UINT64)m_cbStride * m_frameIndex;
+        m_constantBuffer->GetGPUVirtualAddress() +
+        (UINT64)m_cbStride * (m_frameIndex * DrawsPerFrame + cubeSlot);
+
     m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
 
     // SRV 테이블(1번)
     m_commandList->SetGraphicsRootDescriptorTable(1, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
     m_commandList->IASetIndexBuffer(&m_indexBufferView);
 
@@ -1113,6 +1289,7 @@ void D3D12Renderer::EndFrame()
 
 void D3D12Renderer::Render()
 {
+    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
     UpdateInput();
     UpdateConstants();
 
