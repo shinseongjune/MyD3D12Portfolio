@@ -118,7 +118,7 @@ private:
     void CreateDemoResources();     // 파이프라인 + 메쉬 + 상수버퍼를 한 번에 준비
     void RecordAndSubmitFrame();    // 커맨드 기록/제출(+ present, fence 포함)
 
-    void CreateTexture_Checkerboard(); // 임시 텍스쳐 생성+업로드+SRV까지
+    void CreateTexture_FromFile(const wchar_t* path); // 임시 텍스쳐 생성+업로드+SRV까지
 
     // === Helper (중복 제거) ===
     void CreateUploadBufferAndCopy(const void* srcData, UINT64 byteSize,

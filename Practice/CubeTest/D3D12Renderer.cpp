@@ -7,8 +7,10 @@
 #include <sstream>
 #include <fstream>
 #include <cctype>
-#include <cstdio>
 #include <filesystem>
+
+#include <wincodec.h>
+#pragma comment(lib, "windowscodecs.lib")
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "d3d12.lib")
@@ -17,9 +19,69 @@
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 
+static bool LoadImageRGBA8_WIC(const wchar_t* path, UINT& outW, UINT& outH, std::vector<uint8_t>& outRGBA)
+{
+    outW = outH = 0;
+    outRGBA.clear();
+
+    Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
+    HRESULT hr = CoCreateInstance(
+        CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(&factory));
+    if (FAILED(hr))
+    {
+        // Win7 등 환경이면 Factory1로도 시도
+        hr = CoCreateInstance(CLSID_WICImagingFactory1, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
+        if (FAILED(hr)) return false;
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+    hr = factory->CreateDecoderFromFilename(path, nullptr, GENERIC_READ,
+        WICDecodeMetadataCacheOnDemand, &decoder);
+    if (FAILED(hr)) return false;
+
+    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+    hr = decoder->GetFrame(0, &frame);
+    if (FAILED(hr)) return false;
+
+    UINT w = 0, h = 0;
+    hr = frame->GetSize(&w, &h);
+    if (FAILED(hr) || w == 0 || h == 0) return false;
+
+    // RGBA8로 변환
+    Microsoft::WRL::ComPtr<IWICFormatConverter> conv;
+    hr = factory->CreateFormatConverter(&conv);
+    if (FAILED(hr)) return false;
+
+    hr = conv->Initialize(
+        frame.Get(),
+        GUID_WICPixelFormat32bppRGBA,
+        WICBitmapDitherTypeNone,
+        nullptr,
+        0.0,
+        WICBitmapPaletteTypeCustom);
+    if (FAILED(hr)) return false;
+
+    const UINT stride = w * 4;
+    outRGBA.resize((size_t)stride * h);
+
+    hr = conv->CopyPixels(nullptr, stride, (UINT)outRGBA.size(), outRGBA.data());
+    if (FAILED(hr)) return false;
+
+    outW = w;
+    outH = h;
+    return true;
+}
+
 static inline void ThrowIfFailed(HRESULT hr)
 {
-    if (FAILED(hr)) throw std::runtime_error("HRESULT failed");
+    if (FAILED(hr))
+    {
+        char buf[64];
+        sprintf_s(buf, "HRESULT failed: 0x%08X\n", (unsigned)hr);
+        OutputDebugStringA(buf);
+        throw std::runtime_error(buf);
+    }
 }
 
 static ComPtr<ID3DBlob> CompileShader(const char* entry, const char* target, const char* src)
@@ -77,7 +139,7 @@ void D3D12Renderer::Init(HWND hwnd, UINT width, UINT height)
 
     CreateDemoResources();
 
-    CreateTexture_Checkerboard();
+    CreateTexture_FromFile(L"assets\\Alien-Animal-Base-Color.jpg");
 }
 
 static inline void TrimLeft(std::string& s)
@@ -539,44 +601,44 @@ void D3D12Renderer::CreatePipeline()
 {
     // Root Parameters:
     // 0) CBV(b0)
-    //D3D12_ROOT_PARAMETER params[2]{};
-    D3D12_ROOT_PARAMETER params[1]{};
+    D3D12_ROOT_PARAMETER params[2]{};
+    //D3D12_ROOT_PARAMETER params[1]{};
 
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[0].Descriptor.ShaderRegister = 0;
     params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
-    //// 1) DescriptorTable(SRV t0)
-    //D3D12_DESCRIPTOR_RANGE range{};
-    //range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    //range.NumDescriptors = 1;
-    //range.BaseShaderRegister = 0; // t0
-    //range.RegisterSpace = 0;
-    //range.OffsetInDescriptorsFromTableStart = 0;
-    //
-    //params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    //params[1].DescriptorTable.NumDescriptorRanges = 1;
-    //params[1].DescriptorTable.pDescriptorRanges = &range;
-    //params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    //
-    //// Static Sampler(s0)
-    //D3D12_STATIC_SAMPLER_DESC samp{};
-    //samp.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-    //samp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    //samp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    //samp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    //samp.ShaderRegister = 0; // s0
-    //samp.RegisterSpace = 0;
-    //samp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    //samp.MaxLOD = D3D12_FLOAT32_MAX;
+    // 1) DescriptorTable(SRV t0)
+    D3D12_DESCRIPTOR_RANGE range{};
+    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range.NumDescriptors = 1;
+    range.BaseShaderRegister = 0; // t0
+    range.RegisterSpace = 0;
+    range.OffsetInDescriptorsFromTableStart = 0;
+    
+    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    params[1].DescriptorTable.NumDescriptorRanges = 1;
+    params[1].DescriptorTable.pDescriptorRanges = &range;
+    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    
+    // Static Sampler(s0)
+    D3D12_STATIC_SAMPLER_DESC samp{};
+    samp.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    samp.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samp.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samp.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    samp.ShaderRegister = 0; // s0
+    samp.RegisterSpace = 0;
+    samp.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    samp.MaxLOD = D3D12_FLOAT32_MAX;
 
     D3D12_ROOT_SIGNATURE_DESC rs{};
     rs.NumParameters = _countof(params);
     rs.pParameters = params;
-    //rs.NumStaticSamplers = 1;
-    rs.NumStaticSamplers = 0;
-    //rs.pStaticSamplers = &samp;
-    rs.pStaticSamplers = nullptr;
+    rs.NumStaticSamplers = 1;
+    //rs.NumStaticSamplers = 0;
+    rs.pStaticSamplers = &samp;
+    //rs.pStaticSamplers = nullptr;
     rs.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     ComPtr<ID3DBlob> sig, err;
@@ -584,52 +646,52 @@ void D3D12Renderer::CreatePipeline()
     ThrowIfFailed(m_device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
     // HLSL: pos+uv, sample texture
-    //const char* hlsl = R"(
-    //cbuffer PerFrame : register(b0)
-    //{
-    //    row_major float4x4 mvp;
-    //};
-    //
-    //Texture2D    gTex  : register(t0);
-    //SamplerState gSamp : register(s0);
-    //
-    //struct VSIn { float3 pos : POSITION; float2 uv : TEXCOORD0; };
-    //struct PSIn { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
-    //
-    //PSIn VSMain(VSIn i)
-    //{
-    //    PSIn o;
-    //    o.pos = mul(float4(i.pos, 1.0), mvp);
-    //    o.uv  = i.uv;
-    //    return o;
-    //}
-    //
-    //float4 PSMain(PSIn i) : SV_TARGET
-    //{
-    //    return gTex.Sample(gSamp, i.uv);
-    //}
-    //)";
     const char* hlsl = R"(
     cbuffer PerFrame : register(b0)
     {
         float4x4 mvp;
     };
-
+    
+    Texture2D    gTex  : register(t0);
+    SamplerState gSamp : register(s0);
+    
     struct VSIn { float3 pos : POSITION; float2 uv : TEXCOORD0; };
-    struct PSIn { float4 pos : SV_POSITION; };
-
+    struct PSIn { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
+    
     PSIn VSMain(VSIn i)
     {
         PSIn o;
         o.pos = mul(mvp, float4(i.pos, 1.0));
+        o.uv  = i.uv;
         return o;
     }
-
+    
     float4 PSMain(PSIn i) : SV_TARGET
     {
-        return float4(0.9, 0.9, 0.9, 1.0); // 단색
+        return gTex.Sample(gSamp, i.uv);
     }
     )";
+    //const char* hlsl = R"(
+    //cbuffer PerFrame : register(b0)
+    //{
+    //    float4x4 mvp;
+    //};
+    //
+    //struct VSIn { float3 pos : POSITION; float2 uv : TEXCOORD0; };
+    //struct PSIn { float4 pos : SV_POSITION; };
+    //
+    //PSIn VSMain(VSIn i)
+    //{
+    //    PSIn o;
+    //    o.pos = mul(mvp, float4(i.pos, 1.0));
+    //    return o;
+    //}
+    //
+    //float4 PSMain(PSIn i) : SV_TARGET
+    //{
+    //    return float4(0.9, 0.9, 0.9, 1.0); // 단색
+    //}
+    //)";
 
     auto vs = CompileShader("VSMain", "vs_5_0", hlsl);
     auto ps = CompileShader("PSMain", "ps_5_0", hlsl);
@@ -782,9 +844,10 @@ void D3D12Renderer::RecordAndSubmitFrame()
     EndFrame();
 }
 
-void D3D12Renderer::CreateTexture_Checkerboard()
+void D3D12Renderer::CreateTexture_FromFile(const wchar_t* path)
 {
-    // 1) SRV heap (shader-visible) 생성
+    // 1) SRV heap (shader-visible) 생성 (이미 있으면 재사용해도 됨)
+    if (!m_srvHeap)
     {
         D3D12_DESCRIPTOR_HEAP_DESC hd{};
         hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -793,25 +856,11 @@ void D3D12Renderer::CreateTexture_Checkerboard()
         ThrowIfFailed(m_device->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&m_srvHeap)));
     }
 
-    // 2) CPU에서 임시 RGBA 체커보드 생성
-    const UINT texW = 256;
-    const UINT texH = 256;
-    std::vector<uint32_t> pixels(texW * texH);
-
-    for (UINT y = 0; y < texH; ++y)
-    {
-        for (UINT x = 0; x < texW; ++x)
-        {
-            bool checker = ((x / 32) % 2) ^ ((y / 32) % 2);
-            uint8_t c = checker ? 230 : 30;
-            uint32_t rgba =
-                (uint32_t)c |
-                ((uint32_t)c << 8) |
-                ((uint32_t)c << 16) |
-                (0xFFu << 24); // A=255
-            pixels[y * texW + x] = rgba;
-        }
-    }
+    // 2) WIC로 이미지 로드(RGBA8)
+    UINT texW = 0, texH = 0;
+    std::vector<uint8_t> rgba;
+    if (!LoadImageRGBA8_WIC(path, texW, texH, rgba))
+        throw std::runtime_error("Failed to load image via WIC.");
 
     // 3) GPU Texture2D(default heap) 생성 (초기 state: COPY_DEST)
     D3D12_RESOURCE_DESC td{};
@@ -823,7 +872,6 @@ void D3D12Renderer::CreateTexture_Checkerboard()
     td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     td.SampleDesc.Count = 1;
     td.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    td.Flags = D3D12_RESOURCE_FLAG_NONE;
 
     D3D12_HEAP_PROPERTIES hpDef{};
     hpDef.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -834,21 +882,18 @@ void D3D12Renderer::CreateTexture_Checkerboard()
         IID_PPV_ARGS(&m_texture)));
 
     // 4) 업로드 버퍼 생성 + rowPitch 맞춰 복사
-    UINT64 uploadSize = 0;
     D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
     UINT numRows = 0;
     UINT64 rowSizeInBytes = 0;
     UINT64 totalBytes = 0;
-
     m_device->GetCopyableFootprints(&td, 0, 1, 0, &footprint, &numRows, &rowSizeInBytes, &totalBytes);
-    uploadSize = totalBytes;
 
     D3D12_HEAP_PROPERTIES hpUp{};
     hpUp.Type = D3D12_HEAP_TYPE_UPLOAD;
 
     D3D12_RESOURCE_DESC bd{};
     bd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    bd.Width = uploadSize;
+    bd.Width = totalBytes;
     bd.Height = 1;
     bd.DepthOrArraySize = 1;
     bd.MipLevels = 1;
@@ -860,12 +905,11 @@ void D3D12Renderer::CreateTexture_Checkerboard()
         D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
         IID_PPV_ARGS(&m_textureUpload)));
 
-    // Upload buffer에 tex 데이터를 Row 단위로 복사(footprint.RowPitch 사용)
     uint8_t* mapped = nullptr;
     D3D12_RANGE r{ 0,0 };
     ThrowIfFailed(m_textureUpload->Map(0, &r, (void**)&mapped));
 
-    const uint8_t* src = (const uint8_t*)pixels.data();
+    const uint8_t* src = rgba.data();
     uint8_t* dst = mapped + footprint.Offset;
 
     for (UINT y = 0; y < texH; ++y)
@@ -874,10 +918,9 @@ void D3D12Renderer::CreateTexture_Checkerboard()
             src + (size_t)texW * 4 * y,
             (size_t)texW * 4);
     }
-
     m_textureUpload->Unmap(0, nullptr);
 
-    // 5) copy 커맨드 기록/실행/대기 (init 시점 1회)
+    // 5) copy 커맨드 기록/실행/대기
     ThrowIfFailed(m_commandAllocator->Reset());
     ThrowIfFailed(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
 
@@ -893,7 +936,6 @@ void D3D12Renderer::CreateTexture_Checkerboard()
 
     m_commandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
 
-    // COPY_DEST -> PIXEL_SHADER_RESOURCE
     D3D12_RESOURCE_BARRIER b{};
     b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     b.Transition.pResource = m_texture.Get();
@@ -906,7 +948,7 @@ void D3D12Renderer::CreateTexture_Checkerboard()
     ID3D12CommandList* lists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(1, lists);
 
-    WaitForGpu(); // ✅ 업로드 끝날 때까지 기다림(연습용으로 가장 단순)
+    WaitForGpu();
 
     // 6) SRV 생성
     D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
@@ -1020,34 +1062,22 @@ void D3D12Renderer::BeginFrame()
 
 void D3D12Renderer::DrawCube()
 {
-    //// ✅ SRV heap 바인딩 (shader-visible heap)
-    //ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
-    //m_commandList->SetDescriptorHeaps(1, heaps);
-    //
-    //m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-    //m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    //m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-    //m_commandList->IASetIndexBuffer(&m_indexBufferView);
-    //
-    //// Root CBV = 현재 프레임 CB 주소
-    //D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
-    //    m_constantBuffer->GetGPUVirtualAddress() + (UINT64)m_cbStride * m_frameIndex;
-    //m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
-    //
-    //// ✅ Root SRV table = t0
-    //m_commandList->SetGraphicsRootDescriptorTable(1, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
-    //
-    //// 쿼드 인덱스: 6
-    //m_commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+    ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-    m_commandList->IASetIndexBuffer(&m_indexBufferView);
 
+    // CBV 먼저 세팅(0번)
     D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
         m_constantBuffer->GetGPUVirtualAddress() + (UINT64)m_cbStride * m_frameIndex;
     m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
+
+    // SRV 테이블(1번)
+    m_commandList->SetGraphicsRootDescriptorTable(1, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+    m_commandList->IASetIndexBuffer(&m_indexBufferView);
 
     m_commandList->DrawIndexedInstanced(m_indexCount, 1, 0, 0, 0);
 }
