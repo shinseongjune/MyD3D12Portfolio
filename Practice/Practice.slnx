@@ -4,4 +4,5 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="CubeTest\CubeTest.vcxproj" Id="00ec3053-502a-4f77-af63-f8f1e344510a" />
+  <Project Path="Engine/Engine.vcxproj" Id="0fb8ceb0-9f91-46c2-955d-3602b3c25d1d" />
 </Solution>

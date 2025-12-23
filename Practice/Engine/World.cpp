@@ -1,0 +1,378 @@
+#include "World.h"
+
+#include <DirectXMath.h>
+using namespace DirectX;
+
+EntityId World::CreateEntity(const std::string& name)
+{
+    uint32_t index = 0;
+
+    if (!m_freeList.empty())
+    {
+        index = m_freeList.back();
+        m_freeList.pop_back();
+
+        Slot& s = m_slots[index];
+        s.alive = true;
+        // generation은 Destroy에서 올려둔 값 유지
+        s.name = name;
+    }
+    else
+    {
+        index = (uint32_t)m_slots.size();
+        Slot s{};
+        s.generation = 1;   // 0은 Invalid과 헷갈릴 여지가 있어 보통 1부터 시작
+        s.alive = true;
+        s.name = name;
+        m_slots.push_back(std::move(s));
+    }
+
+    EntityId e{ index, m_slots[index].generation };
+
+    EnsureTransformSparseSize(index);
+
+    if (!name.empty())
+        m_nameToEntity[name] = e;
+
+    ++m_aliveCount;
+    return e;
+}
+
+void World::DestroyEntity(EntityId e)
+{
+    if (!IsAlive(e))
+        return;
+
+    RemoveNameMapping(e);
+    RemoveTransform(e);
+
+    Slot& s = m_slots[e.index];
+    s.alive = false;
+    s.name.clear();
+
+    // generation 증가: 예전 핸들 무효화(유령 참조 방지)
+    ++s.generation;
+
+    // 재사용 리스트에 넣기
+    m_freeList.push_back(e.index);
+
+    if (m_aliveCount > 0) --m_aliveCount;
+}
+
+bool World::IsAlive(EntityId e) const
+{
+    if (!e.IsValid()) return false;
+    if (e.index >= m_slots.size()) return false;
+
+    const Slot& s = m_slots[e.index];
+    return s.alive && s.generation == e.generation;
+}
+
+EntityId World::FindByName(const std::string& name) const
+{
+    auto it = m_nameToEntity.find(name);
+    if (it == m_nameToEntity.end())
+        return EntityId::Invalid();
+
+    // 매핑이 오래됐을 수도 있으니 생존 확인
+    if (!IsAlive(it->second))
+        return EntityId::Invalid();
+
+    return it->second;
+}
+
+const std::string& World::GetName(EntityId e) const
+{
+    static const std::string kEmpty;
+    if (!IsAlive(e)) return kEmpty;
+    return m_slots[e.index].name;
+}
+
+void World::RemoveNameMapping(EntityId e)
+{
+    // 이름이 있다면 map에서 제거
+    if (!e.IsValid() || e.index >= m_slots.size()) return;
+    const std::string& name = m_slots[e.index].name;
+    if (name.empty()) return;
+
+    auto it = m_nameToEntity.find(name);
+    if (it != m_nameToEntity.end() && it->second == e)
+        m_nameToEntity.erase(it);
+}
+
+// --- Transform API 구현 ---
+
+void World::EnsureTransformSparseSize(uint32_t entityIndex)
+{
+    if (m_transformSparse.size() <= entityIndex)
+        m_transformSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::AddTransform(EntityId e)
+{
+    if (!IsAlive(e)) return;
+    EnsureTransformSparseSize(e.index);
+
+    if (m_transformSparse[e.index] != InvalidDenseIndex)
+        return; // already has
+
+    const uint32_t denseIndex = (uint32_t)m_transforms.size();
+    m_transformSparse[e.index] = denseIndex;
+
+    m_transformDenseEntities.push_back(e);
+    m_transforms.emplace_back();
+
+    // world를 identity로 초기화
+    XMStoreFloat4x4(&m_transforms.back().world, XMMatrixIdentity());
+    m_transforms.back().dirty = true;
+}
+
+bool World::HasTransform(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_transformSparse.size()) return false;
+    return m_transformSparse[e.index] != InvalidDenseIndex;
+}
+
+TransformComponent& World::GetTransform(EntityId e)
+{
+    // 실전에서는 assert/ThrowIf로 처리 추천
+    const uint32_t denseIndex = m_transformSparse[e.index];
+    return m_transforms[denseIndex];
+}
+
+const TransformComponent& World::GetTransform(EntityId e) const
+{
+    const uint32_t denseIndex = m_transformSparse[e.index];
+    return m_transforms[denseIndex];
+}
+
+void World::RemoveTransform(EntityId e)
+{
+    if (!HasTransform(e))
+        return;
+
+    // parent/child 관계 정리: 부모에서 나 제거, 자식들은 부모 invalid로
+    TransformComponent& t = GetTransform(e);
+
+    // 부모에서 분리
+    if (t.parent.IsValid() && HasTransform(t.parent))
+    {
+        TransformComponent& p = GetTransform(t.parent);
+        auto& ch = p.children;
+        for (size_t i = 0; i < ch.size(); ++i)
+        {
+            if (ch[i] == e)
+            {
+                ch[i] = ch.back();
+                ch.pop_back();
+                break;
+            }
+        }
+    }
+
+    // 자식들 parent 끊기(일단 루트로 올림)
+    for (EntityId c : t.children)
+    {
+        if (HasTransform(c))
+        {
+            TransformComponent& ct = GetTransform(c);
+            ct.parent = EntityId::Invalid();
+            ct.dirty = true;
+        }
+    }
+    t.children.clear();
+    t.parent = EntityId::Invalid();
+
+    // sparse-set swap-remove
+    const uint32_t denseIndex = m_transformSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_transforms.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        // 마지막 요소를 denseIndex 위치로 옮김
+        m_transforms[denseIndex] = std::move(m_transforms[lastIndex]);
+        m_transformDenseEntities[denseIndex] = m_transformDenseEntities[lastIndex];
+
+        // sparse 갱신
+        EntityId movedEntity = m_transformDenseEntities[denseIndex];
+        m_transformSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_transforms.pop_back();
+    m_transformDenseEntities.pop_back();
+    m_transformSparse[e.index] = InvalidDenseIndex;
+}
+
+void World::SetParent(EntityId child, EntityId newParent)
+{
+    if (!HasTransform(child)) return;
+    if (newParent.IsValid() && !HasTransform(newParent)) return;
+    if (child == newParent) return;
+
+    TransformComponent& ct = GetTransform(child);
+
+    // 기존 parent에서 제거
+    if (ct.parent.IsValid() && HasTransform(ct.parent))
+    {
+        TransformComponent& oldP = GetTransform(ct.parent);
+        auto& ch = oldP.children;
+        for (size_t i = 0; i < ch.size(); ++i)
+        {
+            if (ch[i] == child)
+            {
+                ch[i] = ch.back();
+                ch.pop_back();
+                break;
+            }
+        }
+    }
+
+    // 새 parent에 추가
+    ct.parent = newParent;
+    if (newParent.IsValid())
+    {
+        TransformComponent& np = GetTransform(newParent);
+        np.children.push_back(child);
+    }
+
+    // 계층 변경은 월드행렬 전체에 영향
+    MarkDirtyRecursive(child);
+}
+
+void World::MarkDirtyRecursive(EntityId e)
+{
+    if (!HasTransform(e)) return;
+
+    TransformComponent& t = GetTransform(e);
+    if (!t.dirty)
+        t.dirty = true;
+
+    for (EntityId c : t.children)
+        MarkDirtyRecursive(c);
+}
+
+DirectX::XMMATRIX World::LocalMatrix(const TransformComponent& t) const
+{
+    const XMMATRIX S = XMMatrixScaling(t.scale.x, t.scale.y, t.scale.z);
+    const XMVECTOR Q = XMVectorSet(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
+    const XMMATRIX R = XMMatrixRotationQuaternion(Q);
+    const XMMATRIX T = XMMatrixTranslation(t.position.x, t.position.y, t.position.z);
+    return S * R * T; // row-vector 관례
+}
+
+void World::UpdateWorldRecursive(EntityId e, const DirectX::XMMATRIX& parentWorld)
+{
+    using namespace DirectX;
+    TransformComponent& t = GetTransform(e);
+
+    XMMATRIX local = LocalMatrix(t);
+    XMMATRIX worldM = local * parentWorld;
+
+    XMStoreFloat4x4(&t.world, worldM);
+    t.dirty = false;
+
+    for (EntityId c : t.children)
+        if (HasTransform(c)) UpdateWorldRecursive(c, worldM);
+}
+
+void World::UpdateTransforms()
+{
+    // 루트들부터 갱신 (parent가 invalid인 transform)
+    const XMMATRIX I = XMMatrixIdentity();
+
+    for (size_t i = 0; i < m_transformDenseEntities.size(); ++i)
+    {
+        EntityId e = m_transformDenseEntities[i];
+        if (!HasTransform(e)) continue;
+
+        const TransformComponent& t = GetTransform(e);
+        if (!t.parent.IsValid())
+        {
+            UpdateWorldRecursive(e, I);
+        }
+    }
+}
+
+void World::EnsureTransform(EntityId e)
+{
+    if (!IsAlive(e)) return;
+    if (!HasTransform(e)) AddTransform(e);
+}
+
+XMFLOAT3 World::GetLocalPosition(EntityId e) const
+{
+    if (!HasTransform(e)) return XMFLOAT3{ 0,0,0 };
+    const TransformComponent& t = GetTransform(e);
+    return t.position;
+}
+
+void World::SetLocalPosition(EntityId e, const XMFLOAT3& p)
+{
+    EnsureTransform(e);
+    if (!HasTransform(e)) return;
+
+    TransformComponent& t = GetTransform(e);
+    t.position = p;
+    MarkDirtyRecursive(e);
+}
+
+XMFLOAT4 World::GetLocalRotation(EntityId e) const
+{
+    if (!HasTransform(e)) return XMFLOAT4{ 0,0,0,1 };
+    const TransformComponent& t = GetTransform(e);
+    return t.rotation;
+}
+
+void World::SetLocalRotation(EntityId e, const XMFLOAT4& q)
+{
+    EnsureTransform(e);
+    if (!HasTransform(e)) return;
+
+    TransformComponent& t = GetTransform(e);
+    t.rotation = q;
+    MarkDirtyRecursive(e);
+}
+
+XMFLOAT3 World::GetLocalScale(EntityId e) const
+{
+    if (!HasTransform(e)) return XMFLOAT3{ 1,1,1 };
+    const TransformComponent& t = GetTransform(e);
+    return t.scale;
+}
+
+void World::SetLocalScale(EntityId e, const XMFLOAT3& s)
+{
+    EnsureTransform(e);
+    if (!HasTransform(e)) return;
+
+    TransformComponent& t = GetTransform(e);
+    t.scale = s;
+    MarkDirtyRecursive(e);
+}
+
+XMFLOAT4X4 World::GetWorldMatrix(EntityId e) const
+{
+    static XMFLOAT4X4 I;
+    XMStoreFloat4x4(&I, XMMatrixIdentity());
+
+    if (!HasTransform(e)) return I;
+    const TransformComponent& t = GetTransform(e);
+    return t.world;
+}
+
+XMFLOAT3 World::GetWorldPosition(EntityId e) const
+{
+    if (!HasTransform(e)) return XMFLOAT3{ 0,0,0 };
+
+    const TransformComponent& t = GetTransform(e);
+
+    // world 행렬의 translation 성분 추출
+    // XMFLOAT4X4는 row-major처럼 저장되지만, DirectXMath 행렬은 column-major 개념이라 헷갈리기 쉬움.
+    // XMMatrixTranslation을 S*R*T 순으로 구성했으니, 여기서는 "저장된 world"를 로드해서 position 벡터를 뽑는 방식이 안전함.
+    XMMATRIX W = XMLoadFloat4x4(&t.world);
+    XMVECTOR pos = W.r[3]; // (x,y,z,1) row 벡터
+    XMFLOAT3 out{};
+    XMStoreFloat3(&out, pos);
+    return out;
+}

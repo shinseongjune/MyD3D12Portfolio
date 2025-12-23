@@ -1,0 +1,139 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="소스 파일">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="헤더 파일">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="리소스 파일">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="소스 파일\01_Core">
+      <UniqueIdentifier>{384238dc-eb3f-4fee-90bc-432ec9c18107}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\02_Assets">
+      <UniqueIdentifier>{e3c19885-524d-42a4-84b7-072bb6f0a894}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\03_Platform">
+      <UniqueIdentifier>{e226625a-6fe4-49e3-983f-8e2f74915277}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\03_Platform\Win32">
+      <UniqueIdentifier>{ad6aaf04-c6e2-4afe-bcd1-3d1009bd91df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\04_Render">
+      <UniqueIdentifier>{a932593e-55c7-4863-abc0-eac891d1571c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\05_Systems">
+      <UniqueIdentifier>{ee9a221d-1b5c-4a54-9e92-94b4a4f71b93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\06_World">
+      <UniqueIdentifier>{8b05f27a-11f5-4e30-b541-51ad9fa7c7ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\01_Core">
+      <UniqueIdentifier>{6a1ff142-9d11-46d8-9c9f-80c572569c1a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\02_Assets">
+      <UniqueIdentifier>{bedf2ff8-b5fc-4931-bd29-961af66bec41}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\03_Platform">
+      <UniqueIdentifier>{0061356e-11d8-4e8a-9548-cea392741727}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\03_Platform\Win32">
+      <UniqueIdentifier>{3365a44b-641e-44ee-971b-f50cda95052a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\04_Render">
+      <UniqueIdentifier>{987407ce-68a1-4afc-8a30-15af9e472ada}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\05_Systems">
+      <UniqueIdentifier>{b17af95a-6ef2-4337-8b31-511abe12478c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\06_World">
+      <UniqueIdentifier>{5a749e4f-4d79-410f-84d5-085f86264447}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="framework.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Resource.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Application.h">
+      <Filter>헤더 파일\01_Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32Window.h">
+      <Filter>헤더 파일\03_Platform\Win32</Filter>
+    </ClInclude>
+    <ClInclude Include="Time.h">
+      <Filter>헤더 파일\01_Core</Filter>
+    </ClInclude>
+    <ClInclude Include="World.h">
+      <Filter>헤더 파일\06_World</Filter>
+    </ClInclude>
+    <ClInclude Include="IRenderer.h">
+      <Filter>헤더 파일\04_Render</Filter>
+    </ClInclude>
+    <ClInclude Include="EntityId.h">
+      <Filter>헤더 파일\06_World</Filter>
+    </ClInclude>
+    <ClInclude Include="TransformComponent.h">
+      <Filter>헤더 파일\06_World</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderItem.h">
+      <Filter>헤더 파일\04_Render</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderSystem.h">
+      <Filter>헤더 파일\05_Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="D3D12Renderer.h">
+      <Filter>헤더 파일\04_Render</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Engine.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Application.cpp">
+      <Filter>소스 파일\01_Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32Window.cpp">
+      <Filter>소스 파일\03_Platform\Win32</Filter>
+    </ClCompile>
+    <ClCompile Include="Time.cpp">
+      <Filter>소스 파일\01_Core</Filter>
+    </ClCompile>
+    <ClCompile Include="World.cpp">
+      <Filter>소스 파일\06_World</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderSystem.cpp">
+      <Filter>소스 파일\04_Render</Filter>
+    </ClCompile>
+    <ClCompile Include="D3D12Renderer.cpp">
+      <Filter>소스 파일\04_Render</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Engine.rc">
+      <Filter>리소스 파일</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="small.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+    <Image Include="Engine.ico">
+      <Filter>리소스 파일</Filter>
+    </Image>
+  </ItemGroup>
+</Project>
