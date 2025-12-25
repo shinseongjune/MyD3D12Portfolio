@@ -30,6 +30,9 @@ EntityId World::CreateEntity(const std::string& name)
     EntityId e{ index, m_slots[index].generation };
 
     EnsureTransformSparseSize(index);
+    EnsureMeshSparseSize(index);
+    EnsureMaterialSparseSize(index);
+    EnsureCameraSparseSize(index);
 
     if (!name.empty())
         m_nameToEntity[name] = e;
@@ -45,6 +48,9 @@ void World::DestroyEntity(EntityId e)
 
     RemoveNameMapping(e);
     RemoveTransform(e);
+    RemoveMesh(e);
+    RemoveMaterial(e);
+    RemoveCamera(e);
 
     Slot& s = m_slots[e.index];
     s.alive = false;
@@ -106,6 +112,205 @@ void World::EnsureTransformSparseSize(uint32_t entityIndex)
 {
     if (m_transformSparse.size() <= entityIndex)
         m_transformSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+// --- Mesh Storage ---
+void World::EnsureMeshSparseSize(uint32_t entityIndex)
+{
+    if (m_meshSparse.size() <= entityIndex)
+        m_meshSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::AddMesh(EntityId e)
+{
+    if (!IsAlive(e)) return;
+    EnsureMeshSparseSize(e.index);
+    if (m_meshSparse[e.index] != InvalidDenseIndex)
+        return;
+
+    const uint32_t denseIndex = (uint32_t)m_meshes.size();
+    m_meshSparse[e.index] = denseIndex;
+    m_meshDenseEntities.push_back(e);
+    m_meshes.emplace_back();
+}
+
+bool World::HasMesh(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_meshSparse.size()) return false;
+    return m_meshSparse[e.index] != InvalidDenseIndex;
+}
+
+MeshComponent& World::GetMesh(EntityId e)
+{
+    const uint32_t denseIndex = m_meshSparse[e.index];
+    return m_meshes[denseIndex];
+}
+
+const MeshComponent& World::GetMesh(EntityId e) const
+{
+    const uint32_t denseIndex = m_meshSparse[e.index];
+    return m_meshes[denseIndex];
+}
+
+void World::RemoveMesh(EntityId e)
+{
+    if (!HasMesh(e)) return;
+    const uint32_t denseIndex = m_meshSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_meshes.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_meshes[denseIndex] = std::move(m_meshes[lastIndex]);
+        m_meshDenseEntities[denseIndex] = m_meshDenseEntities[lastIndex];
+        EntityId movedEntity = m_meshDenseEntities[denseIndex];
+        m_meshSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_meshes.pop_back();
+    m_meshDenseEntities.pop_back();
+    m_meshSparse[e.index] = InvalidDenseIndex;
+}
+
+void World::EnsureMesh(EntityId e)
+{
+    if (!HasMesh(e)) AddMesh(e);
+}
+
+// --- Material Storage ---
+void World::EnsureMaterialSparseSize(uint32_t entityIndex)
+{
+    if (m_materialSparse.size() <= entityIndex)
+        m_materialSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::AddMaterial(EntityId e)
+{
+    if (!IsAlive(e)) return;
+    EnsureMaterialSparseSize(e.index);
+    if (m_materialSparse[e.index] != InvalidDenseIndex)
+        return;
+
+    const uint32_t denseIndex = (uint32_t)m_materials.size();
+    m_materialSparse[e.index] = denseIndex;
+    m_materialDenseEntities.push_back(e);
+    m_materials.emplace_back();
+}
+
+bool World::HasMaterial(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_materialSparse.size()) return false;
+    return m_materialSparse[e.index] != InvalidDenseIndex;
+}
+
+MaterialComponent& World::GetMaterial(EntityId e)
+{
+    const uint32_t denseIndex = m_materialSparse[e.index];
+    return m_materials[denseIndex];
+}
+
+const MaterialComponent& World::GetMaterial(EntityId e) const
+{
+    const uint32_t denseIndex = m_materialSparse[e.index];
+    return m_materials[denseIndex];
+}
+
+void World::RemoveMaterial(EntityId e)
+{
+    if (!HasMaterial(e)) return;
+    const uint32_t denseIndex = m_materialSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_materials.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_materials[denseIndex] = std::move(m_materials[lastIndex]);
+        m_materialDenseEntities[denseIndex] = m_materialDenseEntities[lastIndex];
+        EntityId movedEntity = m_materialDenseEntities[denseIndex];
+        m_materialSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_materials.pop_back();
+    m_materialDenseEntities.pop_back();
+    m_materialSparse[e.index] = InvalidDenseIndex;
+}
+
+void World::EnsureMaterial(EntityId e)
+{
+    if (!HasMaterial(e)) AddMaterial(e);
+}
+
+// --- Camera Storage (»À´ë) ---
+void World::EnsureCameraSparseSize(uint32_t entityIndex)
+{
+    if (m_cameraSparse.size() <= entityIndex)
+        m_cameraSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::AddCamera(EntityId e)
+{
+    if (!IsAlive(e)) return;
+    EnsureCameraSparseSize(e.index);
+    if (m_cameraSparse[e.index] != InvalidDenseIndex)
+        return;
+
+    const uint32_t denseIndex = (uint32_t)m_cameras.size();
+    m_cameraSparse[e.index] = denseIndex;
+    m_cameraDenseEntities.push_back(e);
+    m_cameras.emplace_back();
+}
+
+bool World::HasCamera(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_cameraSparse.size()) return false;
+    return m_cameraSparse[e.index] != InvalidDenseIndex;
+}
+
+CameraComponent& World::GetCamera(EntityId e)
+{
+    const uint32_t denseIndex = m_cameraSparse[e.index];
+    return m_cameras[denseIndex];
+}
+
+const CameraComponent& World::GetCamera(EntityId e) const
+{
+    const uint32_t denseIndex = m_cameraSparse[e.index];
+    return m_cameras[denseIndex];
+}
+
+void World::RemoveCamera(EntityId e)
+{
+    if (!HasCamera(e)) return;
+    const uint32_t denseIndex = m_cameraSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_cameras.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_cameras[denseIndex] = std::move(m_cameras[lastIndex]);
+        m_cameraDenseEntities[denseIndex] = m_cameraDenseEntities[lastIndex];
+        EntityId movedEntity = m_cameraDenseEntities[denseIndex];
+        m_cameraSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_cameras.pop_back();
+    m_cameraDenseEntities.pop_back();
+    m_cameraSparse[e.index] = InvalidDenseIndex;
+}
+
+void World::EnsureCamera(EntityId e)
+{
+    if (!HasCamera(e)) AddCamera(e);
+}
+
+EntityId World::FindActiveCamera() const
+{
+    for (size_t i = 0; i < m_cameras.size(); ++i)
+    {
+        if (m_cameras[i].active)
+            return m_cameraDenseEntities[i];
+    }
+    return EntityId::Invalid();
 }
 
 void World::AddTransform(EntityId e)

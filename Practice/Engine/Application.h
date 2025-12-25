@@ -8,6 +8,7 @@
 #include "IRenderer.h"
 #include "RenderItem.h"
 #include "RenderSystem.h"
+#include "SceneManager.h"
 
 class Application
 {
@@ -22,6 +23,8 @@ private:
     std::unique_ptr<IRenderer> m_renderer;
     RenderSystem m_renderSystem;
     std::vector<RenderItem> m_renderItems;
+
+    SceneManager m_sceneManager;
 
 public:
     Application() = default;

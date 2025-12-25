@@ -6,6 +6,9 @@
 
 #include "EntityId.h"
 #include "TransformComponent.h"
+#include "MeshComponent.h"
+#include "MaterialComponent.h"
+#include "CameraComponent.h"
 
 class World
 {
@@ -67,6 +70,27 @@ private:
     DirectX::XMMATRIX LocalMatrix(const TransformComponent& t) const;
     void UpdateWorldRecursive(EntityId e, const DirectX::XMMATRIX& parentWorld);
 
+    // --- Mesh Storage (sparse set) ---
+    std::vector<uint32_t> m_meshSparse;
+    std::vector<EntityId> m_meshDenseEntities;
+    std::vector<MeshComponent> m_meshes;
+    void EnsureMeshSparseSize(uint32_t entityIndex);
+    void RemoveMesh(EntityId e);
+
+    // --- Material Storage (sparse set) ---
+    std::vector<uint32_t> m_materialSparse;
+    std::vector<EntityId> m_materialDenseEntities;
+    std::vector<MaterialComponent> m_materials;
+    void EnsureMaterialSparseSize(uint32_t entityIndex);
+    void RemoveMaterial(EntityId e);
+
+    // --- Camera Storage (sparse set) ---
+    std::vector<uint32_t> m_cameraSparse;
+    std::vector<EntityId> m_cameraDenseEntities;
+    std::vector<CameraComponent> m_cameras;
+    void EnsureCameraSparseSize(uint32_t entityIndex);
+    void RemoveCamera(EntityId e);
+
 public:
     // --- Transform Public API ---
     DirectX::XMFLOAT3 GetLocalPosition(EntityId e) const;
@@ -84,4 +108,32 @@ public:
 
     // 편의: Transform 보장(없으면 자동 추가)
     void EnsureTransform(EntityId e);
+
+    // --- Mesh API ---
+    void AddMesh(EntityId e);
+    bool HasMesh(EntityId e) const;
+    MeshComponent& GetMesh(EntityId e);
+    const MeshComponent& GetMesh(EntityId e) const;
+    void EnsureMesh(EntityId e);
+
+    // --- Material API ---
+    void AddMaterial(EntityId e);
+    bool HasMaterial(EntityId e) const;
+    MaterialComponent& GetMaterial(EntityId e);
+    const MaterialComponent& GetMaterial(EntityId e) const;
+    void EnsureMaterial(EntityId e);
+
+    // --- Camera API (아직 렌더러에서 미사용, 뼈대만) ---
+    void AddCamera(EntityId e);
+    bool HasCamera(EntityId e) const;
+    CameraComponent& GetCamera(EntityId e);
+    const CameraComponent& GetCamera(EntityId e) const;
+    void EnsureCamera(EntityId e);
+
+    // 단순한 "활성 카메라" 찾기(첫 active 카메라)
+    EntityId FindActiveCamera() const;
+
+    // ---- Debug/Iteration ----
+    // (임시) dense transform 엔티티 목록을 반환(시스템들이 순회하기 위해 필요)
+    const std::vector<EntityId>& GetTransformEntities() const { return m_transformDenseEntities; }
 };

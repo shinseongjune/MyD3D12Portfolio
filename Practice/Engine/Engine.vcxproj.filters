@@ -55,6 +55,12 @@
     <Filter Include="헤더 파일\06_World">
       <UniqueIdentifier>{5a749e4f-4d79-410f-84d5-085f86264447}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\06_World\Scenes">
+      <UniqueIdentifier>{a3cf4a6f-381b-4ff6-a7ff-46116350e567}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\06_World\Scenes">
+      <UniqueIdentifier>{9b44784b-39fb-4ba3-a84d-1aaec1b942e5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -99,6 +105,24 @@
     <ClInclude Include="D3D12Renderer.h">
       <Filter>헤더 파일\04_Render</Filter>
     </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>헤더 파일\01_Core</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneManager.h">
+      <Filter>헤더 파일\01_Core</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraComponent.h">
+      <Filter>헤더 파일\06_World</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialComponent.h">
+      <Filter>헤더 파일\06_World</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshComponent.h">
+      <Filter>헤더 파일\06_World</Filter>
+    </ClInclude>
+    <ClInclude Include="TestScene.h">
+      <Filter>헤더 파일\06_World\Scenes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -121,6 +145,9 @@
     </ClCompile>
     <ClCompile Include="D3D12Renderer.cpp">
       <Filter>소스 파일\04_Render</Filter>
+    </ClCompile>
+    <ClCompile Include="TestScene.cpp">
+      <Filter>소스 파일\06_World\Scenes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

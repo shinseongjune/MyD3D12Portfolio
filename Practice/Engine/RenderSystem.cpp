@@ -7,23 +7,20 @@ void RenderSystem::Build(const World& world, std::vector<RenderItem>& outItems) 
 {
     outItems.clear();
 
-    // 1) Player(파랑)
-    EntityId player = world.FindByName("Player");
-    if (world.HasTransform(player))
-    {
-        RenderItem it{};
-        it.world = world.GetWorldMatrix(player);
-        it.color = { 0.2f, 0.6f, 1.0f, 1.0f }; // 파랑
-        outItems.push_back(it);
-    }
+    // "Transform + Mesh + Material" 조합을 가진 엔티티를 모두 그린다.
+    // (지금은 RenderItem이 최대 MaxDrawsPerFrame까지만 그려지므로, 우선 테스트에 충분)
+    const auto& entities = world.GetTransformEntities();
+    outItems.reserve(entities.size());
 
-    // 2) MouthSocket(노랑 + 작게)
-    EntityId mouth = world.FindByName("MouthSocket");
-    if (world.HasTransform(mouth))
+    for (EntityId e : entities)
     {
+        if (!world.HasMesh(e) || !world.HasMaterial(e))
+            continue;
+
         RenderItem it{};
-        it.world = world.GetWorldMatrix(mouth);
-        it.color = { 1.0f, 1.0f, 0.2f, 1.0f };
+        it.world = world.GetWorldMatrix(e);
+        it.meshId = world.GetMesh(e).meshId;
+        it.color = world.GetMaterial(e).color;
         outItems.push_back(it);
     }
 }

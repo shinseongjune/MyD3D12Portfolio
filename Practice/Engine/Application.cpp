@@ -2,6 +2,7 @@
 #include "IRenderer.h"
 #include "D3D12Renderer.h"
 #include "Time.h"
+#include "TestScene.h"
 
 #include <stdexcept>
 #include <Windows.h>
@@ -24,26 +25,13 @@ void Application::Initialize(HINSTANCE hInstance)
     // 4) 월드 초기화
     // m_world.Initialize(); // 나중에 필요하면 추가
 
+    // 4-1) 첫 Scene 로드(테스트)
+    m_sceneManager.Load(m_world, std::make_unique<TestScene>());
+
     m_lastW = m_window.GetWidth();
     m_lastH = m_window.GetHeight();
 
     m_running = true;
-
-
-    // ==== 테스트 엔티티 생성 ====
-    EntityId player = m_world.CreateEntity("Player");
-    EntityId mouth = m_world.CreateEntity("MouthSocket");
-
-    m_world.EnsureTransform(player);
-    m_world.EnsureTransform(mouth);
-
-    // mouth를 player의 자식(소켓)으로
-    m_world.SetParent(mouth, player);
-
-    // player는 원점 근처, mouth는 머리/입 위치로 오프셋
-    m_world.SetLocalPosition(player, DirectX::XMFLOAT3{ 0.0f, 0.0f, 0.0f });
-    m_world.SetLocalPosition(mouth, DirectX::XMFLOAT3{ 0.3f, 1.2f, 0.0f });
-    m_world.SetLocalScale(mouth, DirectX::XMFLOAT3{ 0.3f, 0.3f, 0.3f });
 }
 
 void Application::Run()
@@ -71,44 +59,13 @@ void Application::Run()
         Time::Tick();
         const double dt = Time::DeltaTime();
 
-
-        // ==== 테스트: player를 좌우로 흔들기 ====
-        static double t = 0.0;
-        t += dt;
-
-        EntityId player = m_world.FindByName("Player");
-        if (player.IsValid())
-        {
-            auto p = m_world.GetLocalPosition(player);
-            p.x = (float)(sinf((float)t) * 5.0f); // -2~2
-            m_world.SetLocalPosition(player, p);
-        }
-
-		EntityId mouth = m_world.FindByName("MouthSocket");
-        static double acc = 0;
-        acc += dt;
-        if (acc > 0.5)
-        {
-            acc = 0;
-            auto lp = m_world.GetLocalPosition(mouth);
-            wchar_t buf[128];
-            swprintf_s(buf, L"mouth local: %.3f %.3f %.3f\n", lp.x, lp.y, lp.z);
-            //OutputDebugStringW(buf);
-        }
-
-        auto pw = m_world.GetWorldPosition(player);
-        auto mw = m_world.GetWorldPosition(mouth);
-        wchar_t buf[256];
-        swprintf_s(buf, L"player.x=%.3f mouth.x=%.3f\nplayer.x - mouth.x = %.3f\n", pw.x, mw.x, pw.x - mw.x);
-        OutputDebugStringW(buf);
-
         // 월드 갱신
         m_world.UpdateTransforms();
 
         // 드로우 리스트 생성
         m_renderSystem.Build(m_world, m_renderItems);
 
-		// 드로우 리스트 렌더링
+        // 드로우 리스트 렌더링
         m_renderer->Render(m_renderItems);
 
         // 임시: CPU 100% 방지(나중엔 Time/FPS 제어로 대체)
@@ -118,6 +75,9 @@ void Application::Run()
 
 void Application::Shutdown()
 {
+    // Scene 정리
+    m_sceneManager.Load(m_world, nullptr);
+
     if (m_renderer)
     {
         m_renderer->Shutdown();

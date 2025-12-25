@@ -128,15 +128,21 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
+    <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="D3D12Renderer.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="EntityId.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="IRenderer.h" />
+    <ClInclude Include="MaterialComponent.h" />
+    <ClInclude Include="MeshComponent.h" />
     <ClInclude Include="RenderItem.h" />
     <ClInclude Include="RenderSystem.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="Scene.h" />
+    <ClInclude Include="SceneManager.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="TestScene.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="TransformComponent.h" />
     <ClInclude Include="Win32Window.h" />
@@ -147,6 +153,7 @@
     <ClCompile Include="D3D12Renderer.cpp" />
     <ClCompile Include="Engine.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
+    <ClCompile Include="TestScene.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="Win32Window.cpp" />
     <ClCompile Include="World.cpp" />
