@@ -1,5 +1,5 @@
-#include "World.h"
-
+ï»¿#include "World.h"
+#include <cassert>
 #include <algorithm>
 #include <DirectXMath.h>
 
@@ -17,14 +17,14 @@ EntityId World::CreateEntity(const std::string& name)
 
         Slot& s = m_slots[index];
         s.alive = true;
-        // generationÀº Destroy¿¡¼­ ¿Ã·ÁµĞ °ª À¯Áö
+        // generationì€ Destroyì—ì„œ ì˜¬ë ¤ë‘” ê°’ ìœ ì§€
         s.name = name;
     }
     else
     {
         index = (uint32_t)m_slots.size();
         Slot s{};
-        s.generation = 1;   // 0Àº Invalid°ú Çò°¥¸± ¿©Áö°¡ ÀÖ¾î º¸Åë 1ºÎÅÍ ½ÃÀÛ
+        s.generation = 1;   // 0ì€ Invalidê³¼ í—·ê°ˆë¦´ ì—¬ì§€ê°€ ìˆì–´ ë³´í†µ 1ë¶€í„° ì‹œì‘
         s.alive = true;
         s.name = name;
         m_slots.push_back(std::move(s));
@@ -59,10 +59,10 @@ void World::DestroyEntity(EntityId e)
     s.alive = false;
     s.name.clear();
 
-    // generation Áõ°¡: ¿¹Àü ÇÚµé ¹«È¿È­(À¯·É ÂüÁ¶ ¹æÁö)
+    // generation ì¦ê°€: ì˜ˆì „ í•¸ë“¤ ë¬´íš¨í™”(ìœ ë ¹ ì°¸ì¡° ë°©ì§€)
     ++s.generation;
 
-    // Àç»ç¿ë ¸®½ºÆ®¿¡ ³Ö±â
+    // ì¬ì‚¬ìš© ë¦¬ìŠ¤íŠ¸ì— ë„£ê¸°
     m_freeList.push_back(e.index);
 
     if (m_aliveCount > 0) --m_aliveCount;
@@ -83,7 +83,7 @@ EntityId World::FindByName(const std::string& name) const
     if (it == m_nameToEntity.end())
         return EntityId::Invalid();
 
-    // ¸ÅÇÎÀÌ ¿À·¡µÆÀ» ¼öµµ ÀÖÀ¸´Ï »ıÁ¸ È®ÀÎ
+    // ë§¤í•‘ì´ ì˜¤ë˜ëì„ ìˆ˜ë„ ìˆìœ¼ë‹ˆ ìƒì¡´ í™•ì¸
     if (!IsAlive(it->second))
         return EntityId::Invalid();
 
@@ -99,7 +99,7 @@ const std::string& World::GetName(EntityId e) const
 
 void World::RemoveNameMapping(EntityId e)
 {
-    // ÀÌ¸§ÀÌ ÀÖ´Ù¸é map¿¡¼­ Á¦°Å
+    // ì´ë¦„ì´ ìˆë‹¤ë©´ mapì—ì„œ ì œê±°
     if (!e.IsValid() || e.index >= m_slots.size()) return;
     const std::string& name = m_slots[e.index].name;
     if (name.empty()) return;
@@ -109,7 +109,7 @@ void World::RemoveNameMapping(EntityId e)
         m_nameToEntity.erase(it);
 }
 
-// --- Transform API ±¸Çö ---
+// --- Transform API êµ¬í˜„ ---
 
 void World::EnsureTransformSparseSize(uint32_t entityIndex)
 {
@@ -124,7 +124,7 @@ void World::EnsureMeshSparseSize(uint32_t entityIndex)
         m_meshSparse.resize(entityIndex + 1, InvalidDenseIndex);
 }
 
-void World::AddMesh(EntityId e)
+void World::AddMesh(EntityId e, const MeshComponent& comp)
 {
     if (!IsAlive(e)) return;
     EnsureMeshSparseSize(e.index);
@@ -134,26 +134,38 @@ void World::AddMesh(EntityId e)
     const uint32_t denseIndex = (uint32_t)m_meshes.size();
     m_meshSparse[e.index] = denseIndex;
     m_meshDenseEntities.push_back(e);
-    m_meshes.emplace_back();
+    m_meshes.push_back(comp);
 }
 
 bool World::HasMesh(EntityId e) const
 {
     if (!IsAlive(e)) return false;
     if (e.index >= m_meshSparse.size()) return false;
-    return m_meshSparse[e.index] != InvalidDenseIndex;
+
+    const uint32_t di = m_meshSparse[e.index];
+    if (di == InvalidDenseIndex) return false;
+    if (di >= m_meshDenseEntities.size()) return false;
+    return m_meshDenseEntities[di] == e;
 }
 
 MeshComponent& World::GetMesh(EntityId e)
 {
-    const uint32_t denseIndex = m_meshSparse[e.index];
-    return m_meshes[denseIndex];
+#if defined(_DEBUG)
+    assert(HasMesh(e));
+    assert(m_meshes[m_meshSparse[e.index]].mesh.IsValid()
+        && "MeshComponent has invalid MeshHandle");
+#endif
+    return m_meshes[m_meshSparse[e.index]];
 }
 
 const MeshComponent& World::GetMesh(EntityId e) const
 {
-    const uint32_t denseIndex = m_meshSparse[e.index];
-    return m_meshes[denseIndex];
+#if defined(_DEBUG)
+    assert(HasMesh(e));
+    assert(m_meshes[m_meshSparse[e.index]].mesh.IsValid()
+        && "MeshComponent has invalid MeshHandle");
+#endif
+    return m_meshes[m_meshSparse[e.index]];
 }
 
 void World::RemoveMesh(EntityId e)
@@ -173,11 +185,6 @@ void World::RemoveMesh(EntityId e)
     m_meshes.pop_back();
     m_meshDenseEntities.pop_back();
     m_meshSparse[e.index] = InvalidDenseIndex;
-}
-
-void World::EnsureMesh(EntityId e)
-{
-    if (!HasMesh(e)) AddMesh(e);
 }
 
 // --- Material Storage ---
@@ -204,17 +211,27 @@ bool World::HasMaterial(EntityId e) const
 {
     if (!IsAlive(e)) return false;
     if (e.index >= m_materialSparse.size()) return false;
-    return m_materialSparse[e.index] != InvalidDenseIndex;
+
+	const uint32_t di = m_materialSparse[e.index];
+	if (di == InvalidDenseIndex) return false;
+	if (di >= m_materialDenseEntities.size()) return false;
+    return m_materialDenseEntities[di] == e;
 }
 
 MaterialComponent& World::GetMaterial(EntityId e)
 {
-    const uint32_t denseIndex = m_materialSparse[e.index];
+#if defined(_DEBUG)
+    assert(HasMaterial(e));
+#endif
+    uint32_t denseIndex = m_materialSparse[e.index];
     return m_materials[denseIndex];
 }
 
 const MaterialComponent& World::GetMaterial(EntityId e) const
 {
+#if defined(_DEBUG)
+    assert(HasMaterial(e));
+#endif
     const uint32_t denseIndex = m_materialSparse[e.index];
     return m_materials[denseIndex];
 }
@@ -238,12 +255,7 @@ void World::RemoveMaterial(EntityId e)
     m_materialSparse[e.index] = InvalidDenseIndex;
 }
 
-void World::EnsureMaterial(EntityId e)
-{
-    if (!HasMaterial(e)) AddMaterial(e);
-}
-
-// --- Camera Storage (»À´ë) ---
+// --- Camera Storage (ë¼ˆëŒ€) ---
 void World::EnsureCameraSparseSize(uint32_t entityIndex)
 {
     if (m_cameraSparse.size() <= entityIndex)
@@ -267,17 +279,27 @@ bool World::HasCamera(EntityId e) const
 {
     if (!IsAlive(e)) return false;
     if (e.index >= m_cameraSparse.size()) return false;
-    return m_cameraSparse[e.index] != InvalidDenseIndex;
+
+	const uint32_t di = m_cameraSparse[e.index];
+	if (di == InvalidDenseIndex) return false;
+	if (di >= m_cameraDenseEntities.size()) return false;
+	return m_cameraDenseEntities[di] == e;
 }
 
 CameraComponent& World::GetCamera(EntityId e)
 {
-    const uint32_t denseIndex = m_cameraSparse[e.index];
+#if defined(_DEBUG)
+    assert(HasCamera(e));
+#endif
+    uint32_t denseIndex = m_cameraSparse[e.index];
     return m_cameras[denseIndex];
 }
 
 const CameraComponent& World::GetCamera(EntityId e) const
 {
+#if defined(_DEBUG)
+	assert(HasCamera(e));
+#endif
     const uint32_t denseIndex = m_cameraSparse[e.index];
     return m_cameras[denseIndex];
 }
@@ -301,11 +323,6 @@ void World::RemoveCamera(EntityId e)
     m_cameraSparse[e.index] = InvalidDenseIndex;
 }
 
-void World::EnsureCamera(EntityId e)
-{
-    if (!HasCamera(e)) AddCamera(e);
-}
-
 EntityId World::FindActiveCamera() const
 {
     for (size_t i = 0; i < m_cameras.size(); ++i)
@@ -321,7 +338,7 @@ void World::RequestDestroy(EntityId e)
     if (!IsAlive(e))
         return;
 
-    // Áßº¹ ¿äÃ» ¹æÁö
+    // ì¤‘ë³µ ìš”ì²­ ë°©ì§€
     auto it = std::find(m_pendingDestroy.begin(), m_pendingDestroy.end(), e);
     if (it != m_pendingDestroy.end())
         return;
@@ -334,7 +351,7 @@ void World::FlushDestroy()
     if (m_pendingDestroy.empty())
         return;
 
-    // 1) Áßº¹/¼ø¼­ ¾ÈÁ¤È­: Á¤·Ä + unique (È¤½Ã ¸ğ¸¦ Áßº¹ ¹æ¾î)
+    // 1) ì¤‘ë³µ/ìˆœì„œ ì•ˆì •í™”: ì •ë ¬ + unique (í˜¹ì‹œ ëª¨ë¥¼ ì¤‘ë³µ ë°©ì–´)
     std::sort(m_pendingDestroy.begin(), m_pendingDestroy.end(),
         [](EntityId a, EntityId b) { return a.index < b.index; });
 
@@ -342,12 +359,12 @@ void World::FlushDestroy()
         std::unique(m_pendingDestroy.begin(), m_pendingDestroy.end()),
         m_pendingDestroy.end());
 
-    // 2) ½ÇÁ¦ »èÁ¦ ½ÇÇà (¿©±â¼­¸¸!)
+    // 2) ì‹¤ì œ ì‚­ì œ ì‹¤í–‰
     for (EntityId e : m_pendingDestroy)
     {
         if (IsAlive(e))
         {
-            DestroyEntity(e); // ³×°¡ ÀÌ¹Ì °®°í ÀÖ´Â "Áï½Ã »èÁ¦" ·çÆ¾À» ¿©±â¼­ È£Ãâ
+            DestroyEntity(e);
         }
     }
 
@@ -368,7 +385,7 @@ void World::AddTransform(EntityId e)
     m_transformDenseEntities.push_back(e);
     m_transforms.emplace_back();
 
-    // world¸¦ identity·Î ÃÊ±âÈ­
+    // worldë¥¼ identityë¡œ ì´ˆê¸°í™”
     XMStoreFloat4x4(&m_transforms.back().world, XMMatrixIdentity());
     m_transforms.back().dirty = true;
 }
@@ -377,18 +394,27 @@ bool World::HasTransform(EntityId e) const
 {
     if (!IsAlive(e)) return false;
     if (e.index >= m_transformSparse.size()) return false;
-    return m_transformSparse[e.index] != InvalidDenseIndex;
+
+	const uint32_t di = m_transformSparse[e.index];
+	if (di == InvalidDenseIndex) return false;
+	if (di >= m_transformDenseEntities.size()) return false;
+	return m_transformDenseEntities[di] == e;
 }
 
 TransformComponent& World::GetTransform(EntityId e)
 {
-    // ½ÇÀü¿¡¼­´Â assert/ThrowIf·Î Ã³¸® ÃßÃµ
+#if defined(_DEBUG)
+	assert(HasTransform(e));
+#endif
     const uint32_t denseIndex = m_transformSparse[e.index];
     return m_transforms[denseIndex];
 }
 
 const TransformComponent& World::GetTransform(EntityId e) const
 {
+#if defined(_DEBUG)
+    assert(HasTransform(e));
+#endif
     const uint32_t denseIndex = m_transformSparse[e.index];
     return m_transforms[denseIndex];
 }
@@ -398,10 +424,10 @@ void World::RemoveTransform(EntityId e)
     if (!HasTransform(e))
         return;
 
-    // parent/child °ü°è Á¤¸®: ºÎ¸ğ¿¡¼­ ³ª Á¦°Å, ÀÚ½ÄµéÀº ºÎ¸ğ invalid·Î
+    // parent/child ê´€ê³„ ì •ë¦¬: ë¶€ëª¨ì—ì„œ ë‚˜ ì œê±°, ìì‹ë“¤ì€ ë¶€ëª¨ invalidë¡œ
     TransformComponent& t = GetTransform(e);
 
-    // ºÎ¸ğ¿¡¼­ ºĞ¸®
+    // ë¶€ëª¨ì—ì„œ ë¶„ë¦¬
     if (t.parent.IsValid() && HasTransform(t.parent))
     {
         TransformComponent& p = GetTransform(t.parent);
@@ -417,7 +443,7 @@ void World::RemoveTransform(EntityId e)
         }
     }
 
-    // ÀÚ½Äµé parent ²÷±â(ÀÏ´Ü ·çÆ®·Î ¿Ã¸²)
+    // ìì‹ë“¤ parent ëŠê¸°(ì¼ë‹¨ ë£¨íŠ¸ë¡œ ì˜¬ë¦¼)
     for (EntityId c : t.children)
     {
         if (HasTransform(c))
@@ -436,11 +462,11 @@ void World::RemoveTransform(EntityId e)
 
     if (denseIndex != lastIndex)
     {
-        // ¸¶Áö¸· ¿ä¼Ò¸¦ denseIndex À§Ä¡·Î ¿Å±è
+        // ë§ˆì§€ë§‰ ìš”ì†Œë¥¼ denseIndex ìœ„ì¹˜ë¡œ ì˜®ê¹€
         m_transforms[denseIndex] = std::move(m_transforms[lastIndex]);
         m_transformDenseEntities[denseIndex] = m_transformDenseEntities[lastIndex];
 
-        // sparse °»½Å
+        // sparse ê°±ì‹ 
         EntityId movedEntity = m_transformDenseEntities[denseIndex];
         m_transformSparse[movedEntity.index] = denseIndex;
     }
@@ -458,7 +484,7 @@ void World::SetParent(EntityId child, EntityId newParent)
 
     TransformComponent& ct = GetTransform(child);
 
-    // ±âÁ¸ parent¿¡¼­ Á¦°Å
+    // ê¸°ì¡´ parentì—ì„œ ì œê±°
     if (ct.parent.IsValid() && HasTransform(ct.parent))
     {
         TransformComponent& oldP = GetTransform(ct.parent);
@@ -474,7 +500,7 @@ void World::SetParent(EntityId child, EntityId newParent)
         }
     }
 
-    // »õ parent¿¡ Ãß°¡
+    // ìƒˆ parentì— ì¶”ê°€
     ct.parent = newParent;
     if (newParent.IsValid())
     {
@@ -482,7 +508,7 @@ void World::SetParent(EntityId child, EntityId newParent)
         np.children.push_back(child);
     }
 
-    // °èÃş º¯°æÀº ¿ùµåÇà·Ä ÀüÃ¼¿¡ ¿µÇâ
+    // ê³„ì¸µ ë³€ê²½ì€ ì›”ë“œí–‰ë ¬ ì „ì²´ì— ì˜í–¥
     MarkDirtyRecursive(child);
 }
 
@@ -504,7 +530,7 @@ DirectX::XMMATRIX World::LocalMatrix(const TransformComponent& t) const
     const XMVECTOR Q = XMVectorSet(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
     const XMMATRIX R = XMMatrixRotationQuaternion(Q);
     const XMMATRIX T = XMMatrixTranslation(t.position.x, t.position.y, t.position.z);
-    return S * R * T; // row-vector °ü·Ê
+    return S * R * T; // row-vector ê´€ë¡€
 }
 
 void World::UpdateWorldRecursive(EntityId e, const DirectX::XMMATRIX& parentWorld)
@@ -524,7 +550,7 @@ void World::UpdateWorldRecursive(EntityId e, const DirectX::XMMATRIX& parentWorl
 
 void World::UpdateTransforms()
 {
-    // ·çÆ®µéºÎÅÍ °»½Å (parent°¡ invalidÀÎ transform)
+    // ë£¨íŠ¸ë“¤ë¶€í„° ê°±ì‹  (parentê°€ invalidì¸ transform)
     const XMMATRIX I = XMMatrixIdentity();
 
     for (size_t i = 0; i < m_transformDenseEntities.size(); ++i)
@@ -533,7 +559,7 @@ void World::UpdateTransforms()
         if (!HasTransform(e)) continue;
 
         const TransformComponent& t = GetTransform(e);
-        if (!t.parent.IsValid())
+        if (!t.parent.IsValid() && t.dirty)
         {
             UpdateWorldRecursive(e, I);
         }
@@ -552,12 +578,6 @@ bool World::TransformsUpdatedThisFrame() const
     return m_transformUpdatedFrame == m_frameIndex;
 }
 
-void World::EnsureTransform(EntityId e)
-{
-    if (!IsAlive(e)) return;
-    if (!HasTransform(e)) AddTransform(e);
-}
-
 XMFLOAT3 World::GetLocalPosition(EntityId e) const
 {
     if (!HasTransform(e)) return XMFLOAT3{ 0,0,0 };
@@ -567,7 +587,6 @@ XMFLOAT3 World::GetLocalPosition(EntityId e) const
 
 void World::SetLocalPosition(EntityId e, const XMFLOAT3& p)
 {
-    EnsureTransform(e);
     if (!HasTransform(e)) return;
 
     TransformComponent& t = GetTransform(e);
@@ -584,7 +603,6 @@ XMFLOAT4 World::GetLocalRotation(EntityId e) const
 
 void World::SetLocalRotation(EntityId e, const XMFLOAT4& q)
 {
-    EnsureTransform(e);
     if (!HasTransform(e)) return;
 
     TransformComponent& t = GetTransform(e);
@@ -601,7 +619,6 @@ XMFLOAT3 World::GetLocalScale(EntityId e) const
 
 void World::SetLocalScale(EntityId e, const XMFLOAT3& s)
 {
-    EnsureTransform(e);
     if (!HasTransform(e)) return;
 
     TransformComponent& t = GetTransform(e);
@@ -609,10 +626,23 @@ void World::SetLocalScale(EntityId e, const XMFLOAT3& s)
     MarkDirtyRecursive(e);
 }
 
+void World::TranslateLocal(EntityId e, const XMFLOAT3& delta)
+{
+    if (!HasTransform(e)) return;
+    TransformComponent& t = GetTransform(e);
+    t.position.x += delta.x;
+    t.position.y += delta.y;
+    t.position.z += delta.z;
+    MarkDirtyRecursive(e);
+}
+
 XMFLOAT4X4 World::GetWorldMatrix(EntityId e) const
 {
-    static XMFLOAT4X4 I;
-    XMStoreFloat4x4(&I, XMMatrixIdentity());
+    static const XMFLOAT4X4 I = [] {
+        XMFLOAT4X4 m;
+        XMStoreFloat4x4(&m, XMMatrixIdentity());
+        return m;
+        }();
 
     if (!HasTransform(e)) return I;
     const TransformComponent& t = GetTransform(e);
@@ -625,11 +655,11 @@ XMFLOAT3 World::GetWorldPosition(EntityId e) const
 
     const TransformComponent& t = GetTransform(e);
 
-    // world Çà·ÄÀÇ translation ¼ººĞ ÃßÃâ
-    // XMFLOAT4X4´Â row-majorÃ³·³ ÀúÀåµÇÁö¸¸, DirectXMath Çà·ÄÀº column-major °³³äÀÌ¶ó Çò°¥¸®±â ½¬¿ò.
-    // XMMatrixTranslationÀ» S*R*T ¼øÀ¸·Î ±¸¼ºÇßÀ¸´Ï, ¿©±â¼­´Â "ÀúÀåµÈ world"¸¦ ·ÎµåÇØ¼­ position º¤ÅÍ¸¦ »Ì´Â ¹æ½ÄÀÌ ¾ÈÀüÇÔ.
+    // world í–‰ë ¬ì˜ translation ì„±ë¶„ ì¶”ì¶œ
+    // ìš°ë¦¬ ì—”ì§„ì€ row-vector(ë²¡í„°ê°€ ì™¼ìª½) ê´€ë¡€: v * M
+    // ë”°ë¼ì„œ translationì€ Mì˜ row 3 (W.r[3])ì— ì¡´ì¬
     XMMATRIX W = XMLoadFloat4x4(&t.world);
-    XMVECTOR pos = W.r[3]; // (x,y,z,1) row º¤ÅÍ
+    XMVECTOR pos = W.r[3]; // (x,y,z,1) row ë²¡í„°
     XMFLOAT3 out{};
     XMStoreFloat3(&out, pos);
     return out;

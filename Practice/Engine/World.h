@@ -113,33 +113,29 @@ public:
     DirectX::XMFLOAT3 GetLocalScale(EntityId e) const;
     void SetLocalScale(EntityId e, const DirectX::XMFLOAT3& s);
 
+    void TranslateLocal(EntityId e, const DirectX::XMFLOAT3& delta);
+
     // World-space
     DirectX::XMFLOAT4X4 GetWorldMatrix(EntityId e) const;
     DirectX::XMFLOAT3  GetWorldPosition(EntityId e) const;
 
-    // 편의: Transform 보장(없으면 자동 추가)
-    void EnsureTransform(EntityId e);
-
     // --- Mesh API ---
-    void AddMesh(EntityId e);
+    void AddMesh(EntityId e, const MeshComponent& comp);
     bool HasMesh(EntityId e) const;
     MeshComponent& GetMesh(EntityId e);
     const MeshComponent& GetMesh(EntityId e) const;
-    void EnsureMesh(EntityId e);
 
     // --- Material API ---
     void AddMaterial(EntityId e);
     bool HasMaterial(EntityId e) const;
     MaterialComponent& GetMaterial(EntityId e);
     const MaterialComponent& GetMaterial(EntityId e) const;
-    void EnsureMaterial(EntityId e);
 
     // --- Camera API (아직 렌더러에서 미사용, 뼈대만) ---
     void AddCamera(EntityId e);
     bool HasCamera(EntityId e) const;
     CameraComponent& GetCamera(EntityId e);
     const CameraComponent& GetCamera(EntityId e) const;
-    void EnsureCamera(EntityId e);
 
     // 단순한 "활성 카메라" 찾기(첫 active 카메라)
     EntityId FindActiveCamera() const;

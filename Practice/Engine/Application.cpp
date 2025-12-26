@@ -5,7 +5,7 @@
 #include "TestScene.h"
 #include "RenderCamera.h"
 #include "Input.h"
-
+#include "DebugDraw.h"
 #include <DirectXMath.h>
 #include <stdexcept>
 #include <Windows.h>
@@ -25,11 +25,14 @@ void Application::Initialize(HINSTANCE hInstance)
     m_renderer = std::make_unique<D3D12Renderer>();
     m_renderer->Initialize(m_window.GetHwnd(), m_window.GetWidth(), m_window.GetHeight());
 
+    auto* d3d = static_cast<D3D12Renderer*>(m_renderer.get());
+    d3d->SetMeshManager(&m_meshManager);
+
     // 4) 월드 초기화
     // m_world.Initialize(); // 나중에 필요하면 추가
 
     // 4-1) 첫 Scene 로드(테스트)
-    m_sceneManager.Load(m_world, std::make_unique<TestScene>());
+    m_sceneManager.Load(m_world, std::make_unique<TestScene>(m_meshManager));
 
     m_lastW = m_window.GetWidth();
     m_lastH = m_window.GetHeight();
@@ -62,7 +65,11 @@ void Application::Run()
         Time::Tick();
         const double dt = Time::DeltaTime();
 
+        // world 프레임 갱신
         m_world.BeginFrame();
+
+		// DebugDraw 갱신
+        DebugDraw::BeginFrame();
 
 		// Input 갱신
         Input::Update();

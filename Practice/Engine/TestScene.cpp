@@ -1,51 +1,51 @@
 #include "TestScene.h"
-
+#include "DebugDraw.h"
 #include "World.h"
 #include "Input.h"
+#include "MeshResource.h"
 
 using namespace DirectX;
 
+static MeshResource CreateCubeMesh()
+{
+    MeshResource mesh;
+
+    mesh.positions = {
+        {-0.5f,-0.5f,-0.5f}, {-0.5f, 0.5f,-0.5f}, { 0.5f, 0.5f,-0.5f}, { 0.5f,-0.5f,-0.5f},
+        {-0.5f,-0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f}, { 0.5f, 0.5f, 0.5f}, { 0.5f,-0.5f, 0.5f},
+    };
+
+    mesh.indices = {
+        0,1,2, 0,2,3,
+        4,6,5, 4,7,6,
+        4,5,1, 4,1,0,
+        3,2,6, 3,6,7,
+        1,5,6, 1,6,2,
+        4,0,3, 4,3,7
+    };
+
+    return mesh;
+}
+
 void TestScene::OnLoad(World& world)
 {
-    m_spawned.clear();
+    // 1) Å¥ºê ¸Ş½¬ µî·Ï
+    MeshResource cube = CreateCubeMesh();
+    MeshHandle cubeHandle = m_meshManager.Create(cube);
 
-    // Player
-    {
-        EntityId e = world.CreateEntity("Player");
-        m_spawned.push_back(e);
+    // 2) ¿£Æ¼Æ¼ »ı¼º
+    EntityId e = world.CreateEntity("Cube");
 
-        world.EnsureTransform(e);
-        world.EnsureMesh(e);
-        world.EnsureMaterial(e);
+    world.AddTransform(e);
+    world.AddMesh(e, MeshComponent{ cubeHandle });
 
-        world.GetMaterial(e).color = { 0.2f, 0.6f, 1.0f, 1.0f }; // íŒŒë‘
-        world.SetLocalPosition(e, { 0.f, 0.f, 0.f });
-    }
-
-    // MouthSocket (Playerì˜ ìì‹)
-    {
-        EntityId player = world.FindByName("Player");
-        EntityId mouth = world.CreateEntity("MouthSocket");
-        m_spawned.push_back(mouth);
-
-        world.EnsureTransform(mouth);
-        world.EnsureMesh(mouth);
-        world.EnsureMaterial(mouth);
-
-        world.GetMaterial(mouth).color = { 1.0f, 1.0f, 0.2f, 1.0f }; // ë…¸ë‘
-        world.SetLocalPosition(mouth, { 0.f, 0.8f, 0.f });
-        world.SetLocalScale(mouth, { 0.25f, 0.25f, 0.25f });
-
-        world.SetParent(mouth, player);
-    }
-
-    // Camera (ì•„ì§ Rendererì—ì„œ ë¯¸ì‚¬ìš©ì´ì§€ë§Œ, "ì›”ë“œì— ì¹´ë©”ë¼ê°€ ìˆë‹¤"ëŠ” í˜•íƒœë¥¼ ë§Œë“¤ì–´ë‘”ë‹¤)
+    // Camera
     {
         EntityId cam = world.CreateEntity("MainCamera");
         m_spawned.push_back(cam);
 
-        world.EnsureTransform(cam);
-        world.EnsureCamera(cam);
+        world.AddTransform(cam);
+        world.AddCamera(cam);
 
         world.SetLocalPosition(cam, { 0.f, 0.f, -6.f });
         world.GetCamera(cam).active = true;
@@ -54,7 +54,7 @@ void TestScene::OnLoad(World& world)
 
 void TestScene::OnUnload(World& world)
 {
-    // ì—­ìˆœ íŒŒê´´(ë¶€ëª¨-ìì‹ ê´€ê³„ê°€ ìˆì„ ìˆ˜ ìˆì–´ ì•ˆì „)
+    // ¿ª¼ø ÆÄ±«(ºÎ¸ğ-ÀÚ½Ä °ü°è°¡ ÀÖÀ» ¼ö ÀÖ¾î ¾ÈÀü)
     for (auto it = m_spawned.rbegin(); it != m_spawned.rend(); ++it)
         world.RequestDestroy(*it);
     m_spawned.clear();
@@ -69,10 +69,28 @@ void TestScene::OnUpdate(World& world, float deltaTime)
 
     const float speed = 3.0f * deltaTime;
 
-    if (Input::IsKeyDown(Key::W)) t.position.z += speed;
-    if (Input::IsKeyDown(Key::S)) t.position.z -= speed;
-    if (Input::IsKeyDown(Key::A)) t.position.x -= speed;
-    if (Input::IsKeyDown(Key::D)) t.position.x += speed;
-	if (Input::IsKeyDown(Key::Q)) t.position.y -= speed;
-    if (Input::IsKeyDown(Key::E)) t.position.y += speed;
+    XMFLOAT3 delta{ 0,0,0 };
+    if (Input::IsKeyDown(Key::W)) delta.z += speed;
+    if (Input::IsKeyDown(Key::S)) delta.z -= speed;
+    if (Input::IsKeyDown(Key::A)) delta.x -= speed;
+    if (Input::IsKeyDown(Key::D)) delta.x += speed;
+    if (Input::IsKeyDown(Key::Q)) delta.y -= speed;
+    if (Input::IsKeyDown(Key::E)) delta.y += speed;
+	world.TranslateLocal(cam, delta);
+
+    // Debug
+    DebugDraw::Line(
+        XMFLOAT3{ 0,0,0 },
+        XMFLOAT3{ 1,0,0 },
+        XMFLOAT4{ 1,0,0,1 }); // XÃà
+
+    DebugDraw::Line(
+        XMFLOAT3{ 0,0,0 },
+        XMFLOAT3{ 0,1,0 },
+        XMFLOAT4{ 0,1,0,1 }); // YÃà
+
+    DebugDraw::Line(
+        XMFLOAT3{ 0,0,0 },
+        XMFLOAT3{ 0,0,1 },
+        XMFLOAT4{ 0,0,1,1 }); // ZÃà
 }

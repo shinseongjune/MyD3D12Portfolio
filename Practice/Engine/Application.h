@@ -9,6 +9,7 @@
 #include "RenderItem.h"
 #include "RenderSystem.h"
 #include "SceneManager.h"
+#include "MeshManager.h"
 
 class Application
 {
@@ -25,6 +26,7 @@ private:
     std::vector<RenderItem> m_renderItems;
 
     SceneManager m_sceneManager;
+	MeshManager m_meshManager;
 
 public:
     Application() = default;

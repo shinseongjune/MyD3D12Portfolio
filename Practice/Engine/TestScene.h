@@ -2,10 +2,13 @@
 #include <vector>
 #include "Scene.h"
 #include "EntityId.h"
+#include "MeshManager.h"
 
 class TestScene final : public Scene
 {
 public:
+    TestScene(MeshManager& mm) : m_meshManager(mm) {}
+
     void OnLoad(World& world) override;
     void OnUnload(World& world) override;
 
@@ -13,4 +16,6 @@ public:
 
 private:
     std::vector<EntityId> m_spawned;
+
+    MeshManager& m_meshManager;
 };

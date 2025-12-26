@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <algorithm>
 #include <d3dcompiler.h>
+#include "MeshManager.h"
+#include "DebugDraw.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -29,8 +31,10 @@ void D3D12Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
     CreateDepthStencil(width, height);
 
     CreatePipeline();
-    CreateCubeGeometry();
     CreateConstantBuffer();
+
+    CreateDebugLinePipeline();
+    CreateDebugVertexBuffer();
 
     // viewport/scissor
     m_viewport = { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f };
@@ -56,6 +60,12 @@ void D3D12Renderer::Shutdown()
         m_cbMapped = nullptr;
     }
 
+    if (m_debugVBMapped)
+    {
+        m_debugVB->Unmap(0, nullptr);
+        m_debugVBMapped = nullptr;
+    }
+
     if (m_fenceEvent)
     {
         CloseHandle(m_fenceEvent);
@@ -63,6 +73,11 @@ void D3D12Renderer::Shutdown()
     }
 
     // ComPtr들은 자동 해제
+}
+
+void D3D12Renderer::SetMeshManager(const MeshManager* mm)
+{
+    m_meshManager = mm;
 }
 
 void D3D12Renderer::Resize(uint32_t width, uint32_t height)
@@ -131,10 +146,8 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    m_commandList->IASetVertexBuffers(0, 1, &m_vbView);
-    m_commandList->IASetIndexBuffer(&m_ibView);
 
-    // 임시 카메라(나중에 CameraSystem으로 바꿀 자리)
+    // View/Proj 행렬
     XMMATRIX V = XMLoadFloat4x4(&cam.view);
     XMMATRIX P = XMLoadFloat4x4(&cam.proj);
 
@@ -146,6 +159,14 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     {
         const RenderItem& it = items[i];
 
+        // 1) GPU 메쉬 확보
+        GPUMesh& mesh = GetOrCreateGPUMesh(it.mesh.id);
+
+        // 2) IA 설정
+        m_commandList->IASetVertexBuffers(0, 1, &mesh.vbView);
+        m_commandList->IASetIndexBuffer(&mesh.ibView);
+
+        // 3) 상수버퍼 설정 (MVP, color)
         XMMATRIX W = XMLoadFloat4x4(&it.world);
         XMMATRIX MVP = W * V * P;
 
@@ -154,15 +175,74 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         cb.color = it.color;
 
         const uint32_t slot = frameBase + i;
-        uint8_t* dst = m_cbMapped + (size_t)slot * m_cbStride;
-        memcpy(dst, &cb, sizeof(DrawCB));
+        memcpy(m_cbMapped + slot * m_cbStride, &cb, sizeof(DrawCB));
 
-        const D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
+        D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
             m_cb->GetGPUVirtualAddress() + (UINT64)slot * m_cbStride;
 
         m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
-        m_commandList->DrawIndexedInstanced(m_indexCount, 1, 0, 0, 0);
+
+        // 4) Draw
+        m_commandList->DrawIndexedInstanced(
+            mesh.indexCount, 1, 0, 0, 0);
     }
+
+
+    // --- Debug Lines (world-space) ---
+    {
+        const auto& lines = DebugDraw::GetLines();
+        if (!lines.empty() && drawCount < MaxDrawsPerFrame)
+        {
+            const uint32_t lineCount = std::min<uint32_t>((uint32_t)lines.size(), MaxDebugLinesPerFrame);
+            const uint32_t vertexCount = lineCount * 2;
+
+            // Fill frame-sliced VB
+            const uint32_t baseVertex = m_frameIndex * MaxDebugVerticesPerFrame;
+            DebugVertex* dst = reinterpret_cast<DebugVertex*>(m_debugVBMapped) + baseVertex;
+
+            for (uint32_t i = 0; i < lineCount; ++i)
+            {
+                const DebugLine& L = lines[i];
+                dst[i * 2 + 0] = { L.a, L.color };
+                dst[i * 2 + 1] = { L.b, L.color };
+            }
+
+            // Set pipeline
+            m_commandList->SetPipelineState(m_psoDebugLine.Get());
+            m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+            m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+
+            // Set VB view (subrange for this frame)
+            D3D12_VERTEX_BUFFER_VIEW vbv{};
+            vbv.BufferLocation = m_debugVB->GetGPUVirtualAddress() + (UINT64)baseVertex * (UINT64)m_debugVBStride;
+            vbv.SizeInBytes = vertexCount * m_debugVBStride;
+            vbv.StrideInBytes = m_debugVBStride;
+            m_commandList->IASetVertexBuffers(0, 1, &vbv);
+
+            // Set CB (use next slot after mesh draws in this frame)
+            XMMATRIX VP = V * P;
+
+            DrawCB cb{};
+            XMStoreFloat4x4(&cb.mvp, VP);
+            cb.color = { 1,1,1,1 }; // unused in debug PS
+
+            const uint32_t debugSlot = frameBase + drawCount; // safe: drawCount <= MaxDrawsPerFrame
+            memcpy(m_cbMapped + debugSlot * m_cbStride, &cb, sizeof(DrawCB));
+
+            D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
+                m_cb->GetGPUVirtualAddress() + (UINT64)debugSlot * (UINT64)m_cbStride;
+
+            m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
+
+            // Draw
+            m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
+
+            // Restore triangle PSO for future (optional)
+            m_commandList->SetPipelineState(m_pso.Get());
+            m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        }
+    }
+
 
     // Transition: RenderTarget -> Present
     {
@@ -392,7 +472,7 @@ void D3D12Renderer::CreatePipeline()
     //pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT); // d3dx12 없으면 아래로 교체
     //pso.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     //pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    
+
     // RasterizerState (default)
     pso.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
     pso.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
@@ -438,71 +518,124 @@ void D3D12Renderer::CreatePipeline()
     ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_pso)));
 }
 
-void D3D12Renderer::CreateCubeGeometry()
+void D3D12Renderer::CreateDebugLinePipeline()
 {
-    struct V { XMFLOAT3 pos; };
-
-    // unit cube (centered)
-    const V vertices[] =
+    // Shaders (inline)
+    const char* vsCode = R"(
+    cbuffer DrawCB : register(b0)
     {
-        {{-0.5f,-0.5f,-0.5f}}, {{-0.5f, 0.5f,-0.5f}}, {{ 0.5f, 0.5f,-0.5f}}, {{ 0.5f,-0.5f,-0.5f}},
-        {{-0.5f,-0.5f, 0.5f}}, {{-0.5f, 0.5f, 0.5f}}, {{ 0.5f, 0.5f, 0.5f}}, {{ 0.5f,-0.5f, 0.5f}},
+        row_major float4x4 mvp;
+        float4 color;
     };
 
-    const uint16_t indices[] =
+    struct VSIn { float3 pos : POSITION; float4 col : COLOR; };
+    struct VSOut { float4 pos : SV_POSITION; float4 col : COLOR; };
+
+    VSOut main(VSIn i)
     {
-        0,1,2, 0,2,3, // -Z
-        4,6,5, 4,7,6, // +Z
-        4,5,1, 4,1,0, // -X
-        3,2,6, 3,6,7, // +X
-        1,5,6, 1,6,2, // +Y
-        4,0,3, 4,3,7  // -Y
+        VSOut o;
+        o.pos = mul(float4(i.pos, 1.0), mvp);
+        o.col = i.col;
+        return o;
+    }
+    )";
+
+    const char* psCode = R"(
+    struct PSIn { float4 pos : SV_POSITION; float4 col : COLOR; };
+    float4 main(PSIn i) : SV_TARGET { return i.col; }
+    )";
+
+    ComPtr<ID3DBlob> vs, ps, err;
+    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined(_DEBUG)
+    flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+    ThrowIfFailed(D3DCompile(vsCode, strlen(vsCode), nullptr, nullptr, nullptr, "main", "vs_5_0", flags, 0, &vs, &err));
+    ThrowIfFailed(D3DCompile(psCode, strlen(psCode), nullptr, nullptr, nullptr, "main", "ps_5_0", flags, 0, &ps, &err));
+
+    // Input layout
+    D3D12_INPUT_ELEMENT_DESC il[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
-    m_indexCount = (uint32_t)_countof(indices);
 
-    const UINT vbSize = (UINT)sizeof(vertices);
-    const UINT ibSize = (UINT)sizeof(indices);
+    // PSO
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+    pso.pRootSignature = m_rootSignature.Get();
+    pso.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+    pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+    pso.InputLayout = { il, _countof(il) };
+    pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
 
-    // Upload heap (초기 단계: 실전에서는 Default+Upload로 바꾸면 더 좋음)
+    // RasterizerState (default-ish, line AA enable)
+    pso.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    pso.RasterizerState.FrontCounterClockwise = FALSE;
+    pso.RasterizerState.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+    pso.RasterizerState.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+    pso.RasterizerState.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+    pso.RasterizerState.DepthClipEnable = TRUE;
+    pso.RasterizerState.MultisampleEnable = FALSE;
+    pso.RasterizerState.AntialiasedLineEnable = TRUE;
+    pso.RasterizerState.ForcedSampleCount = 0;
+    pso.RasterizerState.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+    // BlendState (default)
+    pso.BlendState.AlphaToCoverageEnable = FALSE;
+    pso.BlendState.IndependentBlendEnable = FALSE;
+    const D3D12_RENDER_TARGET_BLEND_DESC rtBlend =
+    {
+        FALSE,FALSE,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_LOGIC_OP_NOOP,
+        D3D12_COLOR_WRITE_ENABLE_ALL
+    };
+    for (int i = 0; i < 8; ++i) pso.BlendState.RenderTarget[i] = rtBlend;
+
+    // Depth: on
+    pso.DepthStencilState.DepthEnable = TRUE;
+    pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    pso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    pso.DepthStencilState.StencilEnable = FALSE;
+    pso.DepthStencilState.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+    pso.DepthStencilState.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+    pso.DepthStencilState.FrontFace = { D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+    pso.DepthStencilState.BackFace = pso.DepthStencilState.FrontFace;
+
+    pso.SampleMask = UINT_MAX;
+    pso.NumRenderTargets = 1;
+    pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pso.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    pso.SampleDesc.Count = 1;
+
+    ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_psoDebugLine)));
+}
+
+void D3D12Renderer::CreateDebugVertexBuffer()
+{
+    m_debugVBStride = (uint32_t)sizeof(DebugVertex);
+    const uint64_t totalVerts = (uint64_t)MaxDebugVerticesPerFrame * (uint64_t)FrameCount;
+    const uint64_t totalSize = totalVerts * (uint64_t)m_debugVBStride;
+
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_UPLOAD;
 
-    D3D12_RESOURCE_DESC vbDesc = {};
-    vbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    vbDesc.Width = vbSize;
-    vbDesc.Height = 1;
-    vbDesc.DepthOrArraySize = 1;
-    vbDesc.MipLevels = 1;
-    vbDesc.SampleDesc.Count = 1;
-    vbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = totalSize;
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     ThrowIfFailed(m_device->CreateCommittedResource(
-        &heap, D3D12_HEAP_FLAG_NONE, &vbDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_vb)));
+        &heap, D3D12_HEAP_FLAG_NONE, &desc,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_debugVB)));
 
-    void* p = nullptr;
-    ThrowIfFailed(m_vb->Map(0, nullptr, &p));
-    memcpy(p, vertices, vbSize);
-    m_vb->Unmap(0, nullptr);
-
-    D3D12_RESOURCE_DESC ibDesc = vbDesc;
-    ibDesc.Width = ibSize;
-
-    ThrowIfFailed(m_device->CreateCommittedResource(
-        &heap, D3D12_HEAP_FLAG_NONE, &ibDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_ib)));
-
-    ThrowIfFailed(m_ib->Map(0, nullptr, &p));
-    memcpy(p, indices, ibSize);
-    m_ib->Unmap(0, nullptr);
-
-    m_vbView.BufferLocation = m_vb->GetGPUVirtualAddress();
-    m_vbView.SizeInBytes = vbSize;
-    m_vbView.StrideInBytes = sizeof(V);
-
-    m_ibView.BufferLocation = m_ib->GetGPUVirtualAddress();
-    m_ibView.SizeInBytes = ibSize;
-    m_ibView.Format = DXGI_FORMAT_R16_UINT;
+    ThrowIfFailed(m_debugVB->Map(0, nullptr, (void**)&m_debugVBMapped));
 }
 
 void D3D12Renderer::CreateConstantBuffer()
@@ -552,4 +685,77 @@ void D3D12Renderer::MoveToNextFrame()
     }
 
     m_fenceValues[m_frameIndex] = currentFence + 1;
+}
+
+GPUMesh& D3D12Renderer::GetOrCreateGPUMesh(uint32_t meshId)
+{
+    auto it = m_gpuMeshes.find(meshId);
+    if (it != m_gpuMeshes.end())
+        return it->second;
+
+    // 아직 GPU 메쉬 없음 → 생성
+    assert(m_meshManager && "MeshManager not set");
+
+    const MeshResource& cpu = m_meshManager->Get({ meshId });
+
+    GPUMesh gpu{};
+    CreateGPUMeshFromCPU(cpu, gpu);
+
+    auto [iter, _] = m_gpuMeshes.emplace(meshId, std::move(gpu));
+    return iter->second;
+}
+
+void D3D12Renderer::CreateGPUMeshFromCPU(const MeshResource& cpu, GPUMesh& out)
+{
+    const UINT vbSize =
+        (UINT)(cpu.positions.size() * sizeof(DirectX::XMFLOAT3));
+    const UINT ibSize =
+        (UINT)(cpu.indices.size() * sizeof(uint16_t));
+
+    out.indexCount = (uint32_t)cpu.indices.size();
+
+    // Upload heap
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    // --- Vertex Buffer ---
+    D3D12_RESOURCE_DESC vbDesc{};
+    vbDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    vbDesc.Width = vbSize;
+    vbDesc.Height = 1;
+    vbDesc.DepthOrArraySize = 1;
+    vbDesc.MipLevels = 1;
+    vbDesc.SampleDesc.Count = 1;
+    vbDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &vbDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr, IID_PPV_ARGS(&out.vb)));
+
+    void* p = nullptr;
+    out.vb->Map(0, nullptr, &p);
+    memcpy(p, cpu.positions.data(), vbSize);
+    out.vb->Unmap(0, nullptr);
+
+    out.vbView.BufferLocation = out.vb->GetGPUVirtualAddress();
+    out.vbView.SizeInBytes = vbSize;
+    out.vbView.StrideInBytes = sizeof(DirectX::XMFLOAT3);
+
+    // --- Index Buffer ---
+    D3D12_RESOURCE_DESC ibDesc = vbDesc;
+    ibDesc.Width = ibSize;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &ibDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr, IID_PPV_ARGS(&out.ib)));
+
+    out.ib->Map(0, nullptr, &p);
+    memcpy(p, cpu.indices.data(), ibSize);
+    out.ib->Unmap(0, nullptr);
+
+    out.ibView.BufferLocation = out.ib->GetGPUVirtualAddress();
+    out.ibView.SizeInBytes = ibSize;
+    out.ibView.Format = DXGI_FORMAT_R16_UINT;
 }

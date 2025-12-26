@@ -5,8 +5,21 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <DirectXMath.h>
-
+#include <unordered_map>
 #include "IRenderer.h"
+
+class MeshManager;
+struct MeshResource;
+
+struct GPUMesh
+{
+    Microsoft::WRL::ComPtr<ID3D12Resource> vb;
+    Microsoft::WRL::ComPtr<ID3D12Resource> ib;
+
+    D3D12_VERTEX_BUFFER_VIEW vbView{};
+    D3D12_INDEX_BUFFER_VIEW  ibView{};
+    uint32_t indexCount = 0;
+};
 
 class D3D12Renderer final : public IRenderer
 {
@@ -19,7 +32,12 @@ public:
     void Render(const std::vector<RenderItem>& items, const RenderCamera& cam) override;
     void Shutdown() override;
 
+    void SetMeshManager(const MeshManager* mm);
+
 private:
+    std::unordered_map<uint32_t, GPUMesh> m_gpuMeshes;
+    const MeshManager* m_meshManager = nullptr;
+
     static constexpr uint32_t FrameCount = 2;
     static constexpr uint32_t MaxDrawsPerFrame = 2048; // RenderItem ÃÖ´ëÄ¡
 
@@ -27,6 +45,12 @@ private:
     {
         DirectX::XMFLOAT4X4 mvp;
         DirectX::XMFLOAT4   color;
+    };
+
+    struct DebugVertex
+    {
+        DirectX::XMFLOAT3 pos;
+        DirectX::XMFLOAT4 color;
     };
 
 private:
@@ -37,13 +61,18 @@ private:
     void CreateDepthStencil(uint32_t width, uint32_t height);
 
     void CreatePipeline();
-    void CreateCubeGeometry();
     void CreateConstantBuffer();
+
+    void CreateDebugLinePipeline();
+    void CreateDebugVertexBuffer();
 
     void WaitForGPU();
     void MoveToNextFrame();
 
     uint32_t Align256(uint32_t size) const { return (size + 255u) & ~255u; }
+
+    GPUMesh& GetOrCreateGPUMesh(uint32_t meshId);
+    void CreateGPUMeshFromCPU(const MeshResource& cpu, GPUMesh& out);
 
 private:
     // Window
@@ -79,15 +108,20 @@ private:
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pso;
 
+    // Debug Line Pipeline
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_psoDebugLine;
+
+    // Debug Vertex Buffer (Upload, persist-mapped, frame-sliced)
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_debugVB;
+    uint8_t* m_debugVBMapped = nullptr;
+
+    static constexpr uint32_t MaxDebugLinesPerFrame = 16384;
+    static constexpr uint32_t MaxDebugVerticesPerFrame = MaxDebugLinesPerFrame * 2;
+
+    uint32_t m_debugVBStride = 0; // sizeof(DebugVertex)
+
     D3D12_VIEWPORT m_viewport{};
     D3D12_RECT     m_scissor{};
-
-    // Geometry (Cube)
-    Microsoft::WRL::ComPtr<ID3D12Resource> m_vb;
-    Microsoft::WRL::ComPtr<ID3D12Resource> m_ib;
-    D3D12_VERTEX_BUFFER_VIEW m_vbView{};
-    D3D12_INDEX_BUFFER_VIEW  m_ibView{};
-    uint32_t m_indexCount = 0;
 
     // Constant Buffer (Upload, persist-mapped)
     Microsoft::WRL::ComPtr<ID3D12Resource> m_cb;
