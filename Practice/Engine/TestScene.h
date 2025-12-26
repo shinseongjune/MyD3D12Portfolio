@@ -9,6 +9,8 @@ public:
     void OnLoad(World& world) override;
     void OnUnload(World& world) override;
 
+    void OnUpdate(World& world, float deltaTime) override;
+
 private:
     std::vector<EntityId> m_spawned;
 };

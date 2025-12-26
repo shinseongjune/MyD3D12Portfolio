@@ -61,6 +61,12 @@
     <Filter Include="소스 파일\06_World\Scenes">
       <UniqueIdentifier>{9b44784b-39fb-4ba3-a84d-1aaec1b942e5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\04_Render\Interface">
+      <UniqueIdentifier>{ce7ab78c-7c33-42a0-bc69-0c9856f5732e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\06_World\Components">
+      <UniqueIdentifier>{e33cda14-6f97-42e4-ab27-f422b84530f8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -87,13 +93,7 @@
     <ClInclude Include="World.h">
       <Filter>헤더 파일\06_World</Filter>
     </ClInclude>
-    <ClInclude Include="IRenderer.h">
-      <Filter>헤더 파일\04_Render</Filter>
-    </ClInclude>
     <ClInclude Include="EntityId.h">
-      <Filter>헤더 파일\06_World</Filter>
-    </ClInclude>
-    <ClInclude Include="TransformComponent.h">
       <Filter>헤더 파일\06_World</Filter>
     </ClInclude>
     <ClInclude Include="RenderItem.h">
@@ -111,17 +111,29 @@
     <ClInclude Include="SceneManager.h">
       <Filter>헤더 파일\01_Core</Filter>
     </ClInclude>
-    <ClInclude Include="CameraComponent.h">
-      <Filter>헤더 파일\06_World</Filter>
-    </ClInclude>
-    <ClInclude Include="MaterialComponent.h">
-      <Filter>헤더 파일\06_World</Filter>
-    </ClInclude>
-    <ClInclude Include="MeshComponent.h">
-      <Filter>헤더 파일\06_World</Filter>
-    </ClInclude>
     <ClInclude Include="TestScene.h">
       <Filter>헤더 파일\06_World\Scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="IRenderer.h">
+      <Filter>헤더 파일\04_Render\Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraComponent.h">
+      <Filter>헤더 파일\06_World\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialComponent.h">
+      <Filter>헤더 파일\06_World\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshComponent.h">
+      <Filter>헤더 파일\06_World\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="TransformComponent.h">
+      <Filter>헤더 파일\06_World\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="RenderCamera.h">
+      <Filter>헤더 파일\04_Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Input.h">
+      <Filter>헤더 파일\01_Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -148,6 +160,9 @@
     </ClCompile>
     <ClCompile Include="TestScene.cpp">
       <Filter>소스 파일\06_World\Scenes</Filter>
+    </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>소스 파일\01_Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

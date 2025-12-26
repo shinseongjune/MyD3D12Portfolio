@@ -13,6 +13,7 @@ public:
         if (m_current)
         {
             m_current->OnUnload(world);
+            world.FlushDestroy();
             m_current.reset();
         }
 

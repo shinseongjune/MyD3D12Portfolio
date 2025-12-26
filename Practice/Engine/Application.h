@@ -33,4 +33,5 @@ public:
     void Initialize(HINSTANCE hInstance);
     void Run();
     void Shutdown();
+	RenderCamera BuildRenderCamera() const;
 };

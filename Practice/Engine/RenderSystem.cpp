@@ -5,6 +5,10 @@ using namespace DirectX;
 
 void RenderSystem::Build(const World& world, std::vector<RenderItem>& outItems) const
 {
+#if defined(_DEBUG)
+    assert(world.TransformsUpdatedThisFrame() && "RenderSystem::Build called before World::UpdateTransforms()");
+#endif
+
     outItems.clear();
 
     // "Transform + Mesh + Material" 조합을 가진 엔티티를 모두 그린다.

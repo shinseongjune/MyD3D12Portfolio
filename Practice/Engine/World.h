@@ -16,7 +16,6 @@ public:
     World() = default;
 
     EntityId CreateEntity(const std::string& name = "");
-    void DestroyEntity(EntityId e);
     bool IsAlive(EntityId e) const;
 
     // 이름 관련(소켓 찾기용으로 유용)
@@ -37,6 +36,10 @@ public:
     // 매 프레임 호출(또는 필요할 때 호출): dirty 트리 갱신
     void UpdateTransforms();
 
+    // 순서 가드
+    void BeginFrame();
+    bool TransformsUpdatedThisFrame() const;
+
 private:
     struct Slot
     {
@@ -51,7 +54,15 @@ private:
 
     uint32_t m_aliveCount = 0;
 
+	std::vector<EntityId> m_pendingDestroy; // 지연 파괴 대상
+
+    // 순서 가드
+    uint64_t m_frameIndex = 0;
+    uint64_t m_transformUpdatedFrame = UINT64_MAX;
+
 private:
+    void DestroyEntity(EntityId e);
+
     void RemoveNameMapping(EntityId e);
 
     // --- Transform Storage (sparse set) ---
@@ -136,4 +147,8 @@ public:
     // ---- Debug/Iteration ----
     // (임시) dense transform 엔티티 목록을 반환(시스템들이 순회하기 위해 필요)
     const std::vector<EntityId>& GetTransformEntities() const { return m_transformDenseEntities; }
+
+	// ---- 파괴 지연 처리 ----
+    void RequestDestroy(EntityId e);
+    void FlushDestroy();
 };

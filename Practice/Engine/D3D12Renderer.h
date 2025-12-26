@@ -16,7 +16,7 @@ public:
 
     void Initialize(HWND hwnd, uint32_t width, uint32_t height) override;
     void Resize(uint32_t width, uint32_t height) override;
-    void Render(const std::vector<RenderItem>& items) override;
+    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam) override;
     void Shutdown() override;
 
 private:

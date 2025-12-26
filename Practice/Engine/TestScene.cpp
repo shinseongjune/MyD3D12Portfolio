@@ -1,6 +1,7 @@
 #include "TestScene.h"
 
 #include "World.h"
+#include "Input.h"
 
 using namespace DirectX;
 
@@ -55,6 +56,23 @@ void TestScene::OnUnload(World& world)
 {
     // 역순 파괴(부모-자식 관계가 있을 수 있어 안전)
     for (auto it = m_spawned.rbegin(); it != m_spawned.rend(); ++it)
-        world.DestroyEntity(*it);
+        world.RequestDestroy(*it);
     m_spawned.clear();
+}
+
+void TestScene::OnUpdate(World& world, float deltaTime)
+{
+    EntityId cam = world.FindActiveCamera();
+    if (!world.IsAlive(cam)) return;
+
+    auto& t = world.GetTransform(cam);
+
+    const float speed = 3.0f * deltaTime;
+
+    if (Input::IsKeyDown(Key::W)) t.position.z += speed;
+    if (Input::IsKeyDown(Key::S)) t.position.z -= speed;
+    if (Input::IsKeyDown(Key::A)) t.position.x -= speed;
+    if (Input::IsKeyDown(Key::D)) t.position.x += speed;
+	if (Input::IsKeyDown(Key::Q)) t.position.y -= speed;
+    if (Input::IsKeyDown(Key::E)) t.position.y += speed;
 }

@@ -96,7 +96,7 @@ void D3D12Renderer::Resize(uint32_t width, uint32_t height)
     m_scissor = { 0, 0, (LONG)width, (LONG)height };
 }
 
-void D3D12Renderer::Render(const std::vector<RenderItem>& items)
+void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam)
 {
     // Reset allocator/list
     ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
@@ -135,13 +135,8 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items)
     m_commandList->IASetIndexBuffer(&m_ibView);
 
     // 임시 카메라(나중에 CameraSystem으로 바꿀 자리)
-    const XMVECTOR eye = XMVectorSet(0.0f, 0.0f, -6.0f, 1.0f);
-    const XMVECTOR at = XMVectorSet(0.0f, 0.8f, 0.0f, 1.0f);
-    const XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-
-    XMMATRIX V = XMMatrixLookAtLH(eye, at, up);
-    XMMATRIX P = XMMatrixPerspectiveFovLH(XMConvertToRadians(60.0f),
-        (float)m_width / (float)m_height, 0.1f, 100.0f);
+    XMMATRIX V = XMLoadFloat4x4(&cam.view);
+    XMMATRIX P = XMLoadFloat4x4(&cam.proj);
 
     // CB offset (frame-local)
     const uint32_t drawCount = std::min<uint32_t>((uint32_t)items.size(), MaxDrawsPerFrame);
@@ -366,7 +361,7 @@ void D3D12Renderer::CreatePipeline()
     const char* psCode = R"(
     cbuffer DrawCB : register(b0)
     {
-        float4x4 mvp;
+        row_major float4x4 mvp;
         float4 color;
     };
     float4 main() : SV_TARGET { return color; }

@@ -12,4 +12,6 @@ public:
     virtual ~Scene() = default;
     virtual void OnLoad(World& world) = 0;
     virtual void OnUnload(World& world) = 0;
+
+    virtual void OnUpdate(World& world, float deltaTime) = 0;
 };

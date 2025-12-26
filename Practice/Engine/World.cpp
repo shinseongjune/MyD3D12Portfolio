@@ -1,7 +1,10 @@
 #include "World.h"
 
+#include <algorithm>
 #include <DirectXMath.h>
+
 using namespace DirectX;
+
 
 EntityId World::CreateEntity(const std::string& name)
 {
@@ -313,6 +316,44 @@ EntityId World::FindActiveCamera() const
     return EntityId::Invalid();
 }
 
+void World::RequestDestroy(EntityId e)
+{
+    if (!IsAlive(e))
+        return;
+
+    // 중복 요청 방지
+    auto it = std::find(m_pendingDestroy.begin(), m_pendingDestroy.end(), e);
+    if (it != m_pendingDestroy.end())
+        return;
+
+    m_pendingDestroy.push_back(e);
+}
+
+void World::FlushDestroy()
+{
+    if (m_pendingDestroy.empty())
+        return;
+
+    // 1) 중복/순서 안정화: 정렬 + unique (혹시 모를 중복 방어)
+    std::sort(m_pendingDestroy.begin(), m_pendingDestroy.end(),
+        [](EntityId a, EntityId b) { return a.index < b.index; });
+
+    m_pendingDestroy.erase(
+        std::unique(m_pendingDestroy.begin(), m_pendingDestroy.end()),
+        m_pendingDestroy.end());
+
+    // 2) 실제 삭제 실행 (여기서만!)
+    for (EntityId e : m_pendingDestroy)
+    {
+        if (IsAlive(e))
+        {
+            DestroyEntity(e); // 네가 이미 갖고 있는 "즉시 삭제" 루틴을 여기서 호출
+        }
+    }
+
+    m_pendingDestroy.clear();
+}
+
 void World::AddTransform(EntityId e)
 {
     if (!IsAlive(e)) return;
@@ -497,6 +538,18 @@ void World::UpdateTransforms()
             UpdateWorldRecursive(e, I);
         }
     }
+
+    m_transformUpdatedFrame = m_frameIndex;
+}
+
+void World::BeginFrame()
+{
+    ++m_frameIndex;
+}
+
+bool World::TransformsUpdatedThisFrame() const
+{
+    return m_transformUpdatedFrame == m_frameIndex;
 }
 
 void World::EnsureTransform(EntityId e)

@@ -3,7 +3,10 @@
 #include "D3D12Renderer.h"
 #include "Time.h"
 #include "TestScene.h"
+#include "RenderCamera.h"
+#include "Input.h"
 
+#include <DirectXMath.h>
 #include <stdexcept>
 #include <Windows.h>
 
@@ -59,6 +62,15 @@ void Application::Run()
         Time::Tick();
         const double dt = Time::DeltaTime();
 
+        m_world.BeginFrame();
+
+		// Input 갱신
+        Input::Update();
+
+		// Scene 업데이트
+        if (auto* scene = m_sceneManager.Current())
+            scene->OnUpdate(m_world, (float)dt);
+
         // 월드 갱신
         m_world.UpdateTransforms();
 
@@ -66,7 +78,12 @@ void Application::Run()
         m_renderSystem.Build(m_world, m_renderItems);
 
         // 드로우 리스트 렌더링
-        m_renderer->Render(m_renderItems);
+        RenderCamera cam{};
+        cam = BuildRenderCamera();
+        m_renderer->Render(m_renderItems, cam);
+
+		// 지연 파괴된 Entity 실제 삭제
+		m_world.FlushDestroy();
 
         // 임시: CPU 100% 방지(나중엔 Time/FPS 제어로 대체)
         Sleep(1);
@@ -87,3 +104,48 @@ void Application::Shutdown()
     m_window.Destroy();
     m_running = false;
 }
+
+RenderCamera Application::BuildRenderCamera() const
+{
+    using namespace DirectX;
+
+    RenderCamera out{};
+
+    // 1) 활성 카메라 찾기 (정책: 첫 CameraComponent 가진 엔티티)
+    EntityId camEnt = m_world.FindActiveCamera();
+    if (!m_world.IsAlive(camEnt) || !m_world.HasTransform(camEnt) || !m_world.HasCamera(camEnt))
+    {
+        // 폴백: 임시 카메라
+        XMMATRIX V = XMMatrixLookAtLH(
+            XMVectorSet(0.f, 0.f, -6.f, 1.f),
+            XMVectorSet(0.f, 0.8f, 0.f, 1.f),
+            XMVectorSet(0.f, 1.f, 0.f, 0.f));
+
+        float aspect = float(m_window.GetWidth()) / float(m_window.GetHeight());
+        XMMATRIX P = XMMatrixPerspectiveFovLH(XMConvertToRadians(60.f), aspect, 0.1f, 1000.f);
+
+        XMStoreFloat4x4(&out.view, XMMatrixTranspose(V));
+        XMStoreFloat4x4(&out.proj, XMMatrixTranspose(P));
+        return out;
+    }
+
+    const auto& camT = m_world.GetTransform(camEnt);
+    const auto& camC = m_world.GetCamera(camEnt);
+
+    // 2) 카메라 엔티티의 world matrix로부터 View 만들기
+    // camT.world: 카메라의 "카메라->월드" 변환(= 카메라의 pose)
+    // View는 그 역행렬(월드->카메라)
+    XMMATRIX camWorld = XMLoadFloat4x4(&camT.world);
+    XMMATRIX V = XMMatrixInverse(nullptr, camWorld);
+
+    // 3) Projection 만들기
+    float aspect = float(m_window.GetWidth()) / float(m_window.GetHeight());
+    float fovY = camC.FovYRadians(); // 네 필드명에 맞춰 수정
+    XMMATRIX P = XMMatrixPerspectiveFovLH(fovY, aspect, camC.nearZ, camC.farZ);
+
+	// view/proj 저장
+    XMStoreFloat4x4(&out.view, V);
+    XMStoreFloat4x4(&out.proj, P);
+    return out;
+}
+
