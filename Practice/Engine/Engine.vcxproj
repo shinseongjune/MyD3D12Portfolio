@@ -128,12 +128,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Application.h" />
+    <ClInclude Include="AssetPipeline.h" />
+    <ClInclude Include="AssetTypes.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="D3D12Renderer.h" />
     <ClInclude Include="DebugDraw.h" />
     <ClInclude Include="Engine.h" />
     <ClInclude Include="EntityId.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="IAssetImporter.h" />
+    <ClInclude Include="ImportRegistry.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="IRenderer.h" />
     <ClInclude Include="MaterialComponent.h" />
@@ -141,6 +145,7 @@
     <ClInclude Include="MeshHandle.h" />
     <ClInclude Include="MeshManager.h" />
     <ClInclude Include="MeshResource.h" />
+    <ClInclude Include="ObjImporter_Minimal.h" />
     <ClInclude Include="RenderCamera.h" />
     <ClInclude Include="RenderItem.h" />
     <ClInclude Include="RenderSystem.h" />
@@ -156,11 +161,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
+    <ClCompile Include="AssetPipeline.cpp" />
     <ClCompile Include="D3D12Renderer.cpp" />
     <ClCompile Include="DebugDraw.cpp" />
     <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="ImportRegistry.cpp" />
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="MeshManager.cpp" />
+    <ClCompile Include="ObjImporter_Minimal.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="TestScene.cpp" />
     <ClCompile Include="Time.cpp" />

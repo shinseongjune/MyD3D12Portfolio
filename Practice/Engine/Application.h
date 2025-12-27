@@ -10,6 +10,8 @@
 #include "RenderSystem.h"
 #include "SceneManager.h"
 #include "MeshManager.h"
+#include "ImportRegistry.h"
+#include "AssetPipeline.h"
 
 class Application
 {
@@ -27,9 +29,12 @@ private:
 
     SceneManager m_sceneManager;
 	MeshManager m_meshManager;
+    ImportRegistry m_registry;
+    AssetPipeline m_pipeline;
 
 public:
-    Application() = default;
+    Application() : m_pipeline(m_registry, m_meshManager) { }
+
     ~Application();
 
     void Initialize(HINSTANCE hInstance);

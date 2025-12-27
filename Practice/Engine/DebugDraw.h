@@ -1,6 +1,19 @@
 #pragma once
+
+#include <cstdio>
+
 #include <DirectXMath.h>
 #include <vector>
+#include <Windows.h>
+
+#ifndef LOG_ERROR
+#define LOG_ERROR(fmt, ...) do { \
+    char _buf[1024]; \
+    std::snprintf(_buf, sizeof(_buf), "[ERROR] " fmt "\n", ##__VA_ARGS__); \
+    std::fputs(_buf, stderr); \
+    OutputDebugStringA(_buf); \
+} while(0)
+#endif
 
 struct DebugLine
 {

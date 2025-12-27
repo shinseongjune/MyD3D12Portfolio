@@ -73,11 +73,23 @@
     <Filter Include="소스 파일\04_Render\Resources">
       <UniqueIdentifier>{eaf424a7-bf57-421c-9c01-1ac60247b724}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\Debug">
+    <Filter Include="소스 파일\00_Debug">
+      <UniqueIdentifier>{4f3b4f49-3e2b-44dc-931d-11a07928bf05}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\00_Debug">
       <UniqueIdentifier>{057554f5-545c-4b22-8720-870757fde7fb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\Debug">
-      <UniqueIdentifier>{4f3b4f49-3e2b-44dc-931d-11a07928bf05}</UniqueIdentifier>
+    <Filter Include="헤더 파일\07_Resources">
+      <UniqueIdentifier>{a8a616b5-96ab-4f56-a9ba-4ee51457b284}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\07_Resources">
+      <UniqueIdentifier>{87d4440f-6556-4025-9f69-7c06ee867ccb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\02_Assets\Importers">
+      <UniqueIdentifier>{52c5abbe-bc9e-4a30-bf79-9c50577bae35}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\02_Assets\Importers">
+      <UniqueIdentifier>{900ca9d9-00d1-4b41-b86b-12372c74d4d8}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -157,7 +169,22 @@
       <Filter>헤더 파일\04_Render\Resources</Filter>
     </ClInclude>
     <ClInclude Include="DebugDraw.h">
-      <Filter>헤더 파일\Debug</Filter>
+      <Filter>헤더 파일\00_Debug</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetTypes.h">
+      <Filter>헤더 파일\02_Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="IAssetImporter.h">
+      <Filter>헤더 파일\02_Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="ImportRegistry.h">
+      <Filter>헤더 파일\02_Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetPipeline.h">
+      <Filter>헤더 파일\02_Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjImporter_Minimal.h">
+      <Filter>헤더 파일\02_Assets\Importers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -189,10 +216,19 @@
       <Filter>소스 파일\04_Render\Resources</Filter>
     </ClCompile>
     <ClCompile Include="DebugDraw.cpp">
-      <Filter>소스 파일\Debug</Filter>
+      <Filter>소스 파일\00_Debug</Filter>
     </ClCompile>
     <ClCompile Include="TestScene.cpp">
       <Filter>소스 파일\06_World\Scenes</Filter>
+    </ClCompile>
+    <ClCompile Include="ImportRegistry.cpp">
+      <Filter>소스 파일\02_Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetPipeline.cpp">
+      <Filter>소스 파일\02_Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjImporter_Minimal.cpp">
+      <Filter>소스 파일\02_Assets\Importers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -29,15 +29,54 @@ static MeshResource CreateCubeMesh()
 
 void TestScene::OnLoad(World& world)
 {
-    // 1) 큐브 메쉬 등록
-    MeshResource cube = CreateCubeMesh();
-    MeshHandle cubeHandle = m_meshManager.Create(cube);
+    //// 1) 큐브 메쉬 등록
+    //MeshResource cube = CreateCubeMesh();
+    //MeshHandle cubeHandle = m_meshManager.Create(cube);
+    //
+    //// 2) 엔티티 생성
+    //EntityId e = world.CreateEntity("Cube");
+    //
+    //world.AddTransform(e);
+    //world.AddMesh(e, MeshComponent{ cubeHandle });
 
-    // 2) 엔티티 생성
-    EntityId e = world.CreateEntity("Cube");
+    // =========================
+    // 1. Import / Spawn 옵션
+    // =========================
+    ImportOptions importOpt{};
+    importOpt.triangulate = true;
+    importOpt.generateNormalsIfMissing = true;
+    importOpt.flipV = true;          // 텍스처 뒤집힘 방지(지금은 의미 거의 없음)
+    importOpt.uniformScale = 1.0f;   // 필요하면 0.01f 같은 값으로 조절
 
-    world.AddTransform(e);
-    world.AddMesh(e, MeshComponent{ cubeHandle });
+    SpawnModelOptions spawnOpt{};
+    spawnOpt.name = "AlienAnimal";
+
+    // =========================
+    // 2. 에셋 로드 호출
+    // =========================
+    auto result = m_assetPipeline.LoadModelIntoWorld(
+        world,
+        "Assets/Alien Animal.obj",
+        importOpt,
+        spawnOpt
+    );
+
+    if (!result.IsOk())
+    {
+        // 로그만 찍고 씬은 빈 채로 둠
+        LOG_ERROR("Failed to load Alien Animal.obj : %s",
+            result.error->message.c_str());
+        return;
+    }
+
+    EntityId root = result.value;
+
+    // =========================
+    // 3. 위치/회전/스케일 조정
+    // =========================
+	world.SetLocalPosition(root, { 0.f, 0.f, 0.f });
+	world.SetLocalRotation(root, { 0.f, 0.f, 0.f, 1.f });
+	world.SetLocalScale(root, { 1.f, 1.f, 1.f });
 
     // Camera
     {

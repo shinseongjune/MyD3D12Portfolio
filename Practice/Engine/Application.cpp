@@ -6,6 +6,7 @@
 #include "RenderCamera.h"
 #include "Input.h"
 #include "DebugDraw.h"
+#include "ObjImporter_Minimal.h"
 #include <DirectXMath.h>
 #include <stdexcept>
 #include <Windows.h>
@@ -32,7 +33,9 @@ void Application::Initialize(HINSTANCE hInstance)
     // m_world.Initialize(); // 나중에 필요하면 추가
 
     // 4-1) 첫 Scene 로드(테스트)
-    m_sceneManager.Load(m_world, std::make_unique<TestScene>(m_meshManager));
+    m_registry.Register(std::make_unique<ObjImporter_Minimal>());
+
+    m_sceneManager.Load(m_world, std::make_unique<TestScene>(m_meshManager, m_pipeline));
 
     m_lastW = m_window.GetWidth();
     m_lastH = m_window.GetHeight();
@@ -131,8 +134,8 @@ RenderCamera Application::BuildRenderCamera() const
         float aspect = float(m_window.GetWidth()) / float(m_window.GetHeight());
         XMMATRIX P = XMMatrixPerspectiveFovLH(XMConvertToRadians(60.f), aspect, 0.1f, 1000.f);
 
-        XMStoreFloat4x4(&out.view, XMMatrixTranspose(V));
-        XMStoreFloat4x4(&out.proj, XMMatrixTranspose(P));
+        XMStoreFloat4x4(&out.view, V);
+        XMStoreFloat4x4(&out.proj, P);
         return out;
     }
 
