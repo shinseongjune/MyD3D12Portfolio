@@ -183,6 +183,9 @@
     <ClInclude Include="ModelAsset.h">
       <Filter>헤더 파일\02_Assets</Filter>
     </ClInclude>
+    <ClInclude Include="PrimitiveMeshes.h">
+      <Filter>헤더 파일\00_Debug</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -226,6 +229,9 @@
     </ClCompile>
     <ClCompile Include="RenderSystem.cpp">
       <Filter>소스 파일\05_Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="PrimitiveMeshes.cpp">
+      <Filter>소스 파일\00_Debug</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

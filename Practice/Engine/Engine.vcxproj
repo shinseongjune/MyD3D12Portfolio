@@ -147,6 +147,7 @@
     <ClInclude Include="MeshCPUData.h" />
     <ClInclude Include="ModelAsset.h" />
     <ClInclude Include="ObjImporter_Minimal.h" />
+    <ClInclude Include="PrimitiveMeshes.h" />
     <ClInclude Include="RenderCamera.h" />
     <ClInclude Include="RenderItem.h" />
     <ClInclude Include="RenderSystem.h" />
@@ -170,6 +171,7 @@
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="MeshManager.cpp" />
     <ClCompile Include="ObjImporter_Minimal.cpp" />
+    <ClCompile Include="PrimitiveMeshes.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="TestScene.cpp" />
     <ClCompile Include="Time.cpp" />

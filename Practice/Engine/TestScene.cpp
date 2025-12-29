@@ -3,42 +3,14 @@
 #include "World.h"
 #include "Input.h"
 #include "MeshCPUData.h"
+#if defined(_DEBUG)
+#include "PrimitiveMeshes.h"
+#endif
 
 using namespace DirectX;
 
-static MeshCPUData CreateCubeMesh()
-{
-    MeshCPUData mesh;
-
-    mesh.positions = {
-        {-0.5f,-0.5f,-0.5f}, {-0.5f, 0.5f,-0.5f}, { 0.5f, 0.5f,-0.5f}, { 0.5f,-0.5f,-0.5f},
-        {-0.5f,-0.5f, 0.5f}, {-0.5f, 0.5f, 0.5f}, { 0.5f, 0.5f, 0.5f}, { 0.5f,-0.5f, 0.5f},
-    };
-
-    mesh.indices = {
-        0,1,2, 0,2,3,
-        4,6,5, 4,7,6,
-        4,5,1, 4,1,0,
-        3,2,6, 3,6,7,
-        1,5,6, 1,6,2,
-        4,0,3, 4,3,7
-    };
-
-    return mesh;
-}
-
 void TestScene::OnLoad(World& world)
 {
-    //// 1) 큐브 메쉬 등록
-    //MeshResource cube = CreateCubeMesh();
-    //MeshHandle cubeHandle = m_meshManager.Create(cube);
-    //
-    //// 2) 엔티티 생성
-    //EntityId e = world.CreateEntity("Cube");
-    //
-    //world.AddTransform(e);
-    //world.AddMesh(e, MeshComponent{ cubeHandle });
-
     // =========================
     // 1. Import / Spawn 옵션
     // =========================
@@ -75,6 +47,35 @@ void TestScene::OnLoad(World& world)
 	world.SetLocalPosition(root, { 0.f, 0.f, 0.f });
 	world.SetLocalRotation(root, { 0.f, 0.f, 0.f, 1.f });
 	world.SetLocalScale(root, { 1.f, 1.f, 1.f });
+
+
+#if defined(_DEBUG)
+    // 디버그용: primitive mesh 생성 테스트
+    {
+        MeshCPUData boxMesh = PrimitiveMeshes::MakeUnitBox();
+        MeshHandle boxHandle = m_meshManager.Create(boxMesh);
+
+        EntityId boxEntity = world.CreateEntity("DebugBox");
+        m_spawned.push_back(boxEntity);
+        world.AddTransform(boxEntity);
+        world.AddMesh(boxEntity, MeshComponent{ boxHandle });
+        world.SetLocalPosition(boxEntity, { 0.f, 1.f, 0.f });
+
+        MeshCPUData sphereMesh = PrimitiveMeshes::MakeUnitSphereUV(8, 16);
+        MeshHandle sphereHandle = m_meshManager.Create(sphereMesh);
+
+		EntityId sphereEntity = world.CreateEntity("DebugSphere");
+        m_spawned.push_back(sphereEntity);
+        world.AddTransform(sphereEntity);
+        world.AddMesh(sphereEntity, MeshComponent{ sphereHandle });
+		world.SetLocalPosition(sphereEntity, { 2.f, 1.f, 0.f });
+
+		world.GetTransform(sphereEntity).parent = boxEntity;
+		world.GetTransform(boxEntity).children.push_back(sphereEntity);
+        world.GetTransform(boxEntity).parent = root;
+		world.GetTransform(root).children.push_back(boxEntity);
+    }
+#endif
 
     // Camera
     {
@@ -115,6 +116,18 @@ void TestScene::OnUpdate(World& world, float deltaTime)
     if (Input::IsKeyDown(Key::E)) delta.y += speed;
 	world.TranslateLocal(cam, delta);
 
+#if defined(_DEBUG)
+    static float time = 0.0f;
+    time += deltaTime;
+
+    const float amplitude = 20.0f;              // 좌우폭
+    const float frequencyHz = 0.2f;            // 초당 0.2회 왕복(느리게)
+    const float omega = 2.0f * 3.14159265f * frequencyHz;
+
+	float moveSpeed = amplitude * sin(omega * time);
+	EntityId root = world.FindByName("AlienAnimal");
+    world.SetLocalPosition(root, { moveSpeed, 0, 0 });
+
     // Debug
     DebugDraw::Line(
         XMFLOAT3{ 0,0,0 },
@@ -130,4 +143,5 @@ void TestScene::OnUpdate(World& world, float deltaTime)
         XMFLOAT3{ 0,0,0 },
         XMFLOAT3{ 0,0,1 },
         XMFLOAT4{ 0,0,1,1 }); // Z축
+#endif
 }
