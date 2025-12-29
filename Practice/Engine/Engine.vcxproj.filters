@@ -79,12 +79,6 @@
     <Filter Include="헤더 파일\00_Debug">
       <UniqueIdentifier>{057554f5-545c-4b22-8720-870757fde7fb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\07_Resources">
-      <UniqueIdentifier>{a8a616b5-96ab-4f56-a9ba-4ee51457b284}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\07_Resources">
-      <UniqueIdentifier>{87d4440f-6556-4025-9f69-7c06ee867ccb}</UniqueIdentifier>
-    </Filter>
     <Filter Include="소스 파일\02_Assets\Importers">
       <UniqueIdentifier>{52c5abbe-bc9e-4a30-bf79-9c50577bae35}</UniqueIdentifier>
     </Filter>
@@ -162,7 +156,7 @@
     <ClInclude Include="MeshHandle.h">
       <Filter>헤더 파일\04_Render\Resources</Filter>
     </ClInclude>
-    <ClInclude Include="MeshResource.h">
+    <ClInclude Include="MeshCPUData.h">
       <Filter>헤더 파일\04_Render\Resources</Filter>
     </ClInclude>
     <ClInclude Include="MeshManager.h">
@@ -171,7 +165,7 @@
     <ClInclude Include="DebugDraw.h">
       <Filter>헤더 파일\00_Debug</Filter>
     </ClInclude>
-    <ClInclude Include="AssetTypes.h">
+    <ClInclude Include="ImportTypes.h">
       <Filter>헤더 파일\02_Assets</Filter>
     </ClInclude>
     <ClInclude Include="IAssetImporter.h">
@@ -185,6 +179,9 @@
     </ClInclude>
     <ClInclude Include="ObjImporter_Minimal.h">
       <Filter>헤더 파일\02_Assets\Importers</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelAsset.h">
+      <Filter>헤더 파일\02_Assets</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -202,9 +199,6 @@
     </ClCompile>
     <ClCompile Include="World.cpp">
       <Filter>소스 파일\06_World</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderSystem.cpp">
-      <Filter>소스 파일\04_Render</Filter>
     </ClCompile>
     <ClCompile Include="D3D12Renderer.cpp">
       <Filter>소스 파일\04_Render</Filter>
@@ -229,6 +223,9 @@
     </ClCompile>
     <ClCompile Include="ObjImporter_Minimal.cpp">
       <Filter>소스 파일\02_Assets\Importers</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderSystem.cpp">
+      <Filter>소스 파일\05_Systems</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

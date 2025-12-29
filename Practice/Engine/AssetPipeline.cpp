@@ -1,64 +1,47 @@
 #include "AssetPipeline.h"
-
 #include <DirectXMath.h>
-#include <string>
+#include "ImportTypes.h"
 
-Result<EntityId> AssetPipeline::LoadModelIntoWorld(World& world,
+Result<ModelAsset> AssetPipeline::ImportModel(
     const std::string& path,
-    const ImportOptions& importOpt,
-    const SpawnModelOptions& spawnOpt)
+    const ImportOptions& importOpt)
 {
     IAssetImporter* importer = m_registry.FindImporterForFile(path);
     if (!importer)
-        return Result<EntityId>::Fail("No importer found for: " + path);
+        return Result<ModelAsset>::Fail("No importer found for: " + path);
 
     auto imported = importer->Import(path, importOpt);
     if (!imported.IsOk())
-        return Result<EntityId>::Fail(imported.error->message);
+        return Result<ModelAsset>::Fail(imported.error->message);
 
     const ImportedModel& model = imported.value;
     if (model.meshes.empty())
-        return Result<EntityId>::Fail("Imported model has no meshes: " + path);
+        return Result<ModelAsset>::Fail("Imported model has no meshes: " + path);
 
-    // (현재 엔진 구조: MeshComponent는 MeshHandle 1개만 들 수 있으므로)
-    // 가장 단순한 방식으로: root entity + mesh마다 child entity 생성.
-    EntityId root = world.CreateEntity(spawnOpt.name);
-    world.AddTransform(root);
+    ModelAsset out{};
+    out.sourcePath = model.sourcePath.empty() ? path : model.sourcePath;
+    out.meshes.reserve(model.meshes.size());
 
     for (const auto& mesh : model.meshes)
     {
-        EntityId e = world.CreateEntity(mesh.name.empty() ? "Mesh" : mesh.name);
-        world.AddTransform(e);
-        world.SetParent(e, root);
-
-        // --- ImportedMesh -> MeshResource 변환 ---
-        MeshResource mr{};
-        mr.positions.reserve(mesh.vertices.size());
+        // ImportedMesh -> MeshCPUData 변환
+        MeshCPUData cpu{};
+        cpu.positions.reserve(mesh.vertices.size());
         for (const auto& v : mesh.vertices)
-        {
-            mr.positions.push_back(DirectX::XMFLOAT3(v.position.x, v.position.y, v.position.z));
-        }
+            cpu.positions.push_back(DirectX::XMFLOAT3(v.position.x, v.position.y, v.position.z));
 
-        mr.indices.reserve(mesh.indices.size());
+        cpu.indices.reserve(mesh.indices.size());
         for (uint32_t idx : mesh.indices)
         {
             if (idx > 0xFFFFu)
-                return Result<EntityId>::Fail("Mesh has index > 65535 (uint16 overflow). Need 32-bit index support.");
-
-            mr.indices.push_back((uint16_t)idx);
+                return Result<ModelAsset>::Fail("Mesh has index > 65535 (uint16 overflow). Need 32-bit index support.");
+            cpu.indices.push_back((uint16_t)idx);
         }
 
-        MeshHandle h = m_meshManager.Create(mr);
-        world.AddMesh(e, MeshComponent{ h });
+        MeshHandle h = m_meshManager.Create(cpu);
 
-        // --- Material(현재는 색만) ---
-        world.AddMaterial(e);
-
-        // 최소 규칙:
-        // - submesh가 있으면 첫 submesh의 materialIndex를 사용
-        // - 없으면 material 0 (있으면) / 아니면 기본 흰색
+        // 현재는 color만: 기존 규칙 그대로
         DirectX::XMFLOAT4 color{ 1.f, 1.f, 1.f, 1.f };
-
         if (!model.materials.empty())
         {
             uint32_t mi = 0;
@@ -69,15 +52,43 @@ Result<EntityId> AssetPipeline::LoadModelIntoWorld(World& world,
             {
                 const auto& m = model.materials[mi];
                 color = DirectX::XMFLOAT4(
-                    m.baseColorFactor.x,
-                    m.baseColorFactor.y,
-                    m.baseColorFactor.z,
-                    m.baseColorFactor.w
+                    m.baseColorFactor.x, m.baseColorFactor.y,
+                    m.baseColorFactor.z, m.baseColorFactor.w
                 );
             }
         }
 
-        world.GetMaterial(e).color = color;
+        ModelAssetMesh am{};
+        am.name = mesh.name.empty() ? "Mesh" : mesh.name;
+        am.mesh = h;
+        am.baseColor = color;
+        out.meshes.push_back(std::move(am));
+    }
+
+    return Result<ModelAsset>::Ok(std::move(out));
+}
+
+Result<EntityId> AssetPipeline::InstantiateModel(
+    World& world,
+    const ModelAsset& asset,
+    const SpawnModelOptions& spawnOpt)
+{
+    if (asset.meshes.empty())
+        return Result<EntityId>::Fail("ModelAsset has no meshes.");
+
+    EntityId root = world.CreateEntity(spawnOpt.name);
+    world.AddTransform(root);
+
+    // 지금 구조: MeshComponent가 mesh 1개만 가지니까 자식으로 쪼갬(기존과 동일)
+    for (const auto& m : asset.meshes)
+    {
+        EntityId e = world.CreateEntity(m.name);
+        world.AddTransform(e);
+        world.SetParent(e, root);
+
+        world.AddMesh(e, MeshComponent{ m.mesh });
+        world.AddMaterial(e);
+        world.GetMaterial(e).color = m.baseColor;
     }
 
     return Result<EntityId>::Ok(root);

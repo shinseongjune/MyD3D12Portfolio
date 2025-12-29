@@ -53,6 +53,8 @@ void D3D12Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 void D3D12Renderer::Shutdown()
 {
     WaitForGPU();
+    m_pendingMeshReleases.clear();
+    m_gpuMeshes.clear();
 
     if (m_cbMapped)
     {
@@ -75,9 +77,16 @@ void D3D12Renderer::Shutdown()
     // ComPtr들은 자동 해제
 }
 
-void D3D12Renderer::SetMeshManager(const MeshManager* mm)
+void D3D12Renderer::SetMeshManager(MeshManager* mm)
 {
     m_meshManager = mm;
+
+    if (m_meshManager)
+    {
+        m_meshManager->SetOnDestroy([this](uint32_t meshId) {
+            this->RetireMesh(meshId);
+            });
+    }
 }
 
 void D3D12Renderer::Resize(uint32_t width, uint32_t height)
@@ -113,6 +122,8 @@ void D3D12Renderer::Resize(uint32_t width, uint32_t height)
 
 void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam)
 {
+    ProcessPendingMeshReleases();
+
     // Reset allocator/list
     ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
     ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), m_pso.Get()));
@@ -160,7 +171,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         const RenderItem& it = items[i];
 
         // 1) GPU 메쉬 확보
-        GPUMesh& mesh = GetOrCreateGPUMesh(it.mesh.id);
+        MeshGPUData& mesh = GetOrCreateGPUMesh(it.mesh.id);
 
         // 2) IA 설정
         m_commandList->IASetVertexBuffers(0, 1, &mesh.vbView);
@@ -687,7 +698,7 @@ void D3D12Renderer::MoveToNextFrame()
     m_fenceValues[m_frameIndex] = currentFence + 1;
 }
 
-GPUMesh& D3D12Renderer::GetOrCreateGPUMesh(uint32_t meshId)
+MeshGPUData& D3D12Renderer::GetOrCreateGPUMesh(uint32_t meshId)
 {
     auto it = m_gpuMeshes.find(meshId);
     if (it != m_gpuMeshes.end())
@@ -696,16 +707,16 @@ GPUMesh& D3D12Renderer::GetOrCreateGPUMesh(uint32_t meshId)
     // 아직 GPU 메쉬 없음 → 생성
     assert(m_meshManager && "MeshManager not set");
 
-    const MeshResource& cpu = m_meshManager->Get({ meshId });
+    const MeshCPUData& cpu = m_meshManager->Get({ meshId });
 
-    GPUMesh gpu{};
+    MeshGPUData gpu{};
     CreateGPUMeshFromCPU(cpu, gpu);
 
     auto [iter, _] = m_gpuMeshes.emplace(meshId, std::move(gpu));
     return iter->second;
 }
 
-void D3D12Renderer::CreateGPUMeshFromCPU(const MeshResource& cpu, GPUMesh& out)
+void D3D12Renderer::CreateGPUMeshFromCPU(const MeshCPUData& cpu, MeshGPUData& out)
 {
     const UINT vbSize =
         (UINT)(cpu.positions.size() * sizeof(DirectX::XMFLOAT3));
@@ -758,4 +769,40 @@ void D3D12Renderer::CreateGPUMeshFromCPU(const MeshResource& cpu, GPUMesh& out)
     out.ibView.BufferLocation = out.ib->GetGPUVirtualAddress();
     out.ibView.SizeInBytes = ibSize;
     out.ibView.Format = DXGI_FORMAT_R16_UINT;
+}
+
+void D3D12Renderer::RetireMesh(uint32_t meshId)
+{
+    // 이미 없는 id면 스킵
+    if (m_gpuMeshes.find(meshId) == m_gpuMeshes.end())
+        return;
+
+    // "이 프레임에서 사용했을 수도 있는" 커맨드들이 GPU에서 끝난 뒤에 지우기
+    // 가장 안전한 값: 이 프레임 인덱스의 fence 값
+    const uint64_t retireFence = m_fenceValues[m_frameIndex];
+
+    m_pendingMeshReleases.push_back(PendingMeshRelease{ meshId, retireFence });
+}
+
+void D3D12Renderer::ProcessPendingMeshReleases()
+{
+    if (!m_fence)
+        return;
+
+    const uint64_t completed = m_fence->GetCompletedValue();
+
+    size_t write = 0;
+    for (size_t i = 0; i < m_pendingMeshReleases.size(); ++i)
+    {
+        const auto& r = m_pendingMeshReleases[i];
+        if (completed >= r.retireFenceValue)
+        {
+            m_gpuMeshes.erase(r.meshId); // ComPtr 해제
+        }
+        else
+        {
+            m_pendingMeshReleases[write++] = r;
+        }
+    }
+    m_pendingMeshReleases.resize(write);
 }

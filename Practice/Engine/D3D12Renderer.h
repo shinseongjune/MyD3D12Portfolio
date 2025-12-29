@@ -9,9 +9,9 @@
 #include "IRenderer.h"
 
 class MeshManager;
-struct MeshResource;
+struct MeshCPUData;
 
-struct GPUMesh
+struct MeshGPUData
 {
     Microsoft::WRL::ComPtr<ID3D12Resource> vb;
     Microsoft::WRL::ComPtr<ID3D12Resource> ib;
@@ -19,6 +19,12 @@ struct GPUMesh
     D3D12_VERTEX_BUFFER_VIEW vbView{};
     D3D12_INDEX_BUFFER_VIEW  ibView{};
     uint32_t indexCount = 0;
+};
+
+struct PendingMeshRelease
+{
+    uint32_t meshId = 0;
+    uint64_t retireFenceValue = 0;
 };
 
 class D3D12Renderer final : public IRenderer
@@ -32,14 +38,16 @@ public:
     void Render(const std::vector<RenderItem>& items, const RenderCamera& cam) override;
     void Shutdown() override;
 
-    void SetMeshManager(const MeshManager* mm);
+    void SetMeshManager(MeshManager* mm);
 
 private:
-    std::unordered_map<uint32_t, GPUMesh> m_gpuMeshes;
-    const MeshManager* m_meshManager = nullptr;
+    std::unordered_map<uint32_t, MeshGPUData> m_gpuMeshes;
+    MeshManager* m_meshManager = nullptr;
 
     static constexpr uint32_t FrameCount = 2;
     static constexpr uint32_t MaxDrawsPerFrame = 2048; // RenderItem ÃÖ´ëÄ¡
+
+    std::vector<PendingMeshRelease> m_pendingMeshReleases;
 
     struct alignas(256) DrawCB
     {
@@ -71,8 +79,11 @@ private:
 
     uint32_t Align256(uint32_t size) const { return (size + 255u) & ~255u; }
 
-    GPUMesh& GetOrCreateGPUMesh(uint32_t meshId);
-    void CreateGPUMeshFromCPU(const MeshResource& cpu, GPUMesh& out);
+    MeshGPUData& GetOrCreateGPUMesh(uint32_t meshId);
+    void CreateGPUMeshFromCPU(const MeshCPUData& cpu, MeshGPUData& out);
+
+    void RetireMesh(uint32_t meshId);
+    void ProcessPendingMeshReleases();
 
 private:
     // Window

@@ -129,7 +129,7 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="AssetPipeline.h" />
-    <ClInclude Include="AssetTypes.h" />
+    <ClInclude Include="ImportTypes.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="D3D12Renderer.h" />
     <ClInclude Include="DebugDraw.h" />
@@ -144,7 +144,8 @@
     <ClInclude Include="MeshComponent.h" />
     <ClInclude Include="MeshHandle.h" />
     <ClInclude Include="MeshManager.h" />
-    <ClInclude Include="MeshResource.h" />
+    <ClInclude Include="MeshCPUData.h" />
+    <ClInclude Include="ModelAsset.h" />
     <ClInclude Include="ObjImporter_Minimal.h" />
     <ClInclude Include="RenderCamera.h" />
     <ClInclude Include="RenderItem.h" />

@@ -2,13 +2,13 @@
 #include "DebugDraw.h"
 #include "World.h"
 #include "Input.h"
-#include "MeshResource.h"
+#include "MeshCPUData.h"
 
 using namespace DirectX;
 
-static MeshResource CreateCubeMesh()
+static MeshCPUData CreateCubeMesh()
 {
-    MeshResource mesh;
+    MeshCPUData mesh;
 
     mesh.positions = {
         {-0.5f,-0.5f,-0.5f}, {-0.5f, 0.5f,-0.5f}, { 0.5f, 0.5f,-0.5f}, { 0.5f,-0.5f,-0.5f},
@@ -51,25 +51,23 @@ void TestScene::OnLoad(World& world)
     SpawnModelOptions spawnOpt{};
     spawnOpt.name = "AlienAnimal";
 
-    // =========================
-    // 2. 에셋 로드 호출
-    // =========================
-    auto result = m_assetPipeline.LoadModelIntoWorld(
-        world,
-        "Assets/Alien Animal.obj",
-        importOpt,
-        spawnOpt
-    );
-
-    if (!result.IsOk())
+    // 1) Import
+    auto imported = m_assetPipeline.ImportModel("Assets/Alien Animal.obj", importOpt);
+    if (!imported.IsOk())
     {
-        // 로그만 찍고 씬은 빈 채로 둠
-        LOG_ERROR("Failed to load Alien Animal.obj : %s",
-            result.error->message.c_str());
+        LOG_ERROR("Failed to import: %s", imported.error->message.c_str());
         return;
     }
+    ModelAsset asset = std::move(imported.value);
 
-    EntityId root = result.value;
+    // 2) Instantiate
+    auto spawned = m_assetPipeline.InstantiateModel(world, asset, spawnOpt);
+    if (!spawned.IsOk())
+    {
+        LOG_ERROR("Failed to instantiate: %s", spawned.error->message.c_str());
+        return;
+    }
+    EntityId root = spawned.value;
 
     // =========================
     // 3. 위치/회전/스케일 조정

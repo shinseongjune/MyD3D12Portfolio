@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "AssetTypes.h"
+#include "ImportTypes.h"
 
 class IAssetImporter
 {

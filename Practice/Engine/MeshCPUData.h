@@ -2,7 +2,7 @@
 #include <DirectXMath.h>
 #include <vector>
 
-struct MeshResource
+struct MeshCPUData
 {
     std::vector<DirectX::XMFLOAT3> positions;
     std::vector<uint16_t> indices;
