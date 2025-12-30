@@ -27,8 +27,12 @@ Result<ModelAsset> AssetPipeline::ImportModel(
         // ImportedMesh -> MeshCPUData º¯È¯
         MeshCPUData cpu{};
         cpu.positions.reserve(mesh.vertices.size());
+		cpu.uvs.reserve(mesh.vertices.size());
         for (const auto& v : mesh.vertices)
+        {
             cpu.positions.push_back(DirectX::XMFLOAT3(v.position.x, v.position.y, v.position.z));
+			cpu.uvs.push_back(DirectX::XMFLOAT2(v.uv.x, v.uv.y));
+        }
 
         cpu.indices.reserve(mesh.indices.size());
         for (uint32_t idx : mesh.indices)

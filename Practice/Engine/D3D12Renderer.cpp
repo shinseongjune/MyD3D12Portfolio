@@ -36,10 +36,6 @@ void D3D12Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
     CreateDebugLinePipeline();
     CreateDebugVertexBuffer();
 
-    // viewport/scissor
-    m_viewport = { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f };
-    m_scissor = { 0, 0, (LONG)width, (LONG)height };
-
     // fence
     ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
     m_fenceValues[0] = 1;
@@ -48,6 +44,22 @@ void D3D12Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
     if (!m_fenceEvent) throw std::runtime_error("CreateEvent failed.");
 
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+	// 초기 커맨드 리스트 녹화
+    m_commandAllocators[0]->Reset();
+    m_commandList->Reset(m_commandAllocators[0].Get(), nullptr);
+
+    CreateTextureCheckerboard();
+
+    ThrowIfFailed(m_commandList->Close());
+    ID3D12CommandList* lists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(1, lists);
+
+    // viewport/scissor
+    m_viewport = { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f };
+    m_scissor = { 0, 0, (LONG)width, (LONG)height };
+
+	WaitForGPU();
 }
 
 void D3D12Renderer::Shutdown()
@@ -157,6 +169,13 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
 
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// SRV heap
+    ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    D3D12_GPU_DESCRIPTOR_HANDLE h = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+    m_commandList->SetGraphicsRootDescriptorTable(1, h);
 
     // View/Proj 행렬
     XMMATRIX V = XMLoadFloat4x4(&cam.view);
@@ -361,6 +380,14 @@ void D3D12Renderer::CreateDescriptorHeaps()
     dsv.NumDescriptors = 1;
     dsv.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&dsv, IID_PPV_ARGS(&m_dsvHeap)));
+
+    // SRV heap (shader-visible)
+    D3D12_DESCRIPTOR_HEAP_DESC sh{};
+    sh.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    sh.NumDescriptors = 1;
+    sh.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    ThrowIfFailed(m_device->CreateDescriptorHeap(&sh, IID_PPV_ARGS(&m_srvHeap)));
+    m_srvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 void D3D12Renderer::CreateRenderTargets()
@@ -412,39 +439,95 @@ void D3D12Renderer::CreateDepthStencil(uint32_t width, uint32_t height)
 
 void D3D12Renderer::CreatePipeline()
 {
-    // Root signature: CBV(b0)
-    D3D12_ROOT_PARAMETER rp{};
-    rp.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    rp.Descriptor.ShaderRegister = 0;
-    rp.Descriptor.RegisterSpace = 0;
-    rp.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    // =========================
+    // 1) Root Signature
+    //   - [0] CBV(b0)
+    //   - [1] DescriptorTable(SRV t0)
+    //   - Static Sampler(s0)
+    // =========================
 
-    D3D12_ROOT_SIGNATURE_DESC rs{};
-    rs.NumParameters = 1;
-    rs.pParameters = &rp;
-    rs.NumStaticSamplers = 0;
-    rs.pStaticSamplers = nullptr;
+    D3D12_ROOT_PARAMETER rp[2] = {};
+
+    // [0] CBV(b0)
+    rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rp[0].Descriptor.ShaderRegister = 0; // b0
+    rp[0].Descriptor.RegisterSpace = 0;
+    rp[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    // [1] SRV Descriptor Table (t0)
+    D3D12_DESCRIPTOR_RANGE range = {};
+    range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range.NumDescriptors = 1;            // 텍스처 1장 (t0)
+    range.BaseShaderRegister = 0;        // t0
+    range.RegisterSpace = 0;
+    range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+    rp[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rp[1].DescriptorTable.NumDescriptorRanges = 1;
+    rp[1].DescriptorTable.pDescriptorRanges = &range;
+    rp[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // 텍스처는 PS에서만 사용
+
+    // Static Sampler (s0)
+    D3D12_STATIC_SAMPLER_DESC ss = {};
+    ss.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    ss.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    ss.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    ss.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    ss.MipLODBias = 0.0f;
+    ss.MaxAnisotropy = 1;
+    ss.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    ss.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    ss.MinLOD = 0.0f;
+    ss.MaxLOD = D3D12_FLOAT32_MAX;
+    ss.ShaderRegister = 0;  // s0
+    ss.RegisterSpace = 0;
+    ss.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    D3D12_ROOT_SIGNATURE_DESC rs = {};
+    rs.NumParameters = _countof(rp);
+    rs.pParameters = rp;
+    rs.NumStaticSamplers = 1;
+    rs.pStaticSamplers = &ss;
     rs.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     ComPtr<ID3DBlob> sig, err;
-    ThrowIfFailed(D3D12SerializeRootSignature(&rs, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err));
-    ThrowIfFailed(m_device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+    HRESULT hr = D3D12SerializeRootSignature(&rs, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err);
+    if (FAILED(hr))
+    {
+        if (err) OutputDebugStringA((const char*)err->GetBufferPointer());
+        ThrowIfFailed(hr);
+    }
+    ThrowIfFailed(m_device->CreateRootSignature(
+        0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
 
-    // Shaders (inline)
+    // =========================
+    // 2) Shaders (inline)
+    // =========================
+
     const char* vsCode = R"(
     cbuffer DrawCB : register(b0)
     {
         row_major float4x4 mvp;
-        float4 color;
+        float4 color; // tint
     };
 
-    struct VSIn { float3 pos : POSITION; };
-    struct VSOut { float4 pos : SV_POSITION; };
+    struct VSIn
+    {
+        float3 pos : POSITION;
+        float2 uv  : TEXCOORD0;
+    };
+
+    struct VSOut
+    {
+        float4 pos : SV_POSITION;
+        float2 uv  : TEXCOORD0;
+    };
 
     VSOut main(VSIn i)
     {
         VSOut o;
         o.pos = mul(float4(i.pos, 1.0), mvp);
+        o.uv = i.uv;
         return o;
     }
     )";
@@ -453,9 +536,23 @@ void D3D12Renderer::CreatePipeline()
     cbuffer DrawCB : register(b0)
     {
         row_major float4x4 mvp;
-        float4 color;
+        float4 color; // tint
     };
-    float4 main() : SV_TARGET { return color; }
+
+    Texture2D    gTex  : register(t0);
+    SamplerState gSamp : register(s0);
+
+    struct PSIn
+    {
+        float4 pos : SV_POSITION;
+        float2 uv  : TEXCOORD0;
+    };
+
+    float4 main(PSIn i) : SV_TARGET
+    {
+        float4 tex = gTex.Sample(gSamp, i.uv);
+        return tex * color;
+    }
     )";
 
     ComPtr<ID3DBlob> vs, ps;
@@ -463,26 +560,41 @@ void D3D12Renderer::CreatePipeline()
 #if defined(_DEBUG)
     flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
-    ThrowIfFailed(D3DCompile(vsCode, strlen(vsCode), nullptr, nullptr, nullptr, "main", "vs_5_0", flags, 0, &vs, &err));
-    ThrowIfFailed(D3DCompile(psCode, strlen(psCode), nullptr, nullptr, nullptr, "main", "ps_5_0", flags, 0, &ps, &err));
 
-    // Input layout
+    err.Reset();
+    hr = D3DCompile(vsCode, strlen(vsCode), nullptr, nullptr, nullptr, "main", "vs_5_0", flags, 0, &vs, &err);
+    if (FAILED(hr))
+    {
+        if (err) OutputDebugStringA((const char*)err->GetBufferPointer());
+        ThrowIfFailed(hr);
+    }
+
+    err.Reset();
+    hr = D3DCompile(psCode, strlen(psCode), nullptr, nullptr, nullptr, "main", "ps_5_0", flags, 0, &ps, &err);
+    if (FAILED(hr))
+    {
+        if (err) OutputDebugStringA((const char*)err->GetBufferPointer());
+        ThrowIfFailed(hr);
+    }
+
+    // =========================
+    // 3) Input layout (POSITION + TEXCOORD)
+    // =========================
     D3D12_INPUT_ELEMENT_DESC il[] =
     {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 
-    // PSO
+    // =========================
+    // 4) PSO
+    // =========================
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
     pso.pRootSignature = m_rootSignature.Get();
     pso.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
     pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
     pso.InputLayout = { il, _countof(il) };
     pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-
-    //pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT); // d3dx12 없으면 아래로 교체
-    //pso.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    //pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 
     // RasterizerState (default)
     pso.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
@@ -718,8 +830,22 @@ MeshGPUData& D3D12Renderer::GetOrCreateGPUMesh(uint32_t meshId)
 
 void D3D12Renderer::CreateGPUMeshFromCPU(const MeshCPUData& cpu, MeshGPUData& out)
 {
-    const UINT vbSize =
-        (UINT)(cpu.positions.size() * sizeof(DirectX::XMFLOAT3));
+    struct VertexPU
+    {
+        DirectX::XMFLOAT3 pos;
+        DirectX::XMFLOAT2 uv;
+    };
+
+    std::vector<VertexPU> verts;
+    verts.resize(cpu.positions.size());
+
+    for (size_t i = 0; i < verts.size(); ++i)
+    {
+        verts[i].pos = cpu.positions[i];
+        verts[i].uv = (i < cpu.uvs.size()) ? cpu.uvs[i] : DirectX::XMFLOAT2{ 0,0 };
+    }
+
+    const UINT vbSize = (UINT)(verts.size() * sizeof(VertexPU));
     const UINT ibSize =
         (UINT)(cpu.indices.size() * sizeof(uint16_t));
 
@@ -746,12 +872,12 @@ void D3D12Renderer::CreateGPUMeshFromCPU(const MeshCPUData& cpu, MeshGPUData& ou
 
     void* p = nullptr;
     out.vb->Map(0, nullptr, &p);
-    memcpy(p, cpu.positions.data(), vbSize);
+    memcpy(p, verts.data(), vbSize);
     out.vb->Unmap(0, nullptr);
 
     out.vbView.BufferLocation = out.vb->GetGPUVirtualAddress();
     out.vbView.SizeInBytes = vbSize;
-    out.vbView.StrideInBytes = sizeof(DirectX::XMFLOAT3);
+    out.vbView.StrideInBytes = sizeof(VertexPU);
 
     // --- Index Buffer ---
     D3D12_RESOURCE_DESC ibDesc = vbDesc;
@@ -805,4 +931,117 @@ void D3D12Renderer::ProcessPendingMeshReleases()
         }
     }
     m_pendingMeshReleases.resize(write);
+}
+
+void D3D12Renderer::CreateTextureCheckerboard()
+{
+    const UINT texW = 256, texH = 256;
+    std::vector<uint32_t> pixels(texW * texH);
+
+    for (UINT y = 0; y < texH; ++y)
+    {
+        for (UINT x = 0; x < texW; ++x)
+        {
+            bool c = ((x / 32) ^ (y / 32)) & 1;
+            uint8_t v = c ? 230 : 30;
+            pixels[y * texW + x] = (0xFFu << 24) | (v << 16) | (v << 8) | (v); // A8R8G8B8 비슷하게 보이지만 아래 포맷과 맞춤 필요
+        }
+    }
+
+    // 1) Texture2D (Default heap)
+    D3D12_RESOURCE_DESC td{};
+    td.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    td.Width = texW;
+    td.Height = texH;
+    td.DepthOrArraySize = 1;
+    td.MipLevels = 1;
+    td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    td.SampleDesc.Count = 1;
+    td.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    D3D12_HEAP_PROPERTIES hpDefault{};
+    hpDefault.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &hpDefault,
+        D3D12_HEAP_FLAG_NONE,
+        &td,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&m_texture)));
+
+    // 2) Upload buffer (GetCopyableFootprints)
+    UINT64 uploadSize = 0;
+    m_device->GetCopyableFootprints(&td, 0, 1, 0, nullptr, nullptr, nullptr, &uploadSize);
+
+    D3D12_HEAP_PROPERTIES hpUpload{};
+    hpUpload.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC bd{};
+    bd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bd.Width = uploadSize;
+    bd.Height = 1;
+    bd.DepthOrArraySize = 1;
+    bd.MipLevels = 1;
+    bd.SampleDesc.Count = 1;
+    bd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &hpUpload,
+        D3D12_HEAP_FLAG_NONE,
+        &bd,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_textureUpload)));
+
+    // footprints 얻기(실제 rowPitch가 256*4와 다를 수 있음)
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT fp{};
+    UINT numRows = 0;
+    UINT64 rowSize = 0;
+    UINT64 total = 0;
+    m_device->GetCopyableFootprints(&td, 0, 1, 0, &fp, &numRows, &rowSize, &total);
+
+    // 3) Map + rowPitch 맞춰 복사
+    uint8_t* dst = nullptr;
+    D3D12_RANGE r{ 0, 0 };
+    ThrowIfFailed(m_textureUpload->Map(0, &r, (void**)&dst));
+
+    const uint8_t* src = (const uint8_t*)pixels.data();
+    for (UINT y = 0; y < texH; ++y)
+    {
+        memcpy(dst + y * fp.Footprint.RowPitch, src + y * texW * 4, texW * 4);
+    }
+    m_textureUpload->Unmap(0, nullptr);
+
+    // 4) CopyTextureRegion
+    D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+    dstLoc.pResource = m_texture.Get();
+    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dstLoc.SubresourceIndex = 0;
+
+    D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+    srcLoc.pResource = m_textureUpload.Get();
+    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    srcLoc.PlacedFootprint = fp;
+
+    m_commandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+
+    // 5) Resource barrier: COPY_DEST -> PIXEL_SHADER_RESOURCE
+    D3D12_RESOURCE_BARRIER b{};
+    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource = m_texture.Get();
+    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    b.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    b.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    m_commandList->ResourceBarrier(1, &b);
+
+    // 6) Create SRV in shader-visible heap slot 0
+    D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+    srv.Format = td.Format;
+    srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srv.Texture2D.MipLevels = 1;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+    m_device->CreateShaderResourceView(m_texture.Get(), &srv, cpu);
 }

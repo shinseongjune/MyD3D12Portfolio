@@ -60,6 +60,7 @@ namespace PrimitiveMeshes
                 float z = std::sin(theta) * r;
 
                 mesh.positions.push_back(XMFLOAT3{ x, y, z });
+				mesh.uvs.push_back(DirectX::XMFLOAT2{ u, 1.0f - v }); // V ¹ÝÀü
             }
         }
 

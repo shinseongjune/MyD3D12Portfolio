@@ -49,6 +49,11 @@ private:
 
     std::vector<PendingMeshRelease> m_pendingMeshReleases;
 
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_srvHeap;
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_texture;
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_textureUpload;
+    uint32_t m_srvDescriptorSize = 0;
+
     struct alignas(256) DrawCB
     {
         DirectX::XMFLOAT4X4 mvp;
@@ -84,6 +89,8 @@ private:
 
     void RetireMesh(uint32_t meshId);
     void ProcessPendingMeshReleases();
+
+    void CreateTextureCheckerboard();
 
 private:
     // Window
