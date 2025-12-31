@@ -22,7 +22,19 @@ void RenderSystem::Build(const World& world, std::vector<RenderItem>& outItem) c
         RenderItem it{};
         it.mesh = mesh.mesh;
         it.world = tr.world;
-        it.color = { 0.7f, 0.7f, 0.9f, 1.0f };
+
+        // Material이 없으면 기본값
+        if (world.HasMaterial(e))
+        {
+            const auto& mat = world.GetMaterial(e);
+            it.color = mat.color;
+            it.srvIndex = mat.srvIndex;
+        }
+        else
+        {
+            it.color = { 0.7f, 0.7f, 0.9f, 1.0f };
+            it.srvIndex = 0;
+        }
 
         outItem.push_back(it);
     }

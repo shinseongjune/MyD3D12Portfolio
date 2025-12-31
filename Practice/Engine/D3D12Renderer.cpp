@@ -185,18 +185,58 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     const uint32_t drawCount = std::min<uint32_t>((uint32_t)items.size(), MaxDrawsPerFrame);
     const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
 
+    // ----- (1) Sort order: material(srvIndex) -> mesh(id) -----
+    std::vector<uint32_t> order;
+    order.resize(drawCount);
+
     for (uint32_t i = 0; i < drawCount; ++i)
+        order[i] = i;
+
+    auto makeKey = [&](const RenderItem& it) -> uint64_t
+        {
+            // 상위 32bit: srvIndex(=material), 하위 32bit: mesh id
+            return (uint64_t(it.srvIndex) << 32) | uint64_t(it.mesh.id);
+        };
+
+    std::sort(order.begin(), order.end(),
+        [&](uint32_t a, uint32_t b)
+        {
+            return makeKey(items[a]) < makeKey(items[b]);
+        });
+
+    // ----- (2) Cached state -----
+    uint32_t lastSrvIndex = 0xFFFFFFFFu;
+    uint32_t lastMeshId = 0xFFFFFFFFu;
+
+    // SRV heap base handle
+    D3D12_GPU_DESCRIPTOR_HANDLE srvBase = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+
+    for (uint32_t k = 0; k < drawCount; ++k)
     {
-        const RenderItem& it = items[i];
+        const RenderItem& it = items[order[k]];
 
-        // 1) GPU 메쉬 확보
-        MeshGPUData& mesh = GetOrCreateGPUMesh(it.mesh.id);
+        // (A) Material/SRV 바뀔 때만 DescriptorTable 세팅
+        if (it.srvIndex != lastSrvIndex)
+        {
+            D3D12_GPU_DESCRIPTOR_HANDLE h = srvBase;
+            h.ptr += (UINT64)it.srvIndex * (UINT64)m_srvDescriptorSize;
+            m_commandList->SetGraphicsRootDescriptorTable(1, h);
 
-        // 2) IA 설정
-        m_commandList->IASetVertexBuffers(0, 1, &mesh.vbView);
-        m_commandList->IASetIndexBuffer(&mesh.ibView);
+            lastSrvIndex = it.srvIndex;
+        }
 
-        // 3) 상수버퍼 설정 (MVP, color)
+        // (B) Mesh 바뀔 때만 IA 설정
+        if (it.mesh.id != lastMeshId)
+        {
+            MeshGPUData& mesh = GetOrCreateGPUMesh(it.mesh.id);
+
+            m_commandList->IASetVertexBuffers(0, 1, &mesh.vbView);
+            m_commandList->IASetIndexBuffer(&mesh.ibView);
+
+            lastMeshId = it.mesh.id;
+        }
+
+        // (C) Per-draw constant buffer (MVP, tint color)
         XMMATRIX W = XMLoadFloat4x4(&it.world);
         XMMATRIX MVP = W * V * P;
 
@@ -204,17 +244,17 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         XMStoreFloat4x4(&cb.mvp, MVP);
         cb.color = it.color;
 
-        const uint32_t slot = frameBase + i;
+        const uint32_t slot = frameBase + k;
         memcpy(m_cbMapped + slot * m_cbStride, &cb, sizeof(DrawCB));
 
         D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
-            m_cb->GetGPUVirtualAddress() + (UINT64)slot * m_cbStride;
+            m_cb->GetGPUVirtualAddress() + (UINT64)slot * (UINT64)m_cbStride;
 
         m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
 
-        // 4) Draw
-        m_commandList->DrawIndexedInstanced(
-            mesh.indexCount, 1, 0, 0, 0);
+        // Draw
+        MeshGPUData& mesh = GetOrCreateGPUMesh(it.mesh.id);
+        m_commandList->DrawIndexedInstanced(mesh.indexCount, 1, 0, 0, 0);
     }
 
 
@@ -384,7 +424,7 @@ void D3D12Renderer::CreateDescriptorHeaps()
     // SRV heap (shader-visible)
     D3D12_DESCRIPTOR_HEAP_DESC sh{};
     sh.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    sh.NumDescriptors = 1;
+    sh.NumDescriptors = 256;
     sh.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&sh, IID_PPV_ARGS(&m_srvHeap)));
     m_srvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
