@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -140,6 +140,7 @@
     <ClInclude Include="ImportRegistry.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="IRenderer.h" />
+    <ClInclude Include="TextureCPUData.h" />
     <ClInclude Include="MaterialComponent.h" />
     <ClInclude Include="MeshComponent.h" />
     <ClInclude Include="MeshHandle.h" />
@@ -156,6 +157,9 @@
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TestScene.h" />
+    <ClInclude Include="TextureManager.h" />
+    <ClInclude Include="TextureHandle.h" />
+    <ClInclude Include="TextureLoader_WIC.h" />
     <ClInclude Include="Time.h" />
     <ClInclude Include="TransformComponent.h" />
     <ClInclude Include="Win32Window.h" />
@@ -174,6 +178,8 @@
     <ClCompile Include="PrimitiveMeshes.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="TestScene.cpp" />
+    <ClCompile Include="TextureLoader_WIC.cpp" />
+    <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Time.cpp" />
     <ClCompile Include="Win32Window.cpp" />
     <ClCompile Include="World.cpp" />

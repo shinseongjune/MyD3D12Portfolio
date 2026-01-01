@@ -10,6 +10,7 @@
 #include "RenderSystem.h"
 #include "SceneManager.h"
 #include "MeshManager.h"
+#include "TextureManager.h"
 #include "ImportRegistry.h"
 #include "AssetPipeline.h"
 
@@ -29,6 +30,7 @@ private:
 
     SceneManager m_sceneManager;
 	MeshManager m_meshManager;
+	TextureManager m_textureManager;
     ImportRegistry m_registry;
     AssetPipeline m_pipeline;
 

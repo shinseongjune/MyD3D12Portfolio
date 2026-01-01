@@ -28,6 +28,7 @@ void Application::Initialize(HINSTANCE hInstance)
 
     auto* d3d = static_cast<D3D12Renderer*>(m_renderer.get());
     d3d->SetMeshManager(&m_meshManager);
+    d3d->SetTextureManager(&m_textureManager);
 
     // 4) 월드 초기화
     // m_world.Initialize(); // 나중에 필요하면 추가
@@ -35,7 +36,7 @@ void Application::Initialize(HINSTANCE hInstance)
     // 4-1) 첫 Scene 로드(테스트)
     m_registry.Register(std::make_unique<ObjImporter_Minimal>());
 
-    m_sceneManager.Load(m_world, std::make_unique<TestScene>(m_meshManager, m_pipeline));
+    m_sceneManager.Load(m_world, std::make_unique<TestScene>(m_meshManager, m_textureManager, m_pipeline));
 
     m_lastW = m_window.GetWidth();
     m_lastH = m_window.GetHeight();

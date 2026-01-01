@@ -126,7 +126,7 @@ public:
     const MeshComponent& GetMesh(EntityId e) const;
 
     // --- Material API ---
-    void AddMaterial(EntityId e);
+    void AddMaterial(EntityId e, const MaterialComponent& m);
     bool HasMaterial(EntityId e) const;
     MaterialComponent& GetMaterial(EntityId e);
     const MaterialComponent& GetMaterial(EntityId e) const;

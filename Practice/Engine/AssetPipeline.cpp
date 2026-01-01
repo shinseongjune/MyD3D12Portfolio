@@ -63,6 +63,30 @@ Result<ModelAsset> AssetPipeline::ImportModel(
         }
 
         ModelAssetMesh am{};
+        am.submeshes.clear();
+        if (!mesh.submeshes.empty())
+        {
+            am.submeshes.reserve(mesh.submeshes.size());
+            for (const auto& sm : mesh.submeshes)
+            {
+                ModelAssetSubmesh asm2{};
+                asm2.startIndex = sm.startIndex;
+                asm2.indexCount = sm.indexCount;
+                asm2.materialIndex = sm.materialIndex;
+                asm2.name = sm.name;
+                am.submeshes.push_back(std::move(asm2));
+            }
+        }
+        else
+        {
+            // submesh 정보가 없으면 전체를 1개 submesh로 간주
+            ModelAssetSubmesh one{};
+            one.startIndex = 0;
+            one.indexCount = (uint32_t)cpu.indices.size();
+            one.materialIndex = 0;
+            one.name = "Submesh0";
+            am.submeshes.push_back(one);
+        }
         am.name = mesh.name.empty() ? "Mesh" : mesh.name;
         am.mesh = h;
         am.baseColor = color;
@@ -83,16 +107,13 @@ Result<EntityId> AssetPipeline::InstantiateModel(
     EntityId root = world.CreateEntity(spawnOpt.name);
     world.AddTransform(root);
 
-    // 지금 구조: MeshComponent가 mesh 1개만 가지니까 자식으로 쪼갬(기존과 동일)
     for (const auto& m : asset.meshes)
     {
-        EntityId e = world.CreateEntity(m.name);
-        world.AddTransform(e);
-        world.SetParent(e, root);
-
-        world.AddMesh(e, MeshComponent{ m.mesh });
-        world.AddMaterial(e);
-        world.GetMaterial(e).color = m.baseColor;
+        // mesh 전체가 아니라 submesh별로 draw를 쌓는다
+        for (const auto& sm : m.submeshes)
+        {
+            world.AddMesh(root, MeshComponent{ m.mesh, sm.startIndex, sm.indexCount, sm.materialIndex });
+        }
     }
 
     return Result<EntityId>::Ok(root);

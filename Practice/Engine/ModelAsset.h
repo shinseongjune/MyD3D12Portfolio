@@ -4,16 +4,27 @@
 #include <DirectXMath.h>
 #include "MeshHandle.h"
 
-// "파일 1개를 import한 결과"를 엔진이 재사용하기 쉬운 형태로 보관
+struct ModelAssetSubmesh
+{
+    uint32_t startIndex = 0;
+    uint32_t indexCount = 0;
+    uint32_t materialIndex = 0;
+    std::string name;
+};
+
 struct ModelAssetMesh
 {
-    std::string name;                 // mesh 이름(엔티티 이름에 사용)
-    MeshHandle mesh;                  // MeshManager에 등록된 핸들
-    DirectX::XMFLOAT4 baseColor{ 1,1,1,1 }; // 현재는 색만 (나중에 MaterialHandle로 교체)
+    std::string name;
+    MeshHandle mesh;
+    DirectX::XMFLOAT4 baseColor{ 1,1,1,1 };
+
+    std::vector<ModelAssetSubmesh> submeshes;
 };
 
 struct ModelAsset
 {
     std::string sourcePath;
     std::vector<ModelAssetMesh> meshes;
+
+    // (선택 확장) 나중에 이미지/머티리얼 원본도 보관하고 싶으면 여기에 추가
 };

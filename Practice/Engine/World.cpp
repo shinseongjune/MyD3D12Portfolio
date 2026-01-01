@@ -128,8 +128,15 @@ void World::AddMesh(EntityId e, const MeshComponent& comp)
 {
     if (!IsAlive(e)) return;
     EnsureMeshSparseSize(e.index);
+
+    // 이미 MeshComponent가 있으면 append
     if (m_meshSparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_meshSparse[e.index];
+        auto& dst = m_meshes[di].draws;
+        dst.insert(dst.end(), comp.draws.begin(), comp.draws.end());
         return;
+    }
 
     const uint32_t denseIndex = (uint32_t)m_meshes.size();
     m_meshSparse[e.index] = denseIndex;
@@ -152,8 +159,8 @@ MeshComponent& World::GetMesh(EntityId e)
 {
 #if defined(_DEBUG)
     assert(HasMesh(e));
-    assert(m_meshes[m_meshSparse[e.index]].mesh.IsValid()
-        && "MeshComponent has invalid MeshHandle");
+    assert(!m_meshes[m_meshSparse[e.index]].draws.empty());
+    assert(m_meshes[m_meshSparse[e.index]].draws[0].mesh.IsValid());
 #endif
     return m_meshes[m_meshSparse[e.index]];
 }
@@ -162,8 +169,8 @@ const MeshComponent& World::GetMesh(EntityId e) const
 {
 #if defined(_DEBUG)
     assert(HasMesh(e));
-    assert(m_meshes[m_meshSparse[e.index]].mesh.IsValid()
-        && "MeshComponent has invalid MeshHandle");
+    assert(!m_meshes[m_meshSparse[e.index]].draws.empty());
+    assert(m_meshes[m_meshSparse[e.index]].draws[0].mesh.IsValid());
 #endif
     return m_meshes[m_meshSparse[e.index]];
 }
@@ -194,17 +201,21 @@ void World::EnsureMaterialSparseSize(uint32_t entityIndex)
         m_materialSparse.resize(entityIndex + 1, InvalidDenseIndex);
 }
 
-void World::AddMaterial(EntityId e)
+void World::AddMaterial(EntityId e, const MaterialComponent& comp)
 {
     if (!IsAlive(e)) return;
     EnsureMaterialSparseSize(e.index);
+
     if (m_materialSparse[e.index] != InvalidDenseIndex)
+    {
+        m_materials[m_materialSparse[e.index]] = comp; // ✅ 교체
         return;
+    }
 
     const uint32_t denseIndex = (uint32_t)m_materials.size();
     m_materialSparse[e.index] = denseIndex;
     m_materialDenseEntities.push_back(e);
-    m_materials.emplace_back();
+    m_materials.push_back(comp);
 }
 
 bool World::HasMaterial(EntityId e) const

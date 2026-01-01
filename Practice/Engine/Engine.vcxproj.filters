@@ -67,12 +67,6 @@
     <Filter Include="헤더 파일\06_World\Components">
       <UniqueIdentifier>{e33cda14-6f97-42e4-ab27-f422b84530f8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\04_Render\Resources">
-      <UniqueIdentifier>{a0c85d8c-5b9a-4cc2-aff5-510d9b27cfcf}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\04_Render\Resources">
-      <UniqueIdentifier>{eaf424a7-bf57-421c-9c01-1ac60247b724}</UniqueIdentifier>
-    </Filter>
     <Filter Include="소스 파일\00_Debug">
       <UniqueIdentifier>{4f3b4f49-3e2b-44dc-931d-11a07928bf05}</UniqueIdentifier>
     </Filter>
@@ -84,6 +78,30 @@
     </Filter>
     <Filter Include="헤더 파일\02_Assets\Importers">
       <UniqueIdentifier>{900ca9d9-00d1-4b41-b86b-12372c74d4d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\02_Assets\Model">
+      <UniqueIdentifier>{0ec655a0-2d7f-4b19-a788-decb6898b1db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\02_Assets\Model">
+      <UniqueIdentifier>{47860871-a53d-46a8-9b70-0ec57e5dfd36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\02_Assets\Texture">
+      <UniqueIdentifier>{063f6b36-3f08-4870-8627-39ee111b9878}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\02_Assets\Texture">
+      <UniqueIdentifier>{1e7e27b6-9a2f-4ab4-885d-a3c707de8637}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\04_Render\Mesh">
+      <UniqueIdentifier>{eaf424a7-bf57-421c-9c01-1ac60247b724}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\04_Render\Mesh">
+      <UniqueIdentifier>{a0c85d8c-5b9a-4cc2-aff5-510d9b27cfcf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\04_Render\Texture">
+      <UniqueIdentifier>{a6cc2dcf-b5ff-4a59-ba7a-4ebfe0b88c2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\04_Render\Texture">
+      <UniqueIdentifier>{c8c6371f-60f9-460d-9e93-4c0ac5ab79f2}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -154,37 +172,49 @@
       <Filter>헤더 파일\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="MeshHandle.h">
-      <Filter>헤더 파일\04_Render\Resources</Filter>
+      <Filter>헤더 파일\04_Render\Mesh</Filter>
     </ClInclude>
     <ClInclude Include="MeshCPUData.h">
-      <Filter>헤더 파일\04_Render\Resources</Filter>
+      <Filter>헤더 파일\04_Render\Mesh</Filter>
     </ClInclude>
     <ClInclude Include="MeshManager.h">
-      <Filter>헤더 파일\04_Render\Resources</Filter>
+      <Filter>헤더 파일\04_Render\Mesh</Filter>
     </ClInclude>
     <ClInclude Include="DebugDraw.h">
       <Filter>헤더 파일\00_Debug</Filter>
     </ClInclude>
-    <ClInclude Include="ImportTypes.h">
-      <Filter>헤더 파일\02_Assets</Filter>
-    </ClInclude>
-    <ClInclude Include="IAssetImporter.h">
-      <Filter>헤더 파일\02_Assets</Filter>
-    </ClInclude>
-    <ClInclude Include="ImportRegistry.h">
-      <Filter>헤더 파일\02_Assets</Filter>
-    </ClInclude>
-    <ClInclude Include="AssetPipeline.h">
-      <Filter>헤더 파일\02_Assets</Filter>
-    </ClInclude>
     <ClInclude Include="ObjImporter_Minimal.h">
       <Filter>헤더 파일\02_Assets\Importers</Filter>
     </ClInclude>
-    <ClInclude Include="ModelAsset.h">
-      <Filter>헤더 파일\02_Assets</Filter>
-    </ClInclude>
     <ClInclude Include="PrimitiveMeshes.h">
       <Filter>헤더 파일\00_Debug</Filter>
+    </ClInclude>
+    <ClInclude Include="AssetPipeline.h">
+      <Filter>헤더 파일\02_Assets\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="IAssetImporter.h">
+      <Filter>헤더 파일\02_Assets\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="ImportRegistry.h">
+      <Filter>헤더 파일\02_Assets\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="ImportTypes.h">
+      <Filter>헤더 파일\02_Assets\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="ModelAsset.h">
+      <Filter>헤더 파일\02_Assets\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureLoader_WIC.h">
+      <Filter>헤더 파일\02_Assets\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureHandle.h">
+      <Filter>헤더 파일\04_Render\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureCPUData.h">
+      <Filter>헤더 파일\04_Render\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureManager.h">
+      <Filter>헤더 파일\04_Render\Texture</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -210,19 +240,13 @@
       <Filter>소스 파일\01_Core</Filter>
     </ClCompile>
     <ClCompile Include="MeshManager.cpp">
-      <Filter>소스 파일\04_Render\Resources</Filter>
+      <Filter>소스 파일\04_Render\Mesh</Filter>
     </ClCompile>
     <ClCompile Include="DebugDraw.cpp">
       <Filter>소스 파일\00_Debug</Filter>
     </ClCompile>
     <ClCompile Include="TestScene.cpp">
       <Filter>소스 파일\06_World\Scenes</Filter>
-    </ClCompile>
-    <ClCompile Include="ImportRegistry.cpp">
-      <Filter>소스 파일\02_Assets</Filter>
-    </ClCompile>
-    <ClCompile Include="AssetPipeline.cpp">
-      <Filter>소스 파일\02_Assets</Filter>
     </ClCompile>
     <ClCompile Include="ObjImporter_Minimal.cpp">
       <Filter>소스 파일\02_Assets\Importers</Filter>
@@ -232,6 +256,18 @@
     </ClCompile>
     <ClCompile Include="PrimitiveMeshes.cpp">
       <Filter>소스 파일\00_Debug</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetPipeline.cpp">
+      <Filter>소스 파일\02_Assets\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="ImportRegistry.cpp">
+      <Filter>소스 파일\02_Assets\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureLoader_WIC.cpp">
+      <Filter>소스 파일\02_Assets\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureManager.cpp">
+      <Filter>소스 파일\04_Render\Texture</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
