@@ -12,13 +12,13 @@ enum class Key : uint8_t
 class Input
 {
 public:
-    static void Update();
+    void Update();
 
-    static bool IsKeyDown(Key k);
-    static bool IsKeyPressed(Key k); // 이번 프레임에 눌림
-    static bool IsKeyReleased(Key k);
+    bool IsKeyDown(Key k) const;
+    bool IsKeyPressed(Key k) const; // 이번 프레임에 눌림
+    bool IsKeyReleased(Key k) const;
 
 private:
-    static bool s_curr[256];
-    static bool s_prev[256];
+    bool s_curr[256];
+    bool s_prev[256];
 };

@@ -492,6 +492,7 @@ void World::SetParent(EntityId child, EntityId newParent)
     if (!HasTransform(child)) return;
     if (newParent.IsValid() && !HasTransform(newParent)) return;
     if (child == newParent) return;
+    if (newParent.IsValid() && IsDescendant(newParent, child)) return; // cycle 방지
 
     TransformComponent& ct = GetTransform(child);
 
@@ -521,6 +522,21 @@ void World::SetParent(EntityId child, EntityId newParent)
 
     // 계층 변경은 월드행렬 전체에 영향
     MarkDirtyRecursive(child);
+}
+
+bool World::IsDescendant(EntityId node, EntityId potentialAncestor) const
+{
+    EntityId current = potentialAncestor;
+    while (current.IsValid())
+    {
+        if (current == node)
+            return true;
+        if (!HasTransform(current))
+            break;
+        const TransformComponent& t = GetTransform(current);
+        current = t.parent;
+	}
+    return false;
 }
 
 void World::MarkDirtyRecursive(EntityId e)

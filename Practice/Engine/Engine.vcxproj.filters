@@ -216,6 +216,12 @@
     <ClInclude Include="TextureManager.h">
       <Filter>헤더 파일\04_Render\Texture</Filter>
     </ClInclude>
+    <ClInclude Include="SceneScope.h">
+      <Filter>헤더 파일\01_Core</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneContext.h">
+      <Filter>헤더 파일\01_Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -268,6 +274,12 @@
     </ClCompile>
     <ClCompile Include="TextureManager.cpp">
       <Filter>소스 파일\04_Render\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneScope.cpp">
+      <Filter>소스 파일\01_Core</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneManager.cpp">
+      <Filter>소스 파일\01_Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

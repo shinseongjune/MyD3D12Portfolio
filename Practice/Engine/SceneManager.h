@@ -1,29 +1,33 @@
+// SceneManager.h
 #pragma once
 #include <memory>
 
 #include "Scene.h"
-
-class World;
+#include "AssetPipeline.h"
+#include "SceneScope.h"
+#include "Input.h"
 
 class SceneManager
 {
 public:
-    void Load(World& world, std::unique_ptr<Scene> scene)
+    SceneManager(World& w, AssetPipeline& ap, MeshManager& mm, TextureManager& tm, Input& ip)
+		: m_world(w), m_assets(ap), m_meshes(mm), m_textures(tm), m_input(ip)
     {
-        if (m_current)
-        {
-            m_current->OnUnload(world);
-            world.FlushDestroy();
-            m_current.reset();
-        }
-
-        m_current = std::move(scene);
-        if (m_current)
-            m_current->OnLoad(world);
     }
+
+    void Load(std::unique_ptr<Scene> scene);
+    void Update(float dt);
+    void FixedUpdate(float fixedDt);
 
     Scene* Current() const { return m_current.get(); }
 
 private:
+    World& m_world;
+    AssetPipeline& m_assets;
+    MeshManager& m_meshes;
+    TextureManager& m_textures;
+    Input& m_input;
+
+    SceneScope m_scope;
     std::unique_ptr<Scene> m_current;
 };

@@ -140,6 +140,8 @@
     <ClInclude Include="ImportRegistry.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="IRenderer.h" />
+    <ClInclude Include="SceneContext.h" />
+    <ClInclude Include="SceneScope.h" />
     <ClInclude Include="TextureCPUData.h" />
     <ClInclude Include="MaterialComponent.h" />
     <ClInclude Include="MeshComponent.h" />
@@ -177,6 +179,8 @@
     <ClCompile Include="ObjImporter_Minimal.cpp" />
     <ClCompile Include="PrimitiveMeshes.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
+    <ClCompile Include="SceneManager.cpp" />
+    <ClCompile Include="SceneScope.cpp" />
     <ClCompile Include="TestScene.cpp" />
     <ClCompile Include="TextureLoader_WIC.cpp" />
     <ClCompile Include="TextureManager.cpp" />

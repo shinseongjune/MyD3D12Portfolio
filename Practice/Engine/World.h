@@ -32,6 +32,8 @@ public:
 
     // parent/child 연결 (기존 parent 있으면 자동 분리)
     void SetParent(EntityId child, EntityId newParent);
+	inline void Detach(EntityId child) { SetParent(child, EntityId::Invalid()); }
+    bool IsDescendant(EntityId node, EntityId potentialAncestor) const;
 
     // 매 프레임 호출(또는 필요할 때 호출): dirty 트리 갱신
     void UpdateTransforms();

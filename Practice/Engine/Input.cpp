@@ -2,9 +2,6 @@
 #include <Windows.h>
 #include <cstring>
 
-bool Input::s_curr[256]{};
-bool Input::s_prev[256]{};
-
 static int ToVK(Key k)
 {
     switch (k)
@@ -32,19 +29,19 @@ void Input::Update()
         s_curr[i] = (GetAsyncKeyState(i) & 0x8000) != 0;
 }
 
-bool Input::IsKeyDown(Key k)
+bool Input::IsKeyDown(Key k) const
 {
     int vk = ToVK(k);
     return vk ? s_curr[vk] : false;
 }
 
-bool Input::IsKeyPressed(Key k)
+bool Input::IsKeyPressed(Key k) const
 {
     int vk = ToVK(k);
     return vk ? (s_curr[vk] && !s_prev[vk]) : false;
 }
 
-bool Input::IsKeyReleased(Key k)
+bool Input::IsKeyReleased(Key k) const
 {
     int vk = ToVK(k);
     return vk ? (!s_curr[vk] && s_prev[vk]) : false;
