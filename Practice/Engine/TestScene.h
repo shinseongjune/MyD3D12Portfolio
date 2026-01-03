@@ -1,8 +1,5 @@
 #pragma once
-#include <vector>
 #include "Scene.h"
-#include "EntityId.h"
-#include "TextureHandle.h"
 
 class TestScene final : public Scene
 {

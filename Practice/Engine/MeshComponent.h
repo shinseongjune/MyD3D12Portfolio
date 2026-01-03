@@ -7,7 +7,7 @@ struct MeshSubmeshDraw
 {
     MeshHandle mesh;            // 같은 ImportedMesh면 동일 mesh handle
     uint32_t startIndex = 0;    // DrawIndexedInstanced의 StartIndexLocation
-    uint32_t indexCount = 0;    // 0이면 "전체"로 취급(선택)
+    uint32_t indexCount = 0;    // 0이면 "전체"로 취급
     uint32_t materialIndex = 0; // MaterialSetComponent에서 참조할 인덱스
 };
 

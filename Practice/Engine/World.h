@@ -3,12 +3,14 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
-
 #include "EntityId.h"
 #include "TransformComponent.h"
 #include "MeshComponent.h"
 #include "MaterialComponent.h"
 #include "CameraComponent.h"
+#include "RigidBodyComponent.h"
+#include "ColliderComponent.h"
+#include "CollisionEvents.h"
 
 class World
 {
@@ -104,6 +106,19 @@ private:
     void EnsureCameraSparseSize(uint32_t entityIndex);
     void RemoveCamera(EntityId e);
 
+    // Rigidbody storage (dense/sparse)
+    std::vector<RigidBodyComponent> m_rigidBodies;
+    std::vector<EntityId> m_rigidBodyDenseEntities;
+    std::vector<uint32_t> m_rigidBodySparse;
+
+    // Collider storage
+    std::vector<ColliderComponent> m_colliders;
+    std::vector<EntityId> m_colliderDenseEntities;
+    std::vector<uint32_t> m_colliderSparse;
+
+	// Collision Events
+    std::vector<CollisionEvent> m_collisionEvents;
+
 public:
     // --- Transform Public API ---
     DirectX::XMFLOAT3 GetLocalPosition(EntityId e) const;
@@ -149,4 +164,28 @@ public:
 	// ---- 파괴 지연 처리 ----
     void RequestDestroy(EntityId e);
     void FlushDestroy();
+
+    // Rigidbody
+	void EnsureRigidBodySparseSize(uint32_t entityIndex);
+    void AddRigidBody(EntityId e, const RigidBodyComponent& rb);
+    bool HasRigidBody(EntityId e) const;
+    RigidBodyComponent& GetRigidBody(EntityId e);
+    const RigidBodyComponent& GetRigidBody(EntityId e) const;
+	void RemoveRigidBody(EntityId e);
+
+    // Collider
+	void EnsureColliderSparseSize(uint32_t entityIndex);
+    void AddCollider(EntityId e, const ColliderComponent& c);
+    bool HasCollider(EntityId e) const;
+    ColliderComponent& GetCollider(EntityId e);
+    const ColliderComponent& GetCollider(EntityId e) const;
+	void RemoveCollider(EntityId e);
+
+    // 물리 시스템이 후보를 빠르게 순회할 수 있게
+    const std::vector<EntityId>& GetColliderEntities() const { return m_colliderDenseEntities; }
+
+    // Collision Events
+    void PushCollisionEvent(const CollisionEvent& ev);
+    void DrainCollisionEvents(std::vector<CollisionEvent>& out); // out으로 옮기고 내부 비움
+
 };

@@ -2,7 +2,6 @@
 #include <memory>
 #include <vector>
 #include <Windows.h>
-
 #include "Win32Window.h"
 #include "World.h"
 #include "IRenderer.h"
@@ -14,6 +13,7 @@
 #include "ImportRegistry.h"
 #include "AssetPipeline.h"
 #include "Input.h"
+#include "PhysicsSystem.h"
 
 class Application
 {
@@ -42,8 +42,10 @@ private:
     Input m_input;
     SceneManager m_sceneManager;
 
+    PhysicsSystem m_physics;
+
 public:
-    Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_input) { }
+    Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_input, m_physics) { }
 
     ~Application();
 
@@ -56,7 +58,7 @@ private:
     void Resize();
     void BeginFrame();                       // input, time
 	void UpdateScene(const double dt);       // Scene.OnUpdate
-	void FixedUpdate(const double fixedDt);  // Scene.OnFixedUpdate
+    void TickFixed(const double dt);
 	void UpdateTransforms();                 // World.UpdateTransforms
 	void UpdateSystems();                    // RenderSystem.Build °°Àº °Í
 	void RenderFrame();                      // Renderer.Render

@@ -12,11 +12,14 @@ static int ToVK(Key k)
     case Key::D: return 'D';
     case Key::Q: return 'Q';
     case Key::E: return 'E';
+	case Key::R: return 'R';
+	case Key::G: return 'G';
     case Key::Up: return VK_UP;
     case Key::Down: return VK_DOWN;
     case Key::Left: return VK_LEFT;
     case Key::Right: return VK_RIGHT;
     case Key::Escape: return VK_ESCAPE;
+	case Key::Space: return VK_SPACE;
     }
     return 0;
 }

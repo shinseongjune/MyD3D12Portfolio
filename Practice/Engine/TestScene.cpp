@@ -1,4 +1,6 @@
 #include "TestScene.h"
+#include "EntityId.h"
+#include "TextureHandle.h"
 #include "DebugDraw.h"
 #include "World.h"
 #include "Input.h"

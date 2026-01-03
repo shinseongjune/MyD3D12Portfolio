@@ -86,14 +86,17 @@ namespace PrimitiveMeshes
                 uint32_t c = (i + 1) * vertPerRow + (j + 1);
                 uint32_t d = i * vertPerRow + (j + 1);
 
-                // (a,b,c), (a,c,d)
-                mesh.indices.push_back((uint16_t)a);
-                mesh.indices.push_back((uint16_t)b);
-                mesh.indices.push_back((uint16_t)c);
+                // Flip winding to match FrontCounterClockwise = FALSE (CW front)
 
+                // (a,c,b)
                 mesh.indices.push_back((uint16_t)a);
                 mesh.indices.push_back((uint16_t)c);
+                mesh.indices.push_back((uint16_t)b);
+
+                // (a,d,c)
+                mesh.indices.push_back((uint16_t)a);
                 mesh.indices.push_back((uint16_t)d);
+                mesh.indices.push_back((uint16_t)c);
             }
         }
 

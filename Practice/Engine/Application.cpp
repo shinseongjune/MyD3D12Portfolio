@@ -2,7 +2,6 @@
 #include "IRenderer.h"
 #include "D3D12Renderer.h"
 #include "Time.h"
-#include "TestScene.h"
 #include "RenderCamera.h"
 #include "Input.h"
 #include "DebugDraw.h"
@@ -10,6 +9,10 @@
 #include <DirectXMath.h>
 #include <stdexcept>
 #include <Windows.h>
+#if defined(_DEBUG)
+#include "TestScene.h"
+#include "PhysicsTestScene.h"
+#endif
 
 Application::~Application() = default;
 
@@ -36,7 +39,7 @@ void Application::Initialize(HINSTANCE hInstance)
     // 4-1) 첫 Scene 로드(테스트)
     m_registry.Register(std::make_unique<ObjImporter_Minimal>());
 
-    m_sceneManager.Load(std::make_unique<TestScene>());
+    m_sceneManager.Load(std::make_unique<PhysicsTestScene>());
 
     m_lastW = m_window.GetWidth();
     m_lastH = m_window.GetHeight();
@@ -58,8 +61,8 @@ void Application::Run()
         Resize();
         BeginFrame();
         UpdateScene(m_dt);
+		TickFixed(m_dt);
         UpdateTransforms();
-		FixedUpdate(m_fixedDt);
         UpdateSystems();
         RenderFrame();
         EndFrame();
@@ -111,11 +114,18 @@ RenderCamera Application::BuildRenderCamera() const
     const auto& camT = m_world.GetTransform(camEnt);
     const auto& camC = m_world.GetCamera(camEnt);
 
-    // 2) 카메라 엔티티의 world matrix로부터 View 만들기
-    // camT.world: 카메라의 "카메라->월드" 변환(= 카메라의 pose)
-    // View는 그 역행렬(월드->카메라)
-    XMMATRIX camWorld = XMLoadFloat4x4(&camT.world);
-    XMMATRIX V = XMMatrixInverse(nullptr, camWorld);
+    // 2) camera pos/rot로 LookToLH 뷰 구성 (관례 꼬임 방지)
+    XMFLOAT3 p = camT.position;
+    XMFLOAT4 q = camT.rotation;
+
+    XMVECTOR pos = XMVectorSet(p.x, p.y, p.z, 1.0f);
+    XMVECTOR quat = XMVectorSet(q.x, q.y, q.z, q.w);
+
+    // 엔진의 "카메라 기본 전방"을 +Z로 가정(LH)
+    XMVECTOR fwd = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), quat);
+    XMVECTOR up = XMVector3Rotate(XMVectorSet(0, 1, 0, 0), quat);
+
+    XMMATRIX V = XMMatrixLookToLH(pos, fwd, up);
 
     // 3) Projection 만들기
     float aspect = float(m_window.GetWidth()) / float(m_window.GetHeight());
@@ -161,18 +171,22 @@ void Application::UpdateScene(const double dt)
 {
     // Scene 업데이트
     m_sceneManager.Update((float)dt);
-
 }
 
-void Application::FixedUpdate(const double fixedDt)
+void Application::TickFixed(const double dtIn)
 {
-    double dt = m_dt;
-    if (dt > m_maxAccum) dt = m_maxAccum; // 큰 프레임 스파이크 clamp
+    double dt = dtIn;
+    if (dt > m_maxAccum) dt = m_maxAccum;
     m_accum += dt;
 
     while (m_accum >= m_fixedDt)
     {
+        // 1) 사용자 고정 업데이트 (입력/힘/의도 적용 등)
         m_sceneManager.FixedUpdate((float)m_fixedDt);
+
+        // 2) 엔진 내부 물리 스텝
+        m_physics.Step(m_world, (float)m_fixedDt);
+
         m_accum -= m_fixedDt;
     }
 }

@@ -4,9 +4,10 @@
 enum class Key : uint8_t
 {
     W, A, S, D,
-    Q, E,
+    Q, E, R, G,
     Up, Down, Left, Right,
     Escape,
+    Space,
 };
 
 class Input

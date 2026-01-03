@@ -54,6 +54,8 @@ void World::DestroyEntity(EntityId e)
     RemoveMesh(e);
     RemoveMaterial(e);
     RemoveCamera(e);
+	RemoveCollider(e);
+	RemoveRigidBody(e);
 
     Slot& s = m_slots[e.index];
     s.alive = false;
@@ -690,4 +692,172 @@ XMFLOAT3 World::GetWorldPosition(EntityId e) const
     XMFLOAT3 out{};
     XMStoreFloat3(&out, pos);
     return out;
+}
+
+// ================================
+// Rigidbody (dense/sparse) - World.cpp 새 함수
+// ================================
+
+void World::EnsureRigidBodySparseSize(uint32_t entityIndex)
+{
+    if (m_rigidBodySparse.size() <= entityIndex)
+        m_rigidBodySparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::AddRigidBody(EntityId e, const RigidBodyComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureRigidBodySparseSize(e.index);
+
+    // 이미 있으면 갱신(덮어쓰기)
+    if (m_rigidBodySparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_rigidBodySparse[e.index];
+        m_rigidBodies[di] = comp;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_rigidBodies.size();
+    m_rigidBodySparse[e.index] = denseIndex;
+    m_rigidBodyDenseEntities.push_back(e);
+    m_rigidBodies.push_back(comp);
+}
+
+bool World::HasRigidBody(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_rigidBodySparse.size()) return false;
+
+    const uint32_t di = m_rigidBodySparse[e.index];
+    if (di == InvalidDenseIndex) return false;
+    if (di >= m_rigidBodyDenseEntities.size()) return false;
+    return m_rigidBodyDenseEntities[di] == e;
+}
+
+RigidBodyComponent& World::GetRigidBody(EntityId e)
+{
+#if defined(_DEBUG)
+    assert(HasRigidBody(e));
+#endif
+    return m_rigidBodies[m_rigidBodySparse[e.index]];
+}
+
+const RigidBodyComponent& World::GetRigidBody(EntityId e) const
+{
+#if defined(_DEBUG)
+    assert(HasRigidBody(e));
+#endif
+    return m_rigidBodies[m_rigidBodySparse[e.index]];
+}
+
+void World::RemoveRigidBody(EntityId e)
+{
+    if (!HasRigidBody(e)) return;
+
+    const uint32_t denseIndex = m_rigidBodySparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_rigidBodies.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_rigidBodies[denseIndex] = std::move(m_rigidBodies[lastIndex]);
+        m_rigidBodyDenseEntities[denseIndex] = m_rigidBodyDenseEntities[lastIndex];
+
+        EntityId movedEntity = m_rigidBodyDenseEntities[denseIndex];
+        EnsureRigidBodySparseSize(movedEntity.index);
+        m_rigidBodySparse[movedEntity.index] = denseIndex;
+    }
+
+    m_rigidBodies.pop_back();
+    m_rigidBodyDenseEntities.pop_back();
+    m_rigidBodySparse[e.index] = InvalidDenseIndex;
+}
+
+
+// ================================
+// Collider (dense/sparse) - World.cpp 새 함수
+// ================================
+
+void World::EnsureColliderSparseSize(uint32_t entityIndex)
+{
+    if (m_colliderSparse.size() <= entityIndex)
+        m_colliderSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::AddCollider(EntityId e, const ColliderComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureColliderSparseSize(e.index);
+
+    // 이미 있으면 갱신(덮어쓰기)
+    if (m_colliderSparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_colliderSparse[e.index];
+        m_colliders[di] = comp;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_colliders.size();
+    m_colliderSparse[e.index] = denseIndex;
+    m_colliderDenseEntities.push_back(e);
+    m_colliders.push_back(comp);
+}
+
+bool World::HasCollider(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_colliderSparse.size()) return false;
+
+    const uint32_t di = m_colliderSparse[e.index];
+    if (di == InvalidDenseIndex) return false;
+    if (di >= m_colliderDenseEntities.size()) return false;
+    return m_colliderDenseEntities[di] == e;
+}
+
+ColliderComponent& World::GetCollider(EntityId e)
+{
+#if defined(_DEBUG)
+    assert(HasCollider(e));
+#endif
+    return m_colliders[m_colliderSparse[e.index]];
+}
+
+const ColliderComponent& World::GetCollider(EntityId e) const
+{
+#if defined(_DEBUG)
+    assert(HasCollider(e));
+#endif
+    return m_colliders[m_colliderSparse[e.index]];
+}
+
+void World::RemoveCollider(EntityId e)
+{
+    if (!HasCollider(e)) return;
+
+    const uint32_t denseIndex = m_colliderSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_colliders.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_colliders[denseIndex] = std::move(m_colliders[lastIndex]);
+        m_colliderDenseEntities[denseIndex] = m_colliderDenseEntities[lastIndex];
+
+        EntityId movedEntity = m_colliderDenseEntities[denseIndex];
+        EnsureColliderSparseSize(movedEntity.index);
+        m_colliderSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_colliders.pop_back();
+    m_colliderDenseEntities.pop_back();
+    m_colliderSparse[e.index] = InvalidDenseIndex;
+}
+
+void World::PushCollisionEvent(const CollisionEvent& ev)
+{
+    m_collisionEvents.push_back(ev);
+}
+
+void World::DrainCollisionEvents(std::vector<CollisionEvent>& out)
+{
+    out.clear();
+    out.swap(m_collisionEvents); // 빠르게 넘기고 내부 비움
 }

@@ -103,6 +103,12 @@
     <Filter Include="소스 파일\04_Render\Texture">
       <UniqueIdentifier>{c8c6371f-60f9-460d-9e93-4c0ac5ab79f2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\07_Physics">
+      <UniqueIdentifier>{59120faf-2462-4a0c-ba40-0fc45cbece34}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\07_Physics">
+      <UniqueIdentifier>{a45c50e3-e81f-4313-bc1d-a092f3952447}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -222,6 +228,24 @@
     <ClInclude Include="SceneContext.h">
       <Filter>헤더 파일\01_Core</Filter>
     </ClInclude>
+    <ClInclude Include="PhysicsTypes.h">
+      <Filter>헤더 파일\07_Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="RigidBodyComponent.h">
+      <Filter>헤더 파일\06_World\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="ColliderComponent.h">
+      <Filter>헤더 파일\06_World\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsSystem.h">
+      <Filter>헤더 파일\05_Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsTestScene.h">
+      <Filter>헤더 파일\06_World\Scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="CollisionEvents.h">
+      <Filter>헤더 파일\07_Physics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -280,6 +304,12 @@
     </ClCompile>
     <ClCompile Include="SceneManager.cpp">
       <Filter>소스 파일\01_Core</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsSystem.cpp">
+      <Filter>소스 파일\05_Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsTestScene.cpp">
+      <Filter>소스 파일\06_World\Scenes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -102,7 +102,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions);NOMINMAX</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -129,6 +129,8 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="AssetPipeline.h" />
+    <ClInclude Include="ColliderComponent.h" />
+    <ClInclude Include="CollisionEvents.h" />
     <ClInclude Include="ImportTypes.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="D3D12Renderer.h" />
@@ -140,6 +142,10 @@
     <ClInclude Include="ImportRegistry.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="IRenderer.h" />
+    <ClInclude Include="PhysicsSystem.h" />
+    <ClInclude Include="PhysicsTestScene.h" />
+    <ClInclude Include="PhysicsTypes.h" />
+    <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="SceneContext.h" />
     <ClInclude Include="SceneScope.h" />
     <ClInclude Include="TextureCPUData.h" />
@@ -177,6 +183,8 @@
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="MeshManager.cpp" />
     <ClCompile Include="ObjImporter_Minimal.cpp" />
+    <ClCompile Include="PhysicsSystem.cpp" />
+    <ClCompile Include="PhysicsTestScene.cpp" />
     <ClCompile Include="PrimitiveMeshes.cpp" />
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="SceneManager.cpp" />

@@ -9,6 +9,8 @@
 #include "ImportTypes.h"   // Result, ImportOptions
 #include "Input.h"
 
+class PhysicsSystem;
+
 struct SceneContext
 {
     World& world;
@@ -17,6 +19,7 @@ struct SceneContext
     TextureManager& textures;
     SceneScope& scope;
     Input& input;
+	PhysicsSystem& physics;
 
     float dt = 0.0f;
 

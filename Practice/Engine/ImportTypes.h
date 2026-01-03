@@ -8,13 +8,13 @@ struct Float2 { float x, y; };
 struct Float3 { float x, y, z; };
 struct Float4 { float x, y, z, w; };
 
-struct AABB
+struct AABBBound
 {
     Float3 min{ +1e30f, +1e30f, +1e30f };
     Float3 max{ -1e30f, -1e30f, -1e30f };
 };
 
-inline void ExpandAABB(AABB& b, const Float3& p)
+inline void ExpandAABB(AABBBound& b, const Float3& p)
 {
     if (p.x < b.min.x) b.min.x = p.x;
     if (p.y < b.min.y) b.min.y = p.y;
@@ -72,7 +72,7 @@ struct ImportedMesh
     std::vector<uint32_t> indices;
     std::vector<ImportedSubmesh> submeshes;
 
-    AABB bounds{};
+    AABBBound bounds{};
 };
 
 struct ImportedModel
