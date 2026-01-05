@@ -14,6 +14,8 @@
 #include "AssetPipeline.h"
 #include "Input.h"
 #include "PhysicsSystem.h"
+#include "SoundManager.h"
+#include "AudioSystem.h"
 
 class Application
 {
@@ -39,13 +41,15 @@ private:
 	TextureManager m_textureManager;
     ImportRegistry m_registry;
     AssetPipeline m_pipeline;
+    SoundManager m_soundManager;
+    AudioSystem  m_audioSystem;
     Input m_input;
     SceneManager m_sceneManager;
 
     PhysicsSystem m_physics;
 
 public:
-    Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_input, m_physics) { }
+    Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_soundManager, m_audioSystem, m_input, m_physics) { }
 
     ~Application();
 

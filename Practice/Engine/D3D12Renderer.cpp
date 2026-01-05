@@ -1,18 +1,15 @@
 ﻿#include "D3D12Renderer.h"
-
 #include <stdexcept>
 #include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <d3dcompiler.h>
-
 #include "MeshManager.h"
 #include "DebugDraw.h"
-
-// Texture 시스템(정석)
 #include "TextureManager.h"
 #include "TextureHandle.h"
 #include "TextureCpuData.h"
+#include "Utilities.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -215,7 +212,6 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     const uint32_t drawCount = std::min<uint32_t>((uint32_t)items.size(), MaxDrawsPerFrame);
     const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
 
-    // (1) 각 아이템의 srvIndex를 한 번 계산(필요 시 여기서 텍스처 업로드 커맨드 기록됨)
     struct DrawKey
     {
         uint32_t itemIndex = 0;
@@ -231,7 +227,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     {
         const RenderItem& it = items[i];
 
-        // ✅ 정석: TextureHandle -> srvIndex 를 renderer가 해결
+        // TextureHandle -> srvIndex 를 renderer가 해결
         uint32_t srvIndex = 0;
         srvIndex = GetOrCreateSrvIndex(it.albedo); // TextureHandle이 없으면 0(기본)
 
@@ -300,6 +296,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         m_commandList->DrawIndexedInstanced(count, 1, start, 0, 0);
     }
 
+#if defined(_DEBUG)
     // --- Debug Lines ---
     {
         const auto& lines = DebugDraw::GetLines();
@@ -349,6 +346,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
             m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         }
     }
+#endif
 
     // Transition: RenderTarget -> Present
     {
@@ -960,7 +958,7 @@ void D3D12Renderer::ProcessPendingMeshReleases()
 }
 
 // ---------------------------
-// Texture cache (정석)
+// Texture cache
 // ---------------------------
 uint32_t D3D12Renderer::GetOrCreateSrvIndex(const TextureHandle& h)
 {
@@ -1193,7 +1191,7 @@ void D3D12Renderer::CreateDefaultTexture_Checkerboard()
     cpu.pixels = std::move(rgba);
 
     // 기본 텍스처는 TextureHandle 없이도 slot0만 쓰면 되므로,
-    // id=0 캐시에 넣어둔다(선택). 여기서는 편의상 id=0으로 저장.
+    // id=0 캐시에 넣어둔다.
     TextureGPUData gpu{};
     CreateGPUTextureFromCPU(cpu, gpu);
 

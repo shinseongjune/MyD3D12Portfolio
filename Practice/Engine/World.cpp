@@ -56,6 +56,7 @@ void World::DestroyEntity(EntityId e)
     RemoveCamera(e);
 	RemoveCollider(e);
 	RemoveRigidBody(e);
+    RemoveAudioSource(e);
 
     Slot& s = m_slots[e.index];
     s.alive = false;
@@ -860,4 +861,78 @@ void World::DrainCollisionEvents(std::vector<CollisionEvent>& out)
 {
     out.clear();
     out.swap(m_collisionEvents); // 빠르게 넘기고 내부 비움
+}
+
+void World::EnsureAudioSourceSparseSize(uint32_t entityIndex)
+{
+    if (m_audioSourceSparse.size() <= entityIndex)
+        m_audioSourceSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::AddAudioSource(EntityId e, const AudioSourceComponent& c)
+{
+    if (!IsAlive(e)) return;
+    EnsureAudioSourceSparseSize(e.index);
+
+    // 이미 있으면 갱신(덮어쓰기)
+    if (m_audioSourceSparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_audioSourceSparse[e.index];
+        m_audioSources[di] = c;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_audioSources.size();
+    m_audioSourceSparse[e.index] = denseIndex;
+    m_audioSourceDenseEntities.push_back(e);
+    m_audioSources.push_back(c);
+}
+
+bool World::HasAudioSource(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_audioSourceSparse.size()) return false;
+
+    const uint32_t di = m_audioSourceSparse[e.index];
+    if (di == InvalidDenseIndex) return false;
+    if (di >= m_audioSourceDenseEntities.size()) return false;
+    return m_audioSourceDenseEntities[di] == e;
+}
+
+AudioSourceComponent& World::GetAudioSource(EntityId e)
+{
+#if defined(_DEBUG)
+    assert(HasAudioSource(e));
+#endif
+    return m_audioSources[m_audioSourceSparse[e.index]];
+}
+
+const AudioSourceComponent& World::GetAudioSource(EntityId e) const
+{
+#if defined(_DEBUG)
+    assert(HasAudioSource(e));
+#endif
+    return m_audioSources[m_audioSourceSparse[e.index]];
+}
+
+void World::RemoveAudioSource(EntityId e)
+{
+    if (!HasAudioSource(e)) return;
+
+    const uint32_t denseIndex = m_audioSourceSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_audioSources.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_audioSources[denseIndex] = std::move(m_audioSources[lastIndex]);
+        m_audioSourceDenseEntities[denseIndex] = m_audioSourceDenseEntities[lastIndex];
+
+        EntityId movedEntity = m_audioSourceDenseEntities[denseIndex];
+        EnsureAudioSourceSparseSize(movedEntity.index);
+        m_audioSourceSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_audioSources.pop_back();
+    m_audioSourceDenseEntities.pop_back();
+    m_audioSourceSparse[e.index] = InvalidDenseIndex;
 }

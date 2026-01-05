@@ -1,6 +1,7 @@
 #pragma once
 #include "TextureHandle.h"
-#include "TextureCpuData.h"          // 네가 만든 TextureCpuData + LoadTextureRGBA8_WIC 선언 포함(또는 include 분리)
+#include "TextureCpuData.h"
+#include "Utilities.h"
 #include <unordered_map>
 #include <functional>
 #include <string>

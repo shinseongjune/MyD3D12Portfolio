@@ -1,7 +1,5 @@
 #pragma once
-
 #include <cstdio>
-
 #include <DirectXMath.h>
 #include <vector>
 #include <Windows.h>

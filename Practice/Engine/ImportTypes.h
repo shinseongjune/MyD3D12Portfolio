@@ -94,20 +94,3 @@ struct ImportOptions
 
     float uniformScale = 1.0f;
 };
-
-struct ImportError
-{
-    std::string message;
-};
-
-template<typename T>
-struct Result
-{
-    T value{};
-    std::optional<ImportError> error;
-
-    static Result Ok(T v) { Result r; r.value = std::move(v); return r; }
-    static Result Fail(std::string msg) { Result r; r.error = ImportError{ std::move(msg) }; return r; }
-
-    bool IsOk() const { return !error.has_value(); }
-};

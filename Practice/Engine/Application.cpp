@@ -25,7 +25,7 @@ void Application::Initialize(HINSTANCE hInstance)
     // 2) time 초기화
     Time::Initialize();
 
-    // 3) 렌더러 만들기(일단 NullRenderer)
+    // 3) 렌더러 만들기
     m_renderer = std::make_unique<D3D12Renderer>();
     m_renderer->Initialize(m_window.GetHwnd(), m_window.GetWidth(), m_window.GetHeight());
 
@@ -33,10 +33,10 @@ void Application::Initialize(HINSTANCE hInstance)
     d3d->SetMeshManager(&m_meshManager);
     d3d->SetTextureManager(&m_textureManager);
 
-    // 4) 월드 초기화
-    // m_world.Initialize(); // 나중에 필요하면 추가
+	// 4) RenderSystem 초기화
+    m_audioSystem.Initialize();
 
-    // 4-1) 첫 Scene 로드(테스트)
+    // 5) 첫 Scene 로드(테스트)
     m_registry.Register(std::make_unique<ObjImporter_Minimal>());
 
     m_sceneManager.Load(std::make_unique<PhysicsTestScene>());
@@ -77,6 +77,10 @@ void Application::Shutdown()
     // Scene 정리
     m_sceneManager.Load(nullptr);
 
+	// 오디오 시스템 정리
+    m_audioSystem.Shutdown();
+
+	// 렌더러 정리
     if (m_renderer)
     {
         m_renderer->Shutdown();
@@ -199,6 +203,8 @@ void Application::UpdateTransforms()
 
 void Application::UpdateSystems()
 {
+	// 오디오 시스템 업데이트
+    m_audioSystem.Update(m_world, m_soundManager);
     // 드로우 리스트 생성
     m_renderSystem.Build(m_world, m_renderItems);
 }

@@ -362,7 +362,7 @@ void PhysicsSystem::Solve(World& world, std::vector<std::tuple<EntityId, EntityI
     const float slop = 0.01f;      // 관통 허용량
     const float beta = 0.10f;  // bias 강도
     const float bounceThreshold = 2.0f; // 이보다 빠를 때만 반발 적용(바닥 떨림 방지)
-	const float percent = 0.35;     // positional correction 비율(0.2~0.8)
+	const float percent = 0.35f;     // positional correction 비율(0.2~0.8)
 
     for (int it = 0; it < iterations; ++it)
     {

@@ -9,12 +9,14 @@ class MeshManager;
 class TextureManager;
 class Input;
 class PhysicsSystem;
+class SoundManager;
+class AudioSystem;
 
 class SceneManager
 {
 public:
-    SceneManager(World& w, AssetPipeline& ap, MeshManager& mm, TextureManager& tm, Input& ip, PhysicsSystem& ps)
-		: m_world(w), m_assets(ap), m_meshes(mm), m_textures(tm), m_input(ip), m_physics(ps)
+    SceneManager(World& w, AssetPipeline& ap, MeshManager& mm, TextureManager& tm, SoundManager& sm, AudioSystem& au, Input& ip, PhysicsSystem& ps)
+		: m_world(w), m_assets(ap), m_meshes(mm), m_textures(tm), m_sounds(sm), m_audio(au), m_input(ip), m_physics(ps)
     {
     }
 
@@ -31,6 +33,8 @@ private:
     TextureManager& m_textures;
     Input& m_input;
 	PhysicsSystem& m_physics;
+    SoundManager& m_sounds;
+    AudioSystem& m_audio;
 
     SceneScope m_scope;
     std::unique_ptr<Scene> m_current;

@@ -78,17 +78,6 @@ static bool LoadImageRGBA8_WIC(const wchar_t* path, UINT& outW, UINT& outH, std:
     return true;
 }
 
-static inline void ThrowIfFailed(HRESULT hr)
-{
-    if (FAILED(hr))
-    {
-        char buf[64];
-        sprintf_s(buf, "HRESULT failed: 0x%08X\n", (unsigned)hr);
-        OutputDebugStringA(buf);
-        throw std::runtime_error(buf);
-    }
-}
-
 static ComPtr<ID3DBlob> CompileShader(const char* entry, const char* target, const char* src)
 {
     UINT flags = 0;

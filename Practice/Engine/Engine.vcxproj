@@ -109,6 +109,9 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalOptions>
+      </AdditionalOptions>
+      <AdditionalDependencies>mfplat.lib;mfreadwrite.lib;mf.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -129,6 +132,9 @@
   <ItemGroup>
     <ClInclude Include="Application.h" />
     <ClInclude Include="AssetPipeline.h" />
+    <ClInclude Include="AudioCommand.h" />
+    <ClInclude Include="AudioSourceComponent.h" />
+    <ClInclude Include="AudioSystem.h" />
     <ClInclude Include="ColliderComponent.h" />
     <ClInclude Include="CollisionEvents.h" />
     <ClInclude Include="ImportTypes.h" />
@@ -145,9 +151,17 @@
     <ClInclude Include="PhysicsSystem.h" />
     <ClInclude Include="PhysicsTestScene.h" />
     <ClInclude Include="PhysicsTypes.h" />
+    <ClInclude Include="SoundHandle.h" />
+    <ClInclude Include="SoundManager.h" />
+    <ClInclude Include="Utilities.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="SceneContext.h" />
     <ClInclude Include="SceneScope.h" />
+    <ClInclude Include="SoundClip.h" />
+    <ClCompile Include="SoundImporterMF.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClInclude Include="SoundImporterMF.h" />
     <ClInclude Include="TextureCPUData.h" />
     <ClInclude Include="MaterialComponent.h" />
     <ClInclude Include="MeshComponent.h" />
@@ -176,6 +190,7 @@
   <ItemGroup>
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="AssetPipeline.cpp" />
+    <ClCompile Include="AudioSystem.cpp" />
     <ClCompile Include="D3D12Renderer.cpp" />
     <ClCompile Include="DebugDraw.cpp" />
     <ClCompile Include="Engine.cpp" />
@@ -189,6 +204,8 @@
     <ClCompile Include="RenderSystem.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="SceneScope.cpp" />
+    <ClCompile Include="SceneContext.cpp" />
+    <ClCompile Include="SoundManager.cpp" />
     <ClCompile Include="TestScene.cpp" />
     <ClCompile Include="TextureLoader_WIC.cpp" />
     <ClCompile Include="TextureManager.cpp" />

@@ -172,6 +172,11 @@ void PhysicsTestScene::OnLoad(SceneContext& ctx)
 
     m_gravityOn = true;
     ctx.physics.SetGravityEnabled(true);
+
+    // 사운드 테스트
+    auto bgm = ctx.LoadSoundShared("Assets/Audio/bgm.mp3");
+    if (bgm.IsOk())
+        ctx.PlayBGM(bgm.value, 0.6f);
 }
 
 void PhysicsTestScene::OnUnload(SceneContext& ctx)

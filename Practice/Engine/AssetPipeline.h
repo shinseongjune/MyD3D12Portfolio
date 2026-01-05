@@ -5,11 +5,11 @@
 #include "ModelAsset.h"
 #include "World.h"
 #include "EntityId.h"
+#include "Utilities.h"
 
 struct SpawnModelOptions
 {
     std::string name = "ImportedModel";
-    bool spawnAsSingleEntity = true; // (향후) true: 1 entity + 여러 submesh 렌더
 };
 
 class AssetPipeline

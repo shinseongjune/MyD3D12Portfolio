@@ -1,15 +1,4 @@
 #include "TestScene.h"
-#include "EntityId.h"
-#include "TextureHandle.h"
-#include "DebugDraw.h"
-#include "World.h"
-#include "Input.h"
-#include "MeshCPUData.h"
-#include "TextureLoader_WIC.h"
-#include "SceneContext.h"
-#if defined(_DEBUG)
-#include "PrimitiveMeshes.h"
-#endif
 
 using namespace DirectX;
 
@@ -21,7 +10,7 @@ void TestScene::OnLoad(SceneContext& ctx)
     ImportOptions importOpt{};
     importOpt.triangulate = true;
     importOpt.generateNormalsIfMissing = true;
-    importOpt.flipV = true;          // 텍스처 뒤집힘 방지(지금은 의미 거의 없음)
+    importOpt.flipV = true;          // 텍스처 뒤집힘 방지
     importOpt.uniformScale = 1.0f;   // 필요하면 0.01f 같은 값으로 조절
 
     SpawnModelOptions spawnOpt{};
@@ -50,7 +39,7 @@ void TestScene::OnLoad(SceneContext& ctx)
         // hTex invalid -> 기본 텍스처(slot0)로 렌더됨
     }
 
-    // 2.5) Material 연결 (중요!)
+    // 2.5) Material 연결
     {
         // 모델이 submesh별로 materialIndex가 다를 수 있으니 슬롯을 넉넉히 만든다.
         uint32_t maxMatIndex = 256;

@@ -11,6 +11,7 @@
 #include "RigidBodyComponent.h"
 #include "ColliderComponent.h"
 #include "CollisionEvents.h"
+#include "AudioSourceComponent.h"
 
 class World
 {
@@ -119,6 +120,13 @@ private:
 	// Collision Events
     std::vector<CollisionEvent> m_collisionEvents;
 
+    // AudioSource storage (dense/sparse)
+    std::vector<AudioSourceComponent> m_audioSources;
+    std::vector<EntityId>            m_audioSourceDenseEntities;
+    std::vector<uint32_t>            m_audioSourceSparse;
+
+    void EnsureAudioSourceSparseSize(uint32_t entityIndex);
+
 public:
     // --- Transform Public API ---
     DirectX::XMFLOAT3 GetLocalPosition(EntityId e) const;
@@ -156,6 +164,15 @@ public:
 
     // 단순한 "활성 카메라" 찾기(첫 active 카메라)
     EntityId FindActiveCamera() const;
+
+    // --- AudioSource API ---
+    void AddAudioSource(EntityId e, const AudioSourceComponent& c);
+    bool HasAudioSource(EntityId e) const;
+    AudioSourceComponent& GetAudioSource(EntityId e);
+    const AudioSourceComponent& GetAudioSource(EntityId e) const;
+    void RemoveAudioSource(EntityId e);
+
+    const std::vector<EntityId>& GetAudioSourceEntities() const { return m_audioSourceDenseEntities; }
 
     // ---- Debug/Iteration ----
     // (임시) dense transform 엔티티 목록을 반환(시스템들이 순회하기 위해 필요)

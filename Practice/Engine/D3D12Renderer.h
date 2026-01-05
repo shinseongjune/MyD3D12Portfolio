@@ -3,11 +3,9 @@
 #include <vector>
 #include <unordered_map>
 #include <wrl.h>
-
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <DirectXMath.h>
-
 #include "IRenderer.h"
 
 class MeshManager;

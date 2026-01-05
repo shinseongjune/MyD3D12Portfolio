@@ -304,7 +304,7 @@ Result<ImportedModel> ObjImporter_Minimal::Import(const std::string& filePath, c
                 continue;
             }
 
-            // usemtl, mtllib 등은 최소 구현에서는 무시 (엔진 material 파이프가 아직 색만이므로)
+            // usemtl, mtllib 등은 최소 구현에서는 무시
         }
     }
     catch (const std::exception& e)

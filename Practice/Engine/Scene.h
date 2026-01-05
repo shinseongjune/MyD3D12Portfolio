@@ -1,4 +1,17 @@
 #pragma once
+#include "EntityId.h"
+#include "TextureHandle.h"
+#include "DebugDraw.h"
+#include "World.h"
+#include "Input.h"
+#include "MeshCPUData.h"
+#include "TextureLoader_WIC.h"
+#include "SceneContext.h"
+#include "ImportTypes.h"
+#include "Utilities.h"
+#if defined(_DEBUG)
+#include "PrimitiveMeshes.h"
+#endif
 
 struct SceneContext;
 

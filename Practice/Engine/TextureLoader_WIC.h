@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "ImportTypes.h" // Result<T> 재사용
+#include "Utilities.h"
 #include "TextureCPUData.h"
 
 // path(UTF-16)로 로드

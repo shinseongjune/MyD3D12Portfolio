@@ -1,5 +1,6 @@
 #include "TextureLoader_WIC.h"
 
+#include "Utilities.h"
 #include <Windows.h>
 #include <wincodec.h>
 #include <wrl.h>
@@ -8,14 +9,6 @@
 
 using Microsoft::WRL::ComPtr;
 
-static std::wstring Utf8ToWide(const std::string& s)
-{
-    if (s.empty()) return L"";
-    int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
-    std::wstring out(len, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), out.data(), len);
-    return out;
-}
 
 static void FlipRowsRGBA8(uint8_t* rgba, uint32_t w, uint32_t h)
 {

@@ -1,4 +1,3 @@
-// SceneScope.h
 #pragma once
 #include <vector>
 #include <algorithm>
@@ -6,10 +5,12 @@
 #include "EntityId.h"
 #include "MeshHandle.h"
 #include "TextureHandle.h"
+#include "SoundHandle.h"
 
 class World;
 class MeshManager;
 class TextureManager;
+class SoundManager;
 
 class SceneScope
 {
@@ -19,6 +20,7 @@ public:
         m_entities.clear();
         m_meshes.clear();
         m_textures.clear();
+        m_sounds.clear();
     }
 
     inline void Track(EntityId e)
@@ -39,11 +41,18 @@ public:
         m_textures.push_back(h);
     }
 
+    void Track(SoundHandle h)
+    {
+        if (!h.IsValid()) return;
+        m_sounds.push_back(h);
+    }
+
     // æ¿¿Ã º“¿Ø«— ∞Õ ¿œ∞˝ ¡§∏Æ
-    void Cleanup(World& world, MeshManager& meshes, TextureManager& textures);
+    void Cleanup(World& world, MeshManager& meshes, TextureManager& textures, SoundManager& sounds);
 
 private:
     std::vector<EntityId>      m_entities;
     std::vector<MeshHandle>    m_meshes;
     std::vector<TextureHandle> m_textures;
+    std::vector<SoundHandle>   m_sounds;
 };
