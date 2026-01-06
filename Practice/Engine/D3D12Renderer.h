@@ -68,7 +68,8 @@ class D3D12Renderer final : public IRenderer
 public:
     void Initialize(HWND hwnd, uint32_t width, uint32_t height) override;
     void Resize(uint32_t width, uint32_t height) override;
-    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam) override;
+    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const std::vector<UIDrawItem>& ui) override;
+    void RenderUI(const std::vector<UIDrawItem>& ui) override;
     void Shutdown() override;
 
 public:
@@ -92,9 +93,11 @@ private:
 
     void CreatePipeline();
     void CreateDebugLinePipeline();
+    void CreateUIPipeline();
 
     void CreateConstantBuffer();
     void CreateDebugVertexBuffer();
+    void CreateUIVertexBuffer();
 
     void WaitForGPU();
     void MoveToNextFrame();
@@ -219,4 +222,24 @@ private:
 
     // 런타임 텍스처 생성 시, "이번 프레임 커맨드에 의해 업로드된 텍스처" 목록
     std::vector<uint32_t> m_texturesCreatedThisFrame;
+
+    // ---------------------------
+    // UI VB (persist-mapped upload)
+    // ---------------------------
+    struct UIVertex
+    {
+        DirectX::XMFLOAT2 pos;   // NDC (-1~1)
+        DirectX::XMFLOAT2 uv;
+        DirectX::XMFLOAT4 color;
+    };
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_uiVB;
+    uint8_t* m_uiVBMapped = nullptr;
+    uint32_t m_uiVBStride = 0;
+
+    static constexpr uint32_t MaxUIQuadsPerFrame = 4096;
+    static constexpr uint32_t MaxUIVertsPerFrame = MaxUIQuadsPerFrame * 6;
+
+    // UI pipeline
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_psoUI;
 };

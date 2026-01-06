@@ -207,6 +207,8 @@ void Application::UpdateSystems()
     m_audioSystem.Update(m_world, m_soundManager);
     // 드로우 리스트 생성
     m_renderSystem.Build(m_world, m_renderItems);
+    // UI render queue
+    m_uiHud.Build(m_world, m_window.GetWidth(), m_window.GetHeight(), m_uiItems);
 }
 
 void Application::RenderFrame()
@@ -214,7 +216,8 @@ void Application::RenderFrame()
     // 드로우 리스트 렌더링
     RenderCamera cam{};
     cam = BuildRenderCamera();
-    m_renderer->Render(m_renderItems, cam);
+
+    m_renderer->Render(m_renderItems, cam, m_uiItems);
 }
 
 void Application::EndFrame()

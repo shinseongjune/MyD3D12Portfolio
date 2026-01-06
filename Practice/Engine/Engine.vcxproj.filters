@@ -112,6 +112,12 @@
     <Filter Include="헤더 파일\08_Utility">
       <UniqueIdentifier>{873e8a37-de03-48d8-b964-8c8311431857}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\09_UI">
+      <UniqueIdentifier>{01c32b3f-7bc2-462f-aad4-3aac53ffec88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\09_UI">
+      <UniqueIdentifier>{314864ad-e59c-438a-b094-f8e719a0f9d4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -273,6 +279,15 @@
     <ClInclude Include="AudioSystem.h">
       <Filter>헤더 파일\05_Systems</Filter>
     </ClInclude>
+    <ClInclude Include="UIDrawItem.h">
+      <Filter>헤더 파일\09_UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UIHudSystem.h">
+      <Filter>헤더 파일\09_UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UIElementComponent.h">
+      <Filter>헤더 파일\06_World\Components</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -349,6 +364,9 @@
     </ClCompile>
     <ClCompile Include="SoundImporterMF.cpp">
       <Filter>소스 파일\02_Assets\Sound</Filter>
+    </ClCompile>
+    <ClCompile Include="UIHudSystem.cpp">
+      <Filter>소스 파일\09_UI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

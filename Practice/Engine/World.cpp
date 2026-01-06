@@ -936,3 +936,77 @@ void World::RemoveAudioSource(EntityId e)
     m_audioSourceDenseEntities.pop_back();
     m_audioSourceSparse[e.index] = InvalidDenseIndex;
 }
+
+void World::EnsureUIElementSparseSize(uint32_t entityIndex)
+{
+    if (m_uiElementSparse.size() <= entityIndex)
+        m_uiElementSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::AddUIElement(EntityId e, const UIElementComponent& c)
+{
+    if (!IsAlive(e)) return;
+    EnsureUIElementSparseSize(e.index);
+
+    // 이미 있으면 갱신(덮어쓰기)
+    if (m_uiElementSparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_uiElementSparse[e.index];
+        m_uiElements[di] = c;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_uiElements.size();
+    m_uiElementSparse[e.index] = denseIndex;
+    m_uiElementDenseEntities.push_back(e);
+    m_uiElements.push_back(c);
+}
+
+bool World::HasUIElement(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_uiElementSparse.size()) return false;
+
+    const uint32_t di = m_uiElementSparse[e.index];
+    if (di == InvalidDenseIndex) return false;
+    if (di >= m_uiElementDenseEntities.size()) return false;
+    return m_uiElementDenseEntities[di] == e;
+}
+
+UIElementComponent& World::GetUIElement(EntityId e)
+{
+#if defined(_DEBUG)
+    assert(HasUIElement(e));
+#endif
+    return m_uiElements[m_uiElementSparse[e.index]];
+}
+
+const UIElementComponent& World::GetUIElement(EntityId e) const
+{
+#if defined(_DEBUG)
+    assert(HasUIElement(e));
+#endif
+    return m_uiElements[m_uiElementSparse[e.index]];
+}
+
+void World::RemoveUIElement(EntityId e)
+{
+    if (!HasUIElement(e)) return;
+
+    const uint32_t denseIndex = m_uiElementSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_uiElements.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_uiElements[denseIndex] = std::move(m_uiElements[lastIndex]);
+        m_uiElementDenseEntities[denseIndex] = m_uiElementDenseEntities[lastIndex];
+
+        EntityId movedEntity = m_uiElementDenseEntities[denseIndex];
+        EnsureUIElementSparseSize(movedEntity.index);
+        m_uiElementSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_uiElements.pop_back();
+    m_uiElementDenseEntities.pop_back();
+    m_uiElementSparse[e.index] = InvalidDenseIndex;
+}

@@ -37,9 +37,11 @@ void D3D12Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
     CreatePipeline();
     CreateConstantBuffer();
+	CreateUIPipeline();
 
     CreateDebugLinePipeline();
     CreateDebugVertexBuffer();
+	CreateUIVertexBuffer();
 
     // fence
     ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
@@ -94,6 +96,12 @@ void D3D12Renderer::Shutdown()
         m_debugVB->Unmap(0, nullptr);
         m_debugVBMapped = nullptr;
     }
+
+    if (m_uiVBMapped)
+    {
+        m_uiVB->Unmap(0, nullptr);
+        m_uiVBMapped = nullptr;
+	}
 
     if (m_fenceEvent)
     {
@@ -159,7 +167,7 @@ void D3D12Renderer::Resize(uint32_t width, uint32_t height)
     m_scissor = { 0, 0, (LONG)width, (LONG)height };
 }
 
-void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam)
+void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const std::vector<UIDrawItem>& ui)
 {
     ProcessPendingMeshReleases();
     ProcessPendingTextureUploadReleases();
@@ -348,6 +356,9 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     }
 #endif
 
+	// --- UI ---
+    RenderUI(ui);
+
     // Transition: RenderTarget -> Present
     {
         D3D12_RESOURCE_BARRIER b{};
@@ -376,6 +387,139 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     }
 
     MoveToNextFrame();
+}
+
+void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
+{
+    if (ui.empty())
+        return;
+
+    // 안전 상한
+    const uint32_t quadCount = std::min<uint32_t>((uint32_t)ui.size(), MaxUIQuadsPerFrame);
+    if (quadCount == 0)
+        return;
+
+    const uint32_t vertexCount = quadCount * 6;
+
+    // ---- (1) UIDrawItem -> UIVertex(6개)로 확장해서 업로드 VB에 쓰기 ----
+    const uint32_t baseVertex = m_frameIndex * MaxUIVertsPerFrame;
+    UIVertex* dst = reinterpret_cast<UIVertex*>(m_uiVBMapped) + baseVertex;
+
+    auto PxToNdcX = [&](float px) -> float
+        {
+            // [0..W] -> [-1..+1]
+            return (px / (float)m_width) * 2.0f - 1.0f;
+        };
+    auto PxToNdcY = [&](float py) -> float
+        {
+            // [0..H] (top-down) -> [+1..-1]
+            return 1.0f - (py / (float)m_height) * 2.0f;
+        };
+
+    // 배치(텍스처 바뀔 때만 끊기)용 srvIndex 배열
+    // *UI는 그리기 순서가 중요하니 "정렬 배치"는 나중에. 일단 입력 순서 유지.*
+    std::vector<uint32_t> srvIndexPerQuad;
+    srvIndexPerQuad.resize(quadCount);
+
+    for (uint32_t i = 0; i < quadCount; ++i)
+    {
+        const UIDrawItem& it = ui[i];
+
+        // 픽셀 rect
+        const float lpx = it.x;
+        const float rpx = it.x + it.w;
+        const float tpy = it.y;
+        const float bpy = it.y + it.h;
+
+        // NDC
+        const float l = PxToNdcX(lpx);
+        const float r = PxToNdcX(rpx);
+        const float t = PxToNdcY(tpy);
+        const float b = PxToNdcY(bpy);
+
+        const float u0 = it.u0;
+        const float v0 = it.v0;
+        const float u1 = it.u1;
+        const float v1 = it.v1;
+
+        const DirectX::XMFLOAT4 c = it.color;
+
+        // quad -> 2 triangles (lt, rt, lb,  rt, rb, lb)
+        const uint32_t v = i * 6;
+
+        dst[v + 0] = { { l, t }, { u0, v0 }, c };
+        dst[v + 1] = { { r, t }, { u1, v0 }, c };
+        dst[v + 2] = { { l, b }, { u0, v1 }, c };
+
+        dst[v + 3] = { { r, t }, { u1, v0 }, c };
+        dst[v + 4] = { { r, b }, { u1, v1 }, c };
+        dst[v + 5] = { { l, b }, { u0, v1 }, c };
+
+        // TextureHandle -> SRV index (없으면 0 = default)
+        srvIndexPerQuad[i] = GetOrCreateSrvIndex(it.tex);
+    }
+
+    // ---- (2) 파이프라인 세팅 ----
+    m_commandList->SetPipelineState(m_psoUI.Get());
+    m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+    m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // UI VB view (프레임 슬라이스)
+    D3D12_VERTEX_BUFFER_VIEW vbv{};
+    vbv.BufferLocation = m_uiVB->GetGPUVirtualAddress() + (UINT64)baseVertex * (UINT64)m_uiVBStride;
+    vbv.SizeInBytes = vertexCount * m_uiVBStride;
+    vbv.StrideInBytes = m_uiVBStride;
+    m_commandList->IASetVertexBuffers(0, 1, &vbv);
+
+    // SRV heap이 이미 Render()에서 SetDescriptorHeaps 되어있겠지만,
+    // UI 단독 호출 가능성을 위해 다시 세팅해도 무방.
+    ID3D12DescriptorHeap* heaps[] = { m_srvHeap.Get() };
+    m_commandList->SetDescriptorHeaps(1, heaps);
+
+    // ---- (3) 텍스처 바뀔 때만 끊어서 draw (입력 순서 유지) ----
+    D3D12_GPU_DESCRIPTOR_HANDLE srvBase = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+
+    uint32_t curSrv = srvIndexPerQuad[0];
+    uint32_t batchStartVertex = 0;
+    uint32_t batchVertexCount = 0;
+
+    auto FlushBatch = [&](uint32_t srvIndex, uint32_t startV, uint32_t vCount)
+        {
+            if (vCount == 0) return;
+
+            // SRV 바인딩 (root param 1이 SRV descriptor table인 건 기존 Render()랑 동일)
+            D3D12_GPU_DESCRIPTOR_HANDLE h = srvBase;
+            h.ptr += (UINT64)srvIndex * (UINT64)m_srvDescriptorSize;
+            m_commandList->SetGraphicsRootDescriptorTable(1, h);
+
+            // DrawInstanced: startVertexLocation은 vbv 기준
+            m_commandList->DrawInstanced(vCount, 1, startV, 0);
+        };
+
+    for (uint32_t i = 0; i < quadCount; ++i)
+    {
+        const uint32_t srv = srvIndexPerQuad[i];
+
+        // quad는 항상 6 vertices
+        if (srv != curSrv)
+        {
+            FlushBatch(curSrv, batchStartVertex, batchVertexCount);
+
+            curSrv = srv;
+            batchStartVertex = i * 6;
+            batchVertexCount = 6;
+        }
+        else
+        {
+            batchVertexCount += 6;
+        }
+    }
+
+    // 마지막 배치 flush
+    FlushBatch(curSrv, batchStartVertex, batchVertexCount);
+
+    // 이후 다른 패스가 더 있다면 복구 필요하지만,
+    // UI를 Present 직전에 그릴 거면 굳이 복구 안 해도 됨.
 }
 
 // ---------------------------
@@ -767,6 +911,136 @@ void D3D12Renderer::CreateDebugLinePipeline()
     ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_psoDebugLine)));
 }
 
+void D3D12Renderer::CreateUIPipeline()
+{
+    const char* vsCode = R"(
+    cbuffer DrawCB : register(b0)
+    {
+        row_major float4x4 mvp; // UI에서는 사실상 안 써도 되지만, 기존 루트시그니처 재사용 위해 유지
+        float4 color;           // UI 버텍스 컬러를 쓰면 여기 color는 굳이 안 써도 됨
+    };
+
+    struct VSIn
+    {
+        float2 pos : POSITION;   // 이미 NDC (-1~1)로 들어온다고 가정
+        float2 uv  : TEXCOORD0;
+        float4 col : COLOR0;
+    };
+
+    struct VSOut
+    {
+        float4 pos : SV_POSITION;
+        float2 uv  : TEXCOORD0;
+        float4 col : COLOR0;
+    };
+
+    VSOut main(VSIn i)
+    {
+        VSOut o;
+        o.pos = float4(i.pos, 0.0, 1.0);
+        o.uv  = i.uv;
+        o.col = i.col;
+        return o;
+    }
+    )";
+
+    const char* psCode = R"(
+    Texture2D    gTex  : register(t0);
+    SamplerState gSamp : register(s0);
+
+    struct PSIn
+    {
+        float4 pos : SV_POSITION;
+        float2 uv  : TEXCOORD0;
+        float4 col : COLOR0;
+    };
+
+    float4 main(PSIn i) : SV_TARGET
+    {
+        float4 tex = gTex.Sample(gSamp, i.uv);
+        return tex * i.col;
+    }
+    )";
+
+    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined(_DEBUG)
+    flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+
+    ComPtr<ID3DBlob> vs, ps, err;
+    HRESULT hr = D3DCompile(vsCode, std::strlen(vsCode), nullptr, nullptr, nullptr,
+        "main", "vs_5_0", flags, 0, &vs, &err);
+    if (FAILED(hr))
+    {
+        if (err) OutputDebugStringA((const char*)err->GetBufferPointer());
+        ThrowIfFailed(hr);
+    }
+
+    err.Reset();
+    hr = D3DCompile(psCode, std::strlen(psCode), nullptr, nullptr, nullptr,
+        "main", "ps_5_0", flags, 0, &ps, &err);
+    if (FAILED(hr))
+    {
+        if (err) OutputDebugStringA((const char*)err->GetBufferPointer());
+        ThrowIfFailed(hr);
+    }
+
+    D3D12_INPUT_ELEMENT_DESC il[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 8,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+    pso.pRootSignature = m_rootSignature.Get();
+    pso.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+    pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+    pso.InputLayout = { il, _countof(il) };
+    pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+    // Rasterizer: UI는 보통 Cull OFF (2D 쿼드 방향 실수해도 보이게)
+    pso.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    pso.RasterizerState.FrontCounterClockwise = FALSE;
+    pso.RasterizerState.DepthClipEnable = TRUE;
+
+    // Blend: alpha blending ON (SrcAlpha / InvSrcAlpha)
+    pso.BlendState.AlphaToCoverageEnable = FALSE;
+    pso.BlendState.IndependentBlendEnable = FALSE;
+
+	// Alpha blend 설정
+    D3D12_RENDER_TARGET_BLEND_DESC b{};
+    b.BlendEnable = TRUE;
+    b.LogicOpEnable = FALSE;
+    b.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+    b.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+    b.BlendOp = D3D12_BLEND_OP_ADD;
+    b.SrcBlendAlpha = D3D12_BLEND_ONE;
+    b.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+    b.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    b.LogicOp = D3D12_LOGIC_OP_NOOP;
+    b.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+    for (int i = 0; i < 8; ++i)
+        pso.BlendState.RenderTarget[i] = b;
+
+    // Depth: UI는 depth off
+    pso.DepthStencilState.DepthEnable = FALSE;
+    pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+    pso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+
+    pso.SampleMask = UINT_MAX;
+    pso.NumRenderTargets = 1;
+    pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+	pso.DSVFormat = DXGI_FORMAT_D32_FLOAT; // 안 쓰이지만 루트시그니처 재사용 위해 유지(DepthEnable이 FALSE라 무의미)
+
+    pso.SampleDesc.Count = 1;
+
+    ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_psoUI)));
+}
+
 void D3D12Renderer::CreateDebugVertexBuffer()
 {
     m_debugVBStride = (uint32_t)sizeof(DebugVertex);
@@ -790,6 +1064,34 @@ void D3D12Renderer::CreateDebugVertexBuffer()
         D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_debugVB)));
 
     ThrowIfFailed(m_debugVB->Map(0, nullptr, (void**)&m_debugVBMapped));
+}
+
+void D3D12Renderer::CreateUIVertexBuffer()
+{
+    m_uiVBStride = (uint32_t)sizeof(UIVertex);
+
+    // FrameCount * MaxUIVertsPerFrame 만큼 큰 Upload VB 하나 만들어서
+    // 프레임마다 "자기 구간"에만 써서 레이스를 피한다.
+    const uint64_t totalVerts = (uint64_t)MaxUIVertsPerFrame * (uint64_t)FrameCount;
+    const uint64_t totalSize = totalVerts * (uint64_t)m_uiVBStride;
+
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    desc.Width = totalSize;
+    desc.Height = 1;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &desc,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_uiVB)));
+
+    ThrowIfFailed(m_uiVB->Map(0, nullptr, (void**)&m_uiVBMapped));
 }
 
 void D3D12Renderer::CreateConstantBuffer()

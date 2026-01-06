@@ -16,6 +16,8 @@
 #include "PhysicsSystem.h"
 #include "SoundManager.h"
 #include "AudioSystem.h"
+#include "UIHudSystem.h"
+#include "UIDrawItem.h"
 
 class Application
 {
@@ -47,6 +49,9 @@ private:
     SceneManager m_sceneManager;
 
     PhysicsSystem m_physics;
+
+    std::vector<UIDrawItem> m_uiItems;
+    UIHudSystem m_uiHud;
 
 public:
     Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_soundManager, m_audioSystem, m_input, m_physics) { }

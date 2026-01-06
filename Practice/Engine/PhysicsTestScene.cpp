@@ -177,6 +177,35 @@ void PhysicsTestScene::OnLoad(SceneContext& ctx)
     auto bgm = ctx.LoadSoundShared("Assets/Audio/bgm.mp3");
     if (bgm.IsOk())
         ctx.PlayBGM(bgm.value, 0.6f);
+
+    // UI 테스트
+    EntityId ui = ctx.Instantiate("HPBarBG");
+
+    // 텍스쳐
+    auto texRes = LoadTextureRGBA8_WIC("Assets/Texture/Alien-Animal_eye.jpg",
+        ImageColorSpace::SRGB, /*flipY=*/false);
+    TextureHandle hTex{};
+    if (texRes.IsOk())
+    {
+        hTex = ctx.textures.Create(std::move(texRes.value));
+    }
+    else
+    {
+        LOG_ERROR("Failed to load texture: %s", texRes.error->message.c_str());
+        // hTex invalid -> 기본 텍스처(slot0)로 렌더됨
+    }
+
+    UIElementComponent u{};
+    u.anchor = { 0.0f, 0.0f };
+    u.pivot = { 0.0f, 0.0f };
+    u.anchoredPosPx = { 20.0f, 20.0f };
+    u.sizePx = { 300.0f, 24.0f };
+
+    u.texture = hTex;
+    u.color = { 1,1,1,1 };
+    u.z = 0.0f;
+
+    ctx.world.AddUIElement(ui, u);
 }
 
 void PhysicsTestScene::OnUnload(SceneContext& ctx)

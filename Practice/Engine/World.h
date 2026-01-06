@@ -12,6 +12,7 @@
 #include "ColliderComponent.h"
 #include "CollisionEvents.h"
 #include "AudioSourceComponent.h"
+#include "UIElementComponent.h"
 
 class World
 {
@@ -127,6 +128,13 @@ private:
 
     void EnsureAudioSourceSparseSize(uint32_t entityIndex);
 
+    // UIElement storage (dense/sparse)
+    std::vector<UIElementComponent> m_uiElements;
+    std::vector<EntityId>           m_uiElementDenseEntities;
+    std::vector<uint32_t>           m_uiElementSparse;
+
+    void EnsureUIElementSparseSize(uint32_t entityIndex);
+
 public:
     // --- Transform Public API ---
     DirectX::XMFLOAT3 GetLocalPosition(EntityId e) const;
@@ -173,6 +181,15 @@ public:
     void RemoveAudioSource(EntityId e);
 
     const std::vector<EntityId>& GetAudioSourceEntities() const { return m_audioSourceDenseEntities; }
+
+    // --- UIElement API ---
+    void AddUIElement(EntityId e, const UIElementComponent& c);
+    bool HasUIElement(EntityId e) const;
+    UIElementComponent& GetUIElement(EntityId e);
+    const UIElementComponent& GetUIElement(EntityId e) const;
+    void RemoveUIElement(EntityId e);
+
+    const std::vector<EntityId>& GetUIElementEntities() const { return m_uiElementDenseEntities; }
 
     // ---- Debug/Iteration ----
     // (임시) dense transform 엔티티 목록을 반환(시스템들이 순회하기 위해 필요)

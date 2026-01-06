@@ -153,6 +153,8 @@
     <ClInclude Include="PhysicsTypes.h" />
     <ClInclude Include="SoundHandle.h" />
     <ClInclude Include="SoundManager.h" />
+    <ClInclude Include="UIElementComponent.h" />
+    <ClInclude Include="UIHudSystem.h" />
     <ClInclude Include="Utilities.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="SceneContext.h" />
@@ -210,6 +212,8 @@
     <ClCompile Include="TextureLoader_WIC.cpp" />
     <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="Time.cpp" />
+    <ClInclude Include="UIDrawItem.h" />
+    <ClCompile Include="UIHudSystem.cpp" />
     <ClCompile Include="Win32Window.cpp" />
     <ClCompile Include="World.cpp" />
   </ItemGroup>
