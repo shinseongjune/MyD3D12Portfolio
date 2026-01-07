@@ -14,6 +14,10 @@
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "d2d1.lib")
+#pragma comment(lib, "dwrite.lib")
+#pragma comment(lib, "dxguid.lib")
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -68,6 +72,9 @@ void D3D12Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
     m_scissor = { 0, 0, (LONG)width, (LONG)height };
 
     WaitForGPU();
+
+    // Init DirectWrite/Direct2D overlay
+    CreateTextOverlay();
 
     // 초기화에서 만든 텍스처 upload는 fence 완료됐으니 정리 가능
     for (auto& [id, t] : m_gpuTextures)
@@ -161,13 +168,16 @@ void D3D12Renderer::Resize(uint32_t width, uint32_t height)
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
     CreateRenderTargets();
+
+    // Recreate Direct2D targets for resized swapchain buffers
+    RecreateTextOverlayTargets();
     CreateDepthStencil(width, height);
 
     m_viewport = { 0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f };
     m_scissor = { 0, 0, (LONG)width, (LONG)height };
 }
 
-void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const std::vector<UIDrawItem>& ui)
+void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text)
 {
     ProcessPendingMeshReleases();
     ProcessPendingTextureUploadReleases();
@@ -359,16 +369,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
 	// --- UI ---
     RenderUI(ui);
 
-    // Transition: RenderTarget -> Present
-    {
-        D3D12_RESOURCE_BARRIER b{};
-        b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        b.Transition.pResource = m_renderTargets[m_frameIndex].Get();
-        b.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        b.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-        b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        m_commandList->ResourceBarrier(1, &b);
-    }
+    // (Skip RT->Present here; Direct2D overlay will transition to PRESENT)
 
     ThrowIfFailed(m_commandList->Close());
 
@@ -377,6 +378,8 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
 
     ID3D12CommandList* lists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(1, lists);
+
+    DrawTextOverlay(text);
 
     ThrowIfFailed(m_swapChain->Present(1, 0));
 
@@ -567,7 +570,7 @@ void D3D12Renderer::CreateDeviceAndSwapChain(HWND hwnd)
     sc.BufferCount = FrameCount;
     sc.Width = m_width;
     sc.Height = m_height;
-    sc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    sc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
     sc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     sc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     sc.SampleDesc.Count = 1;
@@ -825,7 +828,7 @@ void D3D12Renderer::CreatePipeline()
 
     pso.SampleMask = UINT_MAX;
     pso.NumRenderTargets = 1;
-    pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pso.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
     pso.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     pso.SampleDesc.Count = 1;
 
@@ -904,7 +907,7 @@ void D3D12Renderer::CreateDebugLinePipeline()
 
     pso.SampleMask = UINT_MAX;
     pso.NumRenderTargets = 1;
-    pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pso.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
     pso.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     pso.SampleDesc.Count = 1;
 
@@ -1032,7 +1035,7 @@ void D3D12Renderer::CreateUIPipeline()
 
     pso.SampleMask = UINT_MAX;
     pso.NumRenderTargets = 1;
-    pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pso.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
 
 	pso.DSVFormat = DXGI_FORMAT_D32_FLOAT; // 안 쓰이지만 루트시그니처 재사용 위해 유지(DepthEnable이 FALSE라 무의미)
 
@@ -1505,4 +1508,164 @@ void D3D12Renderer::CreateDefaultTexture_Checkerboard()
     m_gpuTextures.emplace(0u, std::move(gpu));
 
     m_nextSrvIndex = 1; // 이제부터는 slot1부터
+}
+
+// ---------------------------
+// DirectWrite/Direct2D overlay
+// ---------------------------
+void D3D12Renderer::CreateTextOverlay()
+{
+    // Create D3D11On12 device (D2D requires BGRA support)
+    UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+#if defined(_DEBUG)
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+    D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_0 };
+    ComPtr<ID3D11Device> dev11;
+    ComPtr<ID3D11DeviceContext> ctx11;
+
+    ThrowIfFailed(D3D11On12CreateDevice(
+        m_device.Get(),
+        flags,
+        levels,
+        (UINT)std::size(levels),
+        reinterpret_cast<IUnknown**>(m_commandQueue.GetAddressOf()),
+        1,
+        0,
+        &dev11,
+        &ctx11,
+        nullptr));
+
+    ThrowIfFailed(dev11.As(&m_d3d11On12));
+    m_d3d11Device = dev11;
+    m_d3d11Context = ctx11;
+
+    // D2D factory/device/context
+    D2D1_FACTORY_OPTIONS opt{};
+#if defined(_DEBUG)
+    opt.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+#endif
+
+    ThrowIfFailed(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory3), &opt, &m_d2dFactory));
+
+    ComPtr<IDXGIDevice> dxgiDevice;
+    ThrowIfFailed(m_d3d11Device.As(&dxgiDevice));
+
+    ThrowIfFailed(m_d2dFactory->CreateDevice(dxgiDevice.Get(), &m_d2dDevice));
+    ThrowIfFailed(m_d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &m_d2dContext));
+
+    // DWrite factory
+    ThrowIfFailed(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), &m_dwriteFactory));
+
+    // Brush
+    ThrowIfFailed(m_d2dContext->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 1), &m_d2dBrush));
+
+    RecreateTextOverlayTargets();
+}
+
+void D3D12Renderer::RecreateTextOverlayTargets()
+{
+    if (!m_d3d11On12 || !m_d2dContext)
+        return;
+
+    // Release old
+    for (uint32_t i = 0; i < FrameCount; ++i)
+    {
+        m_d2dTargets[i].Reset();
+        m_wrappedBackBuffers[i].Reset();
+    }
+
+    // Wrap swapchain buffers for D3D11/D2D
+    for (uint32_t i = 0; i < FrameCount; ++i)
+    {
+        D3D11_RESOURCE_FLAGS flags11{};
+        flags11.BindFlags = D3D11_BIND_RENDER_TARGET;
+
+        ThrowIfFailed(m_d3d11On12->CreateWrappedResource(
+            m_renderTargets[i].Get(),
+            &flags11,
+            D3D12_RESOURCE_STATE_RENDER_TARGET,
+            D3D12_RESOURCE_STATE_PRESENT,
+            IID_PPV_ARGS(&m_wrappedBackBuffers[i])));
+
+        ComPtr<IDXGISurface> surface;
+        ThrowIfFailed(m_wrappedBackBuffers[i].As(&surface));
+
+        D2D1_BITMAP_PROPERTIES1 props = D2D1::BitmapProperties1(
+            D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+
+        ThrowIfFailed(m_d2dContext->CreateBitmapFromDxgiSurface(surface.Get(), &props, &m_d2dTargets[i]));
+    }
+
+    m_textFormats.clear();
+}
+
+static std::wstring MakeTextFormatKey(const std::wstring& family, float sizePx)
+{
+    // Key: "family|size"
+    wchar_t buf[64]{};
+    swprintf_s(buf, L"|%.2f", sizePx);
+    return family + buf;
+}
+
+void D3D12Renderer::DrawTextOverlay(const std::vector<UITextDraw>& text)
+{
+    if (!m_d3d11On12 || !m_d2dContext || text.empty())
+        return;
+
+    ID3D11Resource* wrapped = m_wrappedBackBuffers[m_frameIndex].Get();
+    m_d3d11On12->AcquireWrappedResources(&wrapped, 1);
+
+    m_d2dContext->SetTarget(m_d2dTargets[m_frameIndex].Get());
+    m_d2dContext->BeginDraw();
+    m_d2dContext->SetTransform(D2D1::Matrix3x2F::Identity());
+
+    for (const UITextDraw& t : text)
+    {
+        const std::wstring& family = t.fontFamily.empty() ? std::wstring(L"Segoe UI") : t.fontFamily;
+        const std::wstring key = MakeTextFormatKey(family, t.sizePx);
+
+        auto it = m_textFormats.find(key);
+        if (it == m_textFormats.end())
+        {
+            ComPtr<IDWriteTextFormat> fmt;
+            ThrowIfFailed(m_dwriteFactory->CreateTextFormat(
+                family.c_str(),
+                nullptr,
+                DWRITE_FONT_WEIGHT_NORMAL,
+                DWRITE_FONT_STYLE_NORMAL,
+                DWRITE_FONT_STRETCH_NORMAL,
+                t.sizePx,
+                L"",
+                &fmt));
+
+            fmt->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            fmt->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+            fmt->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+
+            it = m_textFormats.emplace(key, fmt).first;
+        }
+
+        const DirectX::XMFLOAT4 c = t.color;
+        m_d2dBrush->SetColor(D2D1::ColorF(c.x, c.y, c.z, c.w));
+
+        const D2D1_RECT_F rc = D2D1::RectF(t.x, t.y, t.x + 10000.0f, t.y + 10000.0f);
+        m_d2dContext->DrawTextW(
+            t.text.c_str(),
+            (UINT32)t.text.size(),
+            it->second.Get(),
+            rc,
+            m_d2dBrush.Get(),
+            D2D1_DRAW_TEXT_OPTIONS_NONE,
+            DWRITE_MEASURING_MODE_NATURAL);
+    }
+
+    HRESULT hr = m_d2dContext->EndDraw();
+    // If device removed/reset, just skip this frame
+    (void)hr;
+
+    m_d3d11On12->ReleaseWrappedResources(&wrapped, 1);
+    m_d3d11Context->Flush();
 }

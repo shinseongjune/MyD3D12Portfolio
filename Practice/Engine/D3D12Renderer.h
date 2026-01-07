@@ -5,6 +5,11 @@
 #include <wrl.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
+#include <d3d11on12.h>
+#include <d3d11_4.h>
+#include <d2d1_3.h>
+#include <dwrite.h>
+#include <string>
 #include <DirectXMath.h>
 #include "IRenderer.h"
 
@@ -68,7 +73,7 @@ class D3D12Renderer final : public IRenderer
 public:
     void Initialize(HWND hwnd, uint32_t width, uint32_t height) override;
     void Resize(uint32_t width, uint32_t height) override;
-    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const std::vector<UIDrawItem>& ui) override;
+    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text) override;
     void RenderUI(const std::vector<UIDrawItem>& ui) override;
     void Shutdown() override;
 
@@ -98,6 +103,11 @@ private:
     void CreateConstantBuffer();
     void CreateDebugVertexBuffer();
     void CreateUIVertexBuffer();
+
+    // ---- DirectWrite text overlay ----
+    void CreateTextOverlay();
+    void RecreateTextOverlayTargets();
+    void DrawTextOverlay(const std::vector<UITextDraw>& text);
 
     void WaitForGPU();
     void MoveToNextFrame();
@@ -242,4 +252,23 @@ private:
 
     // UI pipeline
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_psoUI;
+
+    // ---------------------------
+    // DirectWrite/Direct2D text overlay
+    // ---------------------------
+    Microsoft::WRL::ComPtr<ID3D11Device> m_d3d11Device;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_d3d11Context;
+    Microsoft::WRL::ComPtr<ID3D11On12Device> m_d3d11On12;
+
+    Microsoft::WRL::ComPtr<ID2D1Factory3> m_d2dFactory;
+    Microsoft::WRL::ComPtr<ID2D1Device2> m_d2dDevice;
+    Microsoft::WRL::ComPtr<ID2D1DeviceContext2> m_d2dContext;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_d2dBrush;
+
+    Microsoft::WRL::ComPtr<IDWriteFactory> m_dwriteFactory;
+    std::unordered_map<std::wstring, Microsoft::WRL::ComPtr<IDWriteTextFormat>> m_textFormats;
+
+    Microsoft::WRL::ComPtr<ID3D11Resource> m_wrappedBackBuffers[FrameCount];
+    Microsoft::WRL::ComPtr<ID2D1Bitmap1> m_d2dTargets[FrameCount];
+
 };

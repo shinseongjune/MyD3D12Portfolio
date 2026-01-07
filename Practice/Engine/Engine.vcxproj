@@ -111,7 +111,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions>
       </AdditionalOptions>
-      <AdditionalDependencies>mfplat.lib;mfreadwrite.lib;mf.lib;mfuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>mfplat.lib;mfreadwrite.lib;mf.lib;mfuuid.lib;dwrite.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -127,6 +127,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>mfplat.lib;mfreadwrite.lib;mf.lib;mfuuid.lib;dwrite.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -137,6 +138,8 @@
     <ClInclude Include="AudioSystem.h" />
     <ClInclude Include="ColliderComponent.h" />
     <ClInclude Include="CollisionEvents.h" />
+    <ClInclude Include="DWriteFontFace.h" />
+    <ClInclude Include="IFontFace.h" />
     <ClInclude Include="ImportTypes.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="D3D12Renderer.h" />
@@ -151,15 +154,20 @@
     <ClInclude Include="PhysicsSystem.h" />
     <ClInclude Include="PhysicsTestScene.h" />
     <ClInclude Include="PhysicsTypes.h" />
+    <ClInclude Include="PlayScene.h" />
     <ClInclude Include="SoundHandle.h" />
     <ClInclude Include="SoundManager.h" />
+    <ClInclude Include="TextRenderer.h" />
     <ClInclude Include="UIElementComponent.h" />
     <ClInclude Include="UIHudSystem.h" />
+    <ClInclude Include="UITextDraw.h" />
     <ClInclude Include="Utilities.h" />
     <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="SceneContext.h" />
     <ClInclude Include="SceneScope.h" />
     <ClInclude Include="SoundClip.h" />
+    <ClCompile Include="DWriteFontFace.cpp" />
+    <ClCompile Include="PlayScene.cpp" />
     <ClCompile Include="SoundImporterMF.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>

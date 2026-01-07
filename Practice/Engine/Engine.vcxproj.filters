@@ -13,110 +13,137 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="소스 파일\01_Core">
-      <UniqueIdentifier>{384238dc-eb3f-4fee-90bc-432ec9c18107}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\02_Assets">
-      <UniqueIdentifier>{e3c19885-524d-42a4-84b7-072bb6f0a894}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\03_Platform">
-      <UniqueIdentifier>{e226625a-6fe4-49e3-983f-8e2f74915277}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\03_Platform\Win32">
-      <UniqueIdentifier>{ad6aaf04-c6e2-4afe-bcd1-3d1009bd91df}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\04_Render">
-      <UniqueIdentifier>{a932593e-55c7-4863-abc0-eac891d1571c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\05_Systems">
-      <UniqueIdentifier>{ee9a221d-1b5c-4a54-9e92-94b4a4f71b93}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\06_World">
-      <UniqueIdentifier>{8b05f27a-11f5-4e30-b541-51ad9fa7c7ab}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\01_Core">
-      <UniqueIdentifier>{6a1ff142-9d11-46d8-9c9f-80c572569c1a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\02_Assets">
-      <UniqueIdentifier>{bedf2ff8-b5fc-4931-bd29-961af66bec41}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\03_Platform">
-      <UniqueIdentifier>{0061356e-11d8-4e8a-9548-cea392741727}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\03_Platform\Win32">
-      <UniqueIdentifier>{3365a44b-641e-44ee-971b-f50cda95052a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\04_Render">
-      <UniqueIdentifier>{987407ce-68a1-4afc-8a30-15af9e472ada}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\05_Systems">
-      <UniqueIdentifier>{b17af95a-6ef2-4337-8b31-511abe12478c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\06_World">
-      <UniqueIdentifier>{5a749e4f-4d79-410f-84d5-085f86264447}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\06_World\Scenes">
+    <Filter Include="헤더 파일\Scenes">
       <UniqueIdentifier>{a3cf4a6f-381b-4ff6-a7ff-46116350e567}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\06_World\Scenes">
-      <UniqueIdentifier>{9b44784b-39fb-4ba3-a84d-1aaec1b942e5}</UniqueIdentifier>
+    <Filter Include="헤더 파일\Engine">
+      <UniqueIdentifier>{a52c4689-d164-493d-b542-d2b2519cafeb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\04_Render\Interface">
-      <UniqueIdentifier>{ce7ab78c-7c33-42a0-bc69-0c9856f5732e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\06_World\Components">
-      <UniqueIdentifier>{e33cda14-6f97-42e4-ab27-f422b84530f8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\00_Debug">
-      <UniqueIdentifier>{4f3b4f49-3e2b-44dc-931d-11a07928bf05}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\00_Debug">
+    <Filter Include="헤더 파일\Engine\00_Debug">
       <UniqueIdentifier>{057554f5-545c-4b22-8720-870757fde7fb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\02_Assets\Model">
+    <Filter Include="헤더 파일\Engine\01_Core">
+      <UniqueIdentifier>{6a1ff142-9d11-46d8-9c9f-80c572569c1a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\02_Assets">
+      <UniqueIdentifier>{bedf2ff8-b5fc-4931-bd29-961af66bec41}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\02_Assets\Model">
       <UniqueIdentifier>{0ec655a0-2d7f-4b19-a788-decb6898b1db}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\02_Assets\Model">
-      <UniqueIdentifier>{47860871-a53d-46a8-9b70-0ec57e5dfd36}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\02_Assets\Texture">
-      <UniqueIdentifier>{063f6b36-3f08-4870-8627-39ee111b9878}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\02_Assets\Texture">
-      <UniqueIdentifier>{1e7e27b6-9a2f-4ab4-885d-a3c707de8637}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\04_Render\Mesh">
-      <UniqueIdentifier>{eaf424a7-bf57-421c-9c01-1ac60247b724}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\04_Render\Texture">
-      <UniqueIdentifier>{c8c6371f-60f9-460d-9e93-4c0ac5ab79f2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\07_Physics">
-      <UniqueIdentifier>{59120faf-2462-4a0c-ba40-0fc45cbece34}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\07_Physics">
-      <UniqueIdentifier>{a45c50e3-e81f-4313-bc1d-a092f3952447}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\02_Assets\Model\3DImporters">
+    <Filter Include="헤더 파일\Engine\02_Assets\Model\3DImporters">
       <UniqueIdentifier>{900ca9d9-00d1-4b41-b86b-12372c74d4d8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\02_Assets\Model\3DImporters">
-      <UniqueIdentifier>{52c5abbe-bc9e-4a30-bf79-9c50577bae35}</UniqueIdentifier>
+    <Filter Include="헤더 파일\Engine\02_Assets\Texture">
+      <UniqueIdentifier>{063f6b36-3f08-4870-8627-39ee111b9878}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\02_Assets\Sound">
+    <Filter Include="헤더 파일\Engine\02_Assets\Sound">
       <UniqueIdentifier>{0e342746-98e7-4129-9d7c-a5f7bcb6a0f7}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\02_Assets\Sound">
-      <UniqueIdentifier>{0687bad4-dec3-4c0b-9292-62ad3e2ef839}</UniqueIdentifier>
+    <Filter Include="헤더 파일\Engine\03_Platform">
+      <UniqueIdentifier>{0061356e-11d8-4e8a-9548-cea392741727}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\08_Utility">
+    <Filter Include="헤더 파일\Engine\03_Platform\Win32">
+      <UniqueIdentifier>{3365a44b-641e-44ee-971b-f50cda95052a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\04_Render">
+      <UniqueIdentifier>{987407ce-68a1-4afc-8a30-15af9e472ada}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\04_Render\Interface">
+      <UniqueIdentifier>{ce7ab78c-7c33-42a0-bc69-0c9856f5732e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\05_Systems">
+      <UniqueIdentifier>{b17af95a-6ef2-4337-8b31-511abe12478c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\06_World">
+      <UniqueIdentifier>{5a749e4f-4d79-410f-84d5-085f86264447}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\06_World\Components">
+      <UniqueIdentifier>{e33cda14-6f97-42e4-ab27-f422b84530f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\07_Physics">
+      <UniqueIdentifier>{59120faf-2462-4a0c-ba40-0fc45cbece34}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\08_Utility">
       <UniqueIdentifier>{873e8a37-de03-48d8-b964-8c8311431857}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\09_UI">
+    <Filter Include="헤더 파일\Engine\09_UI">
       <UniqueIdentifier>{01c32b3f-7bc2-462f-aad4-3aac53ffec88}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\09_UI">
+    <Filter Include="소스 파일\Scenes">
+      <UniqueIdentifier>{9b44784b-39fb-4ba3-a84d-1aaec1b942e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine">
+      <UniqueIdentifier>{a296d923-0521-4bf5-98ef-ac6fec2ef426}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\09_UI">
       <UniqueIdentifier>{314864ad-e59c-438a-b094-f8e719a0f9d4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\00_Debug">
+      <UniqueIdentifier>{4f3b4f49-3e2b-44dc-931d-11a07928bf05}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\01_Core">
+      <UniqueIdentifier>{384238dc-eb3f-4fee-90bc-432ec9c18107}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\02_Assets">
+      <UniqueIdentifier>{e3c19885-524d-42a4-84b7-072bb6f0a894}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\02_Assets\Model">
+      <UniqueIdentifier>{47860871-a53d-46a8-9b70-0ec57e5dfd36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\02_Assets\Model\3DImporters">
+      <UniqueIdentifier>{52c5abbe-bc9e-4a30-bf79-9c50577bae35}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\02_Assets\Texture">
+      <UniqueIdentifier>{1e7e27b6-9a2f-4ab4-885d-a3c707de8637}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\02_Assets\Sound">
+      <UniqueIdentifier>{0687bad4-dec3-4c0b-9292-62ad3e2ef839}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\03_Platform">
+      <UniqueIdentifier>{e226625a-6fe4-49e3-983f-8e2f74915277}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\03_Platform\Win32">
+      <UniqueIdentifier>{ad6aaf04-c6e2-4afe-bcd1-3d1009bd91df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\04_Render">
+      <UniqueIdentifier>{a932593e-55c7-4863-abc0-eac891d1571c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\04_Render\Mesh">
+      <UniqueIdentifier>{eaf424a7-bf57-421c-9c01-1ac60247b724}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\04_Render\Texture">
+      <UniqueIdentifier>{c8c6371f-60f9-460d-9e93-4c0ac5ab79f2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\05_Systems">
+      <UniqueIdentifier>{ee9a221d-1b5c-4a54-9e92-94b4a4f71b93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\06_World">
+      <UniqueIdentifier>{8b05f27a-11f5-4e30-b541-51ad9fa7c7ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\07_Physics">
+      <UniqueIdentifier>{a45c50e3-e81f-4313-bc1d-a092f3952447}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Scenes\Test">
+      <UniqueIdentifier>{19863151-d8d1-4f9a-87ca-2bbd1b62502f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Scenes\Test">
+      <UniqueIdentifier>{96096585-b2a2-46d6-9a4e-998c2d7862ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\09_UI\Image">
+      <UniqueIdentifier>{525cbb63-3eea-4aab-a74d-d2ccef09cbc4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\09_UI\Image">
+      <UniqueIdentifier>{3d6fd2e9-30a0-4589-a9ba-ecbbda4a6d3f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\09_UI\Font">
+      <UniqueIdentifier>{1d60edaa-097c-4bdf-9f37-0a74366103c4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\09_UI\Font">
+      <UniqueIdentifier>{40aad139-4cf1-42c6-b3c9-19c21665d9f6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\09_UI\Font\Interface">
+      <UniqueIdentifier>{942e8d6c-d949-4c90-97d4-358316346093}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -133,160 +160,175 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Application.h">
-      <Filter>헤더 파일\01_Core</Filter>
+      <Filter>헤더 파일\Engine\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="Win32Window.h">
-      <Filter>헤더 파일\03_Platform\Win32</Filter>
+      <Filter>헤더 파일\Engine\03_Platform\Win32</Filter>
     </ClInclude>
     <ClInclude Include="Time.h">
-      <Filter>헤더 파일\01_Core</Filter>
+      <Filter>헤더 파일\Engine\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="World.h">
-      <Filter>헤더 파일\06_World</Filter>
+      <Filter>헤더 파일\Engine\06_World</Filter>
     </ClInclude>
     <ClInclude Include="EntityId.h">
-      <Filter>헤더 파일\06_World</Filter>
+      <Filter>헤더 파일\Engine\06_World</Filter>
     </ClInclude>
     <ClInclude Include="RenderItem.h">
-      <Filter>헤더 파일\04_Render</Filter>
+      <Filter>헤더 파일\Engine\04_Render</Filter>
     </ClInclude>
     <ClInclude Include="RenderSystem.h">
-      <Filter>헤더 파일\05_Systems</Filter>
+      <Filter>헤더 파일\Engine\05_Systems</Filter>
     </ClInclude>
     <ClInclude Include="D3D12Renderer.h">
-      <Filter>헤더 파일\04_Render</Filter>
+      <Filter>헤더 파일\Engine\04_Render</Filter>
     </ClInclude>
     <ClInclude Include="Scene.h">
-      <Filter>헤더 파일\01_Core</Filter>
+      <Filter>헤더 파일\Engine\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="SceneManager.h">
-      <Filter>헤더 파일\01_Core</Filter>
-    </ClInclude>
-    <ClInclude Include="TestScene.h">
-      <Filter>헤더 파일\06_World\Scenes</Filter>
+      <Filter>헤더 파일\Engine\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="IRenderer.h">
-      <Filter>헤더 파일\04_Render\Interface</Filter>
+      <Filter>헤더 파일\Engine\04_Render\Interface</Filter>
     </ClInclude>
     <ClInclude Include="CameraComponent.h">
-      <Filter>헤더 파일\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
     </ClInclude>
     <ClInclude Include="MaterialComponent.h">
-      <Filter>헤더 파일\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
     </ClInclude>
     <ClInclude Include="MeshComponent.h">
-      <Filter>헤더 파일\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
     </ClInclude>
     <ClInclude Include="TransformComponent.h">
-      <Filter>헤더 파일\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
     </ClInclude>
     <ClInclude Include="RenderCamera.h">
-      <Filter>헤더 파일\04_Render</Filter>
+      <Filter>헤더 파일\Engine\04_Render</Filter>
     </ClInclude>
     <ClInclude Include="Input.h">
-      <Filter>헤더 파일\01_Core</Filter>
+      <Filter>헤더 파일\Engine\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="DebugDraw.h">
-      <Filter>헤더 파일\00_Debug</Filter>
+      <Filter>헤더 파일\Engine\00_Debug</Filter>
     </ClInclude>
     <ClInclude Include="ObjImporter_Minimal.h">
-      <Filter>헤더 파일\02_Assets\Model\3DImporters</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model\3DImporters</Filter>
     </ClInclude>
     <ClInclude Include="PrimitiveMeshes.h">
-      <Filter>헤더 파일\00_Debug</Filter>
+      <Filter>헤더 파일\Engine\00_Debug</Filter>
     </ClInclude>
     <ClInclude Include="AssetPipeline.h">
-      <Filter>헤더 파일\02_Assets\Model</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
     <ClInclude Include="IAssetImporter.h">
-      <Filter>헤더 파일\02_Assets\Model</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
     <ClInclude Include="ImportRegistry.h">
-      <Filter>헤더 파일\02_Assets\Model</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
     <ClInclude Include="ImportTypes.h">
-      <Filter>헤더 파일\02_Assets\Model</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
     <ClInclude Include="ModelAsset.h">
-      <Filter>헤더 파일\02_Assets\Model</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
     <ClInclude Include="TextureLoader_WIC.h">
-      <Filter>헤더 파일\02_Assets\Texture</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Texture</Filter>
     </ClInclude>
     <ClInclude Include="SceneScope.h">
-      <Filter>헤더 파일\01_Core</Filter>
+      <Filter>헤더 파일\Engine\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="SceneContext.h">
-      <Filter>헤더 파일\01_Core</Filter>
+      <Filter>헤더 파일\Engine\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsTypes.h">
-      <Filter>헤더 파일\07_Physics</Filter>
+      <Filter>헤더 파일\Engine\07_Physics</Filter>
     </ClInclude>
     <ClInclude Include="RigidBodyComponent.h">
-      <Filter>헤더 파일\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
     </ClInclude>
     <ClInclude Include="ColliderComponent.h">
-      <Filter>헤더 파일\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsSystem.h">
-      <Filter>헤더 파일\05_Systems</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsTestScene.h">
-      <Filter>헤더 파일\06_World\Scenes</Filter>
+      <Filter>헤더 파일\Engine\05_Systems</Filter>
     </ClInclude>
     <ClInclude Include="CollisionEvents.h">
-      <Filter>헤더 파일\07_Physics</Filter>
+      <Filter>헤더 파일\Engine\07_Physics</Filter>
     </ClInclude>
     <ClInclude Include="SoundClip.h">
-      <Filter>헤더 파일\02_Assets\Sound</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Sound</Filter>
     </ClInclude>
     <ClInclude Include="SoundImporterMF.h">
-      <Filter>헤더 파일\02_Assets\Sound</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Sound</Filter>
     </ClInclude>
     <ClInclude Include="Utilities.h">
-      <Filter>헤더 파일\08_Utility</Filter>
+      <Filter>헤더 파일\Engine\08_Utility</Filter>
     </ClInclude>
     <ClInclude Include="MeshHandle.h">
-      <Filter>헤더 파일\02_Assets\Model</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
     <ClInclude Include="TextureHandle.h">
-      <Filter>헤더 파일\02_Assets\Texture</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Texture</Filter>
     </ClInclude>
     <ClInclude Include="SoundHandle.h">
-      <Filter>헤더 파일\02_Assets\Sound</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Sound</Filter>
     </ClInclude>
     <ClInclude Include="MeshManager.h">
-      <Filter>헤더 파일\02_Assets\Model</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
     <ClInclude Include="TextureManager.h">
-      <Filter>헤더 파일\02_Assets\Texture</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Texture</Filter>
     </ClInclude>
     <ClInclude Include="MeshCPUData.h">
-      <Filter>헤더 파일\02_Assets\Model</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
     <ClInclude Include="TextureCPUData.h">
-      <Filter>헤더 파일\02_Assets\Texture</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Texture</Filter>
     </ClInclude>
     <ClInclude Include="SoundManager.h">
-      <Filter>헤더 파일\02_Assets\Sound</Filter>
+      <Filter>헤더 파일\Engine\02_Assets\Sound</Filter>
     </ClInclude>
     <ClInclude Include="AudioSourceComponent.h">
-      <Filter>헤더 파일\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
     </ClInclude>
     <ClInclude Include="AudioCommand.h">
-      <Filter>헤더 파일\05_Systems</Filter>
+      <Filter>헤더 파일\Engine\05_Systems</Filter>
     </ClInclude>
     <ClInclude Include="AudioSystem.h">
-      <Filter>헤더 파일\05_Systems</Filter>
-    </ClInclude>
-    <ClInclude Include="UIDrawItem.h">
-      <Filter>헤더 파일\09_UI</Filter>
-    </ClInclude>
-    <ClInclude Include="UIHudSystem.h">
-      <Filter>헤더 파일\09_UI</Filter>
+      <Filter>헤더 파일\Engine\05_Systems</Filter>
     </ClInclude>
     <ClInclude Include="UIElementComponent.h">
-      <Filter>헤더 파일\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="TestScene.h">
+      <Filter>헤더 파일\Scenes\Test</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsTestScene.h">
+      <Filter>헤더 파일\Scenes\Test</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayScene.h">
+      <Filter>헤더 파일\Scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="UIDrawItem.h">
+      <Filter>헤더 파일\Engine\09_UI\Image</Filter>
+    </ClInclude>
+    <ClInclude Include="IFontFace.h">
+      <Filter>헤더 파일\Engine\09_UI\Font\Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="DWriteFontFace.h">
+      <Filter>헤더 파일\Engine\09_UI\Font</Filter>
+    </ClInclude>
+    <ClInclude Include="UIHudSystem.h">
+      <Filter>헤더 파일\Engine\09_UI</Filter>
+    </ClInclude>
+    <ClInclude Include="TextRenderer.h">
+      <Filter>헤더 파일\Engine\09_UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UITextDraw.h">
+      <Filter>헤더 파일\Engine\09_UI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -294,79 +336,85 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Application.cpp">
-      <Filter>소스 파일\01_Core</Filter>
+      <Filter>소스 파일\Engine\01_Core</Filter>
     </ClCompile>
     <ClCompile Include="Win32Window.cpp">
-      <Filter>소스 파일\03_Platform\Win32</Filter>
+      <Filter>소스 파일\Engine\03_Platform\Win32</Filter>
     </ClCompile>
     <ClCompile Include="Time.cpp">
-      <Filter>소스 파일\01_Core</Filter>
+      <Filter>소스 파일\Engine\01_Core</Filter>
     </ClCompile>
     <ClCompile Include="World.cpp">
-      <Filter>소스 파일\06_World</Filter>
+      <Filter>소스 파일\Engine\06_World</Filter>
     </ClCompile>
     <ClCompile Include="D3D12Renderer.cpp">
-      <Filter>소스 파일\04_Render</Filter>
+      <Filter>소스 파일\Engine\04_Render</Filter>
     </ClCompile>
     <ClCompile Include="Input.cpp">
-      <Filter>소스 파일\01_Core</Filter>
+      <Filter>소스 파일\Engine\01_Core</Filter>
     </ClCompile>
     <ClCompile Include="MeshManager.cpp">
-      <Filter>소스 파일\04_Render\Mesh</Filter>
+      <Filter>소스 파일\Engine\04_Render\Mesh</Filter>
     </ClCompile>
     <ClCompile Include="DebugDraw.cpp">
-      <Filter>소스 파일\00_Debug</Filter>
-    </ClCompile>
-    <ClCompile Include="TestScene.cpp">
-      <Filter>소스 파일\06_World\Scenes</Filter>
+      <Filter>소스 파일\Engine\00_Debug</Filter>
     </ClCompile>
     <ClCompile Include="ObjImporter_Minimal.cpp">
-      <Filter>소스 파일\02_Assets\Model\3DImporters</Filter>
+      <Filter>소스 파일\Engine\02_Assets\Model\3DImporters</Filter>
     </ClCompile>
     <ClCompile Include="RenderSystem.cpp">
-      <Filter>소스 파일\05_Systems</Filter>
+      <Filter>소스 파일\Engine\05_Systems</Filter>
     </ClCompile>
     <ClCompile Include="PrimitiveMeshes.cpp">
-      <Filter>소스 파일\00_Debug</Filter>
+      <Filter>소스 파일\Engine\00_Debug</Filter>
     </ClCompile>
     <ClCompile Include="AssetPipeline.cpp">
-      <Filter>소스 파일\02_Assets\Model</Filter>
+      <Filter>소스 파일\Engine\02_Assets\Model</Filter>
     </ClCompile>
     <ClCompile Include="ImportRegistry.cpp">
-      <Filter>소스 파일\02_Assets\Model</Filter>
+      <Filter>소스 파일\Engine\02_Assets\Model</Filter>
     </ClCompile>
     <ClCompile Include="TextureLoader_WIC.cpp">
-      <Filter>소스 파일\02_Assets\Texture</Filter>
+      <Filter>소스 파일\Engine\02_Assets\Texture</Filter>
     </ClCompile>
     <ClCompile Include="TextureManager.cpp">
-      <Filter>소스 파일\04_Render\Texture</Filter>
+      <Filter>소스 파일\Engine\04_Render\Texture</Filter>
     </ClCompile>
     <ClCompile Include="SceneScope.cpp">
-      <Filter>소스 파일\01_Core</Filter>
+      <Filter>소스 파일\Engine\01_Core</Filter>
     </ClCompile>
     <ClCompile Include="SceneManager.cpp">
-      <Filter>소스 파일\01_Core</Filter>
+      <Filter>소스 파일\Engine\01_Core</Filter>
     </ClCompile>
     <ClCompile Include="PhysicsSystem.cpp">
-      <Filter>소스 파일\05_Systems</Filter>
-    </ClCompile>
-    <ClCompile Include="PhysicsTestScene.cpp">
-      <Filter>소스 파일\06_World\Scenes</Filter>
+      <Filter>소스 파일\Engine\05_Systems</Filter>
     </ClCompile>
     <ClCompile Include="SoundManager.cpp">
-      <Filter>소스 파일\02_Assets\Sound</Filter>
+      <Filter>소스 파일\Engine\02_Assets\Sound</Filter>
     </ClCompile>
     <ClCompile Include="AudioSystem.cpp">
-      <Filter>소스 파일\05_Systems</Filter>
+      <Filter>소스 파일\Engine\05_Systems</Filter>
     </ClCompile>
     <ClCompile Include="SceneContext.cpp">
-      <Filter>소스 파일\01_Core</Filter>
+      <Filter>소스 파일\Engine\01_Core</Filter>
     </ClCompile>
     <ClCompile Include="SoundImporterMF.cpp">
-      <Filter>소스 파일\02_Assets\Sound</Filter>
+      <Filter>소스 파일\Engine\02_Assets\Sound</Filter>
+    </ClCompile>
+    <ClCompile Include="PhysicsTestScene.cpp">
+      <Filter>소스 파일\Scenes\Test</Filter>
+    </ClCompile>
+    <ClCompile Include="TestScene.cpp">
+      <Filter>소스 파일\Scenes\Test</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayScene.cpp">
+      <Filter>소스 파일\Scenes</Filter>
+    </ClCompile>
+    <ClCompile Include="DWriteFontFace.cpp">
+      <Filter>소스 파일\Engine\09_UI\Font</Filter>
     </ClCompile>
     <ClCompile Include="UIHudSystem.cpp">
-      <Filter>소스 파일\09_UI</Filter>
+      <Filter>소스 파일\Engine\09_UI</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

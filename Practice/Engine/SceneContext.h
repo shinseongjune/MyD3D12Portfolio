@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 
 #include "World.h"
 #include "AssetPipeline.h"
@@ -15,6 +16,7 @@
 #include "AudioSystem.h"
 #include "AudioCommand.h"
 #include "TextureHandle.h"
+#include "UITextDraw.h"
 
 class PhysicsSystem;
 
@@ -29,6 +31,9 @@ struct SceneContext
 	PhysicsSystem& physics;
     SoundManager& sounds;
     AudioSystem& audio;
+
+    // ---- Per-frame text overlay sink (owned by Application) ----
+    std::vector<UITextDraw>& text;
 
     float dt = 0.0f;
 
@@ -57,5 +62,11 @@ struct SceneContext
     void PlayBGM(SoundHandle clip, float volume = 1.0f);
 
     void StopBGM();
+
+    // ---- Text overlay helpers (scene-friendly) ----
+    void DrawText(float x, float y, const std::wstring& str,
+                  float sizePx = 16.0f,
+                  const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4(1, 1, 1, 1),
+                  const std::wstring& fontFamily = L"Segoe UI");
 
 };

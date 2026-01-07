@@ -18,6 +18,7 @@
 #include "AudioSystem.h"
 #include "UIHudSystem.h"
 #include "UIDrawItem.h"
+#include "UITextDraw.h"
 
 class Application
 {
@@ -46,6 +47,8 @@ private:
     SoundManager m_soundManager;
     AudioSystem  m_audioSystem;
     Input m_input;
+    std::vector<UITextDraw> m_textItems;
+
     SceneManager m_sceneManager;
 
     PhysicsSystem m_physics;
@@ -53,8 +56,9 @@ private:
     std::vector<UIDrawItem> m_uiItems;
     UIHudSystem m_uiHud;
 
+
 public:
-    Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_soundManager, m_audioSystem, m_input, m_physics) { }
+    Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_soundManager, m_audioSystem, m_input, m_physics, m_textItems) { }
 
     ~Application();
 

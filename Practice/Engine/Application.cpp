@@ -36,14 +36,19 @@ void Application::Initialize(HINSTANCE hInstance)
 	// 4) RenderSystem 초기화
     m_audioSystem.Initialize();
 
-    // 5) 첫 Scene 로드(테스트)
+	// 5) Importer 등록
     m_registry.Register(std::make_unique<ObjImporter_Minimal>());
 
+	// 6) 폰트/텍스트 렌더러 초기화
+    
+    // 7) 첫 Scene 로드
     m_sceneManager.Load(std::make_unique<PhysicsTestScene>());
 
+	// 8) 마지막 창 크기 저장
     m_lastW = m_window.GetWidth();
     m_lastH = m_window.GetHeight();
 
+	// 9) 실행 상태로 설정
     m_running = true;
 }
 
@@ -133,7 +138,7 @@ RenderCamera Application::BuildRenderCamera() const
 
     // 3) Projection 만들기
     float aspect = float(m_window.GetWidth()) / float(m_window.GetHeight());
-    float fovY = camC.FovYRadians(); // 네 필드명에 맞춰 수정
+    float fovY = camC.FovYRadians();
     XMMATRIX P = XMMatrixPerspectiveFovLH(fovY, aspect, camC.nearZ, camC.farZ);
 
 	// view/proj 저장
@@ -166,6 +171,9 @@ void Application::BeginFrame()
 
     // DebugDraw 갱신
     DebugDraw::BeginFrame();
+
+    // Per-frame text overlay list
+    m_textItems.clear();
 
     // Input 갱신
     m_input.Update();
@@ -217,7 +225,7 @@ void Application::RenderFrame()
     RenderCamera cam{};
     cam = BuildRenderCamera();
 
-    m_renderer->Render(m_renderItems, cam, m_uiItems);
+    m_renderer->Render(m_renderItems, cam, m_uiItems, m_textItems);
 }
 
 void Application::EndFrame()
