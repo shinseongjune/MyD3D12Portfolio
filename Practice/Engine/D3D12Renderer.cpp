@@ -9,7 +9,6 @@
 #include "TextureManager.h"
 #include "TextureHandle.h"
 #include "TextureCpuData.h"
-#include "Utilities.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -27,6 +26,23 @@ void D3D12Renderer::ThrowIfFailed(HRESULT hr)
     if (FAILED(hr)) throw std::runtime_error("D3D12 call failed.");
 }
 
+static D3D12_RESOURCE_DESC MakeBufferDesc(UINT64 byteSize)
+{
+    D3D12_RESOURCE_DESC d{};
+    d.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    d.Alignment = 0;
+    d.Width = byteSize;
+    d.Height = 1;
+    d.DepthOrArraySize = 1;
+    d.MipLevels = 1;
+    d.Format = DXGI_FORMAT_UNKNOWN;
+    d.SampleDesc.Count = 1;
+    d.SampleDesc.Quality = 0;
+    d.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    d.Flags = D3D12_RESOURCE_FLAG_NONE;
+    return d;
+}
+
 void D3D12Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 {
     m_hwnd = hwnd;
@@ -40,6 +56,8 @@ void D3D12Renderer::Initialize(HWND hwnd, uint32_t width, uint32_t height)
     CreateDepthStencil(width, height);
 
     CreatePipeline();
+    CreateSkyboxPipeline();
+    CreateSkyboxMesh();
     CreateConstantBuffer();
 	CreateUIPipeline();
 
@@ -177,7 +195,7 @@ void D3D12Renderer::Resize(uint32_t width, uint32_t height)
     m_scissor = { 0, 0, (LONG)width, (LONG)height };
 }
 
-void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text)
+void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam, TextureHandle skybox, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text)
 {
     ProcessPendingMeshReleases();
     ProcessPendingTextureUploadReleases();
@@ -227,8 +245,53 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     XMMATRIX V = XMLoadFloat4x4(&cam.view);
     XMMATRIX P = XMLoadFloat4x4(&cam.proj);
 
-    const uint32_t drawCount = std::min<uint32_t>((uint32_t)items.size(), MaxDrawsPerFrame);
+    const uint32_t maxOpaque = MaxDrawsPerFrame - 1; // 마지막 1개는 skybox용
+    const uint32_t drawCount = std::min<uint32_t>((uint32_t)items.size(), maxOpaque);
     const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
+    const uint32_t skySlot = frameBase + MaxDrawsPerFrame - 1;
+
+    // Skybox (if set)
+    if (skybox.IsValid())
+    {
+        // PSO 전환
+        m_commandList->SetPipelineState(m_skyPso.Get());
+        m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+
+        // SRV (cubemap)
+        const uint32_t srvIndex = GetOrCreateSrvIndex(skybox);
+
+        D3D12_GPU_DESCRIPTOR_HANDLE gh = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
+        gh.ptr += (SIZE_T)srvIndex * m_srvDescriptorSize;
+        m_commandList->SetGraphicsRootDescriptorTable(1, gh);
+
+        // view translation 제거한 viewProj
+        using namespace DirectX;
+        XMMATRIX V = XMLoadFloat4x4(&cam.view);
+        XMMATRIX P = XMLoadFloat4x4(&cam.proj);
+        V.r[3] = XMVectorSet(0, 0, 0, 1); // translation 제거 (row-major)
+
+        XMMATRIX VP = V * P;
+
+        DrawCB cb{};
+        XMStoreFloat4x4(&cb.mvp, VP);
+        cb.color = XMFLOAT4(1, 1, 1, 1);
+
+        std::memcpy(m_cbMapped + skySlot * m_cbStride, &cb, sizeof(DrawCB));
+        D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
+            m_cb->GetGPUVirtualAddress() + (UINT64)skySlot * (UINT64)m_cbStride;
+
+        m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
+
+        // IA
+        m_commandList->IASetVertexBuffers(0, 1, &m_skyVBView);
+        m_commandList->IASetIndexBuffer(&m_skyIBView);
+        m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        m_commandList->DrawIndexedInstanced(m_skyIndexCount, 1, 0, 0, 0);
+
+        // 다시 기본 PSO로 복귀 (opaque용)
+        m_commandList->SetPipelineState(m_pso.Get());
+    }
 
     struct DrawKey
     {
@@ -1231,6 +1294,131 @@ void D3D12Renderer::CreateGPUMeshFromCPU(const MeshCPUData& cpu, MeshGPUData& ou
     out.ibView.Format = DXGI_FORMAT_R16_UINT;
 }
 
+void D3D12Renderer::CreateGPUCubeTextureFromCPU(const TextureCubeCpuData& cpu, TextureGPUData& out)
+{
+    if (cpu.width == 0 || cpu.height == 0)
+        throw std::runtime_error("CreateGPUCubeTextureFromCPU: invalid cpu cubemap.");
+
+    const uint32_t srvIndex = m_nextSrvIndex++;
+    if (srvIndex >= 256)
+        throw std::runtime_error("SRV heap is full (>=256).");
+
+    const DXGI_FORMAT fmt =
+        (cpu.colorSpace == ImageColorSpace::SRGB)
+        ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+        : DXGI_FORMAT_R8G8B8A8_UNORM;
+
+    // Cube는 Texture2DArray(6)로 만든다.
+    D3D12_RESOURCE_DESC td{};
+    td.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    td.Width = cpu.width;
+    td.Height = cpu.height;
+    td.DepthOrArraySize = 6; // faces
+    td.MipLevels = 1;
+    td.Format = fmt;
+    td.SampleDesc.Count = 1;
+    td.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    D3D12_HEAP_PROPERTIES hpDefault{};
+    hpDefault.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &hpDefault, D3D12_HEAP_FLAG_NONE, &td,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr, IID_PPV_ARGS(&out.tex)));
+
+    // Upload buffer for 6 subresources
+    std::array<D3D12_PLACED_SUBRESOURCE_FOOTPRINT, 6> fp{};
+    std::array<UINT, 6> numRows{};
+    std::array<UINT64, 6> rowSize{};
+    UINT64 totalBytes = 0;
+
+    m_device->GetCopyableFootprints(&td, 0, 6, 0,
+        fp.data(), numRows.data(), rowSize.data(), &totalBytes);
+
+    D3D12_RESOURCE_DESC bd{};
+    bd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    bd.Width = totalBytes;
+    bd.Height = 1;
+    bd.DepthOrArraySize = 1;
+    bd.MipLevels = 1;
+    bd.SampleDesc.Count = 1;
+    bd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    D3D12_HEAP_PROPERTIES hpUpload{};
+    hpUpload.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &hpUpload, D3D12_HEAP_FLAG_NONE, &bd,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr, IID_PPV_ARGS(&out.upload)));
+
+    // Map and copy each face respecting RowPitch
+    uint8_t* dst = nullptr;
+    D3D12_RANGE r{ 0,0 };
+    ThrowIfFailed(out.upload->Map(0, &r, (void**)&dst));
+
+    const uint32_t srcRowBytes = cpu.width * 4;
+
+    for (int face = 0; face < 6; ++face)
+    {
+        uint8_t* faceDst = dst + fp[face].Offset;
+        const uint8_t* faceSrc = cpu.pixels[face].data();
+
+        for (uint32_t y = 0; y < cpu.height; ++y)
+        {
+            std::memcpy(faceDst + (size_t)y * fp[face].Footprint.RowPitch,
+                faceSrc + (size_t)y * srcRowBytes,
+                srcRowBytes);
+        }
+    }
+    out.upload->Unmap(0, nullptr);
+
+    // CopyTextureRegion for each subresource(face)
+    for (int face = 0; face < 6; ++face)
+    {
+        D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+        dstLoc.pResource = out.tex.Get();
+        dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dstLoc.SubresourceIndex = face;
+
+        D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+        srcLoc.pResource = out.upload.Get();
+        srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        srcLoc.PlacedFootprint = fp[face];
+
+        m_commandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+    }
+
+    // Transition to PIXEL_SHADER_RESOURCE
+    D3D12_RESOURCE_BARRIER b{};
+    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource = out.tex.Get();
+    b.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    b.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    m_commandList->ResourceBarrier(1, &b);
+
+    // SRV as TEXTURECUBE
+    D3D12_SHADER_RESOURCE_VIEW_DESC sd{};
+    sd.Format = fmt;
+    sd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+    sd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    sd.TextureCube.MipLevels = 1;
+    sd.TextureCube.MostDetailedMip = 0;
+    sd.TextureCube.ResourceMinLODClamp = 0.0f;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE h = m_srvHeap->GetCPUDescriptorHandleForHeapStart();
+    h.ptr += (SIZE_T)srvIndex * m_srvDescriptorSize;
+    m_device->CreateShaderResourceView(out.tex.Get(), &sd, h);
+
+    out.srvIndex = srvIndex;
+    out.width = cpu.width;
+    out.height = cpu.height;
+    out.format = fmt;
+    out.isCubemap = true;
+}
+
 void D3D12Renderer::RetireMesh(uint32_t meshId)
 {
     if (m_gpuMeshes.find(meshId) == m_gpuMeshes.end())
@@ -1276,10 +1464,18 @@ uint32_t D3D12Renderer::GetOrCreateSrvIndex(const TextureHandle& h)
         return it->second.srvIndex;
 
     assert(m_textureManager && "TextureManager not set");
-    const TextureCpuData& cpu = m_textureManager->Get(h);
 
     TextureGPUData gpu{};
-    CreateGPUTextureFromCPU(cpu, gpu);
+    if (m_textureManager->IsCubemap(h))
+    {
+        const TextureCubeCpuData& cpu = m_textureManager->GetCube(h);
+        CreateGPUCubeTextureFromCPU(cpu, gpu);
+    }
+    else
+    {
+        const TextureCpuData& cpu = m_textureManager->Get(h);
+        CreateGPUTextureFromCPU(cpu, gpu);
+    }
 
     auto [iter, inserted] = m_gpuTextures.emplace(h.id, std::move(gpu));
     m_texturesCreatedThisFrame.push_back(h.id);
@@ -1508,6 +1704,191 @@ void D3D12Renderer::CreateDefaultTexture_Checkerboard()
     m_gpuTextures.emplace(0u, std::move(gpu));
 
     m_nextSrvIndex = 1; // 이제부터는 slot1부터
+}
+
+void D3D12Renderer::CreateSkyboxPipeline()
+{
+    const char* vsCode = R"(
+    cbuffer DrawCB : register(b0)
+    {
+        row_major float4x4 mvp;
+        float4 color;
+    };
+
+    struct VSIn { float3 pos : POSITION; };
+    struct VSOut
+    {
+        float4 posH : SV_POSITION;
+        float3 dir  : TEXCOORD0;
+    };
+
+    VSOut main(VSIn i)
+    {
+        VSOut o;
+        o.dir = i.pos;
+        float4 p = mul(float4(i.pos, 1.0), mvp);
+        p.z = p.w;          // 항상 far
+        o.posH = p;
+        return o;
+    })";
+
+    const char* psCode = R"(
+    cbuffer DrawCB : register(b0)
+    {
+        row_major float4x4 mvp;
+        float4 color;
+    };
+
+    TextureCube gSky : register(t0);
+    SamplerState gSamp : register(s0);
+
+    struct PSIn
+    {
+        float4 posH : SV_POSITION;
+        float3 dir  : TEXCOORD0;
+    };
+
+    float4 main(PSIn i) : SV_TARGET
+    {
+        return gSky.Sample(gSamp, normalize(i.dir));
+    })";
+
+    ComPtr<ID3DBlob> vs, ps, err;
+    UINT flags = 0;
+#if defined(_DEBUG)
+    flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+
+    ThrowIfFailed(D3DCompile(vsCode, std::strlen(vsCode), nullptr, nullptr, nullptr,
+        "main", "vs_5_0", flags, 0, &vs, &err));
+    ThrowIfFailed(D3DCompile(psCode, std::strlen(psCode), nullptr, nullptr, nullptr,
+        "main", "ps_5_0", flags, 0, &ps, &err));
+
+    D3D12_INPUT_ELEMENT_DESC il[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
+          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    D3D12_RASTERIZER_DESC rast{};
+    rast.FillMode = D3D12_FILL_MODE_SOLID;
+    rast.CullMode = D3D12_CULL_MODE_FRONT;
+    rast.FrontCounterClockwise = FALSE;
+    rast.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+    rast.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+    rast.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+    rast.DepthClipEnable = TRUE;
+    rast.MultisampleEnable = FALSE;
+    rast.AntialiasedLineEnable = FALSE;
+    rast.ForcedSampleCount = 0;
+    rast.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+    D3D12_BLEND_DESC blend{};
+    blend.AlphaToCoverageEnable = FALSE;
+    blend.IndependentBlendEnable = FALSE;
+    auto& rt0 = blend.RenderTarget[0];
+    rt0.BlendEnable = FALSE;
+    rt0.LogicOpEnable = FALSE;
+    rt0.SrcBlend = D3D12_BLEND_ONE;
+    rt0.DestBlend = D3D12_BLEND_ZERO;
+    rt0.BlendOp = D3D12_BLEND_OP_ADD;
+    rt0.SrcBlendAlpha = D3D12_BLEND_ONE;
+    rt0.DestBlendAlpha = D3D12_BLEND_ZERO;
+    rt0.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    rt0.LogicOp = D3D12_LOGIC_OP_NOOP;
+    rt0.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+    D3D12_DEPTH_STENCIL_DESC ds{};
+    ds.DepthEnable = TRUE;
+    ds.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;         // write off
+    ds.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;         // far 허용
+    ds.StencilEnable = FALSE;
+    ds.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+    ds.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+    // ds.FrontFace/BackFace는 stencil off라 의미 없음
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+    pso.InputLayout = { il, _countof(il) };
+    pso.pRootSignature = m_rootSignature.Get();
+    pso.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+    pso.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+    pso.RasterizerState = rast;
+    pso.BlendState = blend;
+    pso.DepthStencilState = ds;
+    pso.SampleMask = UINT_MAX;
+    pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    pso.NumRenderTargets = 1;
+    pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pso.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+    pso.SampleDesc.Count = 1;
+
+    ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_skyPso)));
+}
+
+struct SkyVtx { float x, y, z; };
+
+void D3D12Renderer::CreateSkyboxMesh()
+{
+    // unit cube
+    const SkyVtx v[] =
+    {
+        {-1,-1,-1}, {+1,-1,-1}, {+1,+1,-1}, {-1,+1,-1},
+        {-1,-1,+1}, {+1,-1,+1}, {+1,+1,+1}, {-1,+1,+1},
+    };
+
+    const uint16_t idx[] =
+    {
+        // -Z
+        0,2,1, 0,3,2,
+        // +Z
+        4,5,6, 4,6,7,
+        // -X
+        0,7,3, 0,4,7,
+        // +X
+        1,2,6, 1,6,5,
+        // -Y
+        0,1,5, 0,5,4,
+        // +Y
+        3,7,6, 3,6,2,
+    };
+    m_skyIndexCount = (uint32_t)_countof(idx);
+
+    const UINT vbBytes = sizeof(v);
+    const UINT ibBytes = sizeof(idx);
+
+    // Upload heap (static)
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+    D3D12_RESOURCE_DESC bd = MakeBufferDesc(vbBytes);
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &bd,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+        IID_PPV_ARGS(&m_skyVB)));
+
+    void* p = nullptr;
+    D3D12_RANGE r{ 0,0 };
+    ThrowIfFailed(m_skyVB->Map(0, &r, &p));
+    std::memcpy(p, v, vbBytes);
+    m_skyVB->Unmap(0, nullptr);
+
+    bd = MakeBufferDesc(ibBytes);
+    ThrowIfFailed(m_device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &bd,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+        IID_PPV_ARGS(&m_skyIB)));
+
+    ThrowIfFailed(m_skyIB->Map(0, &r, &p));
+    std::memcpy(p, idx, ibBytes);
+    m_skyIB->Unmap(0, nullptr);
+
+    m_skyVBView.BufferLocation = m_skyVB->GetGPUVirtualAddress();
+    m_skyVBView.StrideInBytes = sizeof(SkyVtx);
+    m_skyVBView.SizeInBytes = vbBytes;
+
+    m_skyIBView.BufferLocation = m_skyIB->GetGPUVirtualAddress();
+    m_skyIBView.Format = DXGI_FORMAT_R16_UINT;
+    m_skyIBView.SizeInBytes = ibBytes;
 }
 
 // ---------------------------

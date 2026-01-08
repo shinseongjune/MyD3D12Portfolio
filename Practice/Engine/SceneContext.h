@@ -37,16 +37,37 @@ struct SceneContext
 
     float dt = 0.0f;
 
+	// ---- Skybox 관리용 포인터 (SceneManager가 소유) ----
+    TextureHandle* skybox = nullptr;
+
+	// ---- Skybox helpers ----
+    void SetSkybox(TextureHandle h)
+    {
+        if (!skybox) return;
+        *skybox = h; // invalid면 제거 효과
+    }
+
+    void ClearSkybox()
+    {
+        if (!skybox) return;
+        *skybox = {};
+    }
+
+    // Cubemap (6-face) load
+    Result<TextureHandle> LoadCubemapScoped(const std::array<std::string, 6>& utf8Paths);
+
     // ---- Unity-like helpers ----
     EntityId Instantiate(const std::string& name = "");
 
     void Destroy(EntityId e);    
 
+	// 모델 임포트 (리소스만 생성)
+    Result<ModelAsset> ImportModel(const std::string& path, const ImportOptions& importOpt);
+
     // Import + Instantiate를 한 번에(씬에서 제일 많이 쓰는 UX)
-    Result<EntityId> SpawnModel(
-        const std::string& path,
-        const ImportOptions& importOpt,
-        const SpawnModelOptions& spawnOpt);
+    Result<EntityId> SpawnModel(const std::string& path, const ImportOptions& importOpt, const SpawnModelOptions& spawnOpt);
+
+    Result<EntityId> SpawnModel(const ModelAsset& asset, const SpawnModelOptions& spawnOpt);
 
     // 텍스처 로드
     Result<TextureHandle> LoadTextureScoped(const std::string& utf8Path);

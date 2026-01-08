@@ -28,6 +28,9 @@ public:
 
     Scene* Current() const { return m_current.get(); }
 
+    TextureHandle GetSkybox() const { return m_skybox; }
+    void ClearSkybox() { m_skybox = {}; }
+
 private:
     World& m_world;
     AssetPipeline& m_assets;
@@ -41,4 +44,6 @@ private:
 
     SceneScope m_scope;
     std::unique_ptr<Scene> m_current;
+
+    TextureHandle m_skybox{}; // id=0 => none
 };

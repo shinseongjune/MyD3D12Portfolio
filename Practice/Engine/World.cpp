@@ -640,6 +640,52 @@ void World::SetLocalRotation(EntityId e, const XMFLOAT4& q)
     MarkDirtyRecursive(e);
 }
 
+DirectX::XMFLOAT3 World::GetLocalRotationEuler(EntityId e) const
+{
+    using namespace DirectX;
+
+    if (!HasTransform(e)) return XMFLOAT3{ 0,0,0 };
+
+    const TransformComponent& t = GetTransform(e);
+    const float x = t.rotation.x;
+    const float y = t.rotation.y;
+    const float z = t.rotation.z;
+    const float w = t.rotation.w;
+
+    auto clamp = [](float v, float mn, float mx) { return (v < mn) ? mn : (v > mx) ? mx : v; };
+
+    // pitch (x)
+    float sinp = 2.0f * (w * x - z * y);
+    sinp = clamp(sinp, -1.0f, 1.0f);
+    float pitch = std::asin(sinp);
+
+    // yaw (y)
+    float siny_cosp = 2.0f * (w * y + x * z);
+    float cosy_cosp = 1.0f - 2.0f * (x * x + y * y);
+    float yaw = std::atan2(siny_cosp, cosy_cosp);
+
+    // roll (z)
+    float sinr_cosp = 2.0f * (w * z + x * y);
+    float cosr_cosp = 1.0f - 2.0f * (y * y + z * z);
+    float roll = std::atan2(sinr_cosp, cosr_cosp);
+
+    return XMFLOAT3{ pitch, yaw, roll };
+}
+
+void World::SetLocalRotationEuler(EntityId e, const DirectX::XMFLOAT3& eulerRad)
+{
+    using namespace DirectX;
+
+    if (!HasTransform(e)) return;
+
+    XMVECTOR q = XMQuaternionRotationRollPitchYaw(eulerRad.x, eulerRad.y, eulerRad.z);
+
+    TransformComponent& t = GetTransform(e);
+    XMStoreFloat4(&t.rotation, q);
+
+    MarkDirtyRecursive(e);
+}
+
 XMFLOAT3 World::GetLocalScale(EntityId e) const
 {
     if (!HasTransform(e)) return XMFLOAT3{ 1,1,1 };

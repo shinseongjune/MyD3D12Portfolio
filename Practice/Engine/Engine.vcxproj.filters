@@ -130,12 +130,6 @@
     <Filter Include="소스 파일\Scenes\Test">
       <UniqueIdentifier>{96096585-b2a2-46d6-9a4e-998c2d7862ab}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\Engine\09_UI\Image">
-      <UniqueIdentifier>{525cbb63-3eea-4aab-a74d-d2ccef09cbc4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일\Engine\09_UI\Image">
-      <UniqueIdentifier>{3d6fd2e9-30a0-4589-a9ba-ecbbda4a6d3f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="소스 파일\Engine\09_UI\Font">
       <UniqueIdentifier>{1d60edaa-097c-4bdf-9f37-0a74366103c4}</UniqueIdentifier>
     </Filter>
@@ -312,23 +306,26 @@
     <ClInclude Include="PlayScene.h">
       <Filter>헤더 파일\Scenes</Filter>
     </ClInclude>
-    <ClInclude Include="UIDrawItem.h">
-      <Filter>헤더 파일\Engine\09_UI\Image</Filter>
-    </ClInclude>
     <ClInclude Include="IFontFace.h">
       <Filter>헤더 파일\Engine\09_UI\Font\Interface</Filter>
     </ClInclude>
     <ClInclude Include="DWriteFontFace.h">
       <Filter>헤더 파일\Engine\09_UI\Font</Filter>
     </ClInclude>
-    <ClInclude Include="UIHudSystem.h">
-      <Filter>헤더 파일\Engine\09_UI</Filter>
-    </ClInclude>
     <ClInclude Include="TextRenderer.h">
       <Filter>헤더 파일\Engine\09_UI</Filter>
     </ClInclude>
     <ClInclude Include="UITextDraw.h">
       <Filter>헤더 파일\Engine\09_UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UIDrawItem.h">
+      <Filter>헤더 파일\Engine\09_UI</Filter>
+    </ClInclude>
+    <ClInclude Include="UIHudSystem.h">
+      <Filter>헤더 파일\Engine\09_UI</Filter>
+    </ClInclude>
+    <ClInclude Include="TextureCubeCpuData.h">
+      <Filter>헤더 파일\Engine\02_Assets\Texture</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

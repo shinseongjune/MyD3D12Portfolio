@@ -158,6 +158,7 @@
     <ClInclude Include="SoundHandle.h" />
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="TextRenderer.h" />
+    <ClInclude Include="TextureCubeCpuData.h" />
     <ClInclude Include="UIElementComponent.h" />
     <ClInclude Include="UIHudSystem.h" />
     <ClInclude Include="UITextDraw.h" />

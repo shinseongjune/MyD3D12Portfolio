@@ -1,5 +1,13 @@
 #include "SceneContext.h"
 
+Result<TextureHandle> SceneContext::LoadCubemapScoped(const std::array<std::string, 6>& utf8Paths)
+{
+    auto r = textures.LoadCubemap(utf8Paths);
+    if (r.IsOk())
+        scope.Track(r.value);
+    return r;
+}
+
 EntityId SceneContext::Instantiate(const std::string& name)
 {
     EntityId e = world.CreateEntity(name);
@@ -14,6 +22,15 @@ void SceneContext::Destroy(EntityId e)
     // scope에서 제거까지 굳이 안 해도 됨(중복 요청은 Flush에서 처리하면 됨)
 }
 
+Result<ModelAsset> SceneContext::ImportModel(const std::string& path, const ImportOptions& importOpt)
+{
+    auto imported = assets.ImportModel(path, importOpt);
+	if (!imported.IsOk())
+        return Result<ModelAsset>::Fail(imported.error->message);
+    
+    return imported;
+}
+
 Result<EntityId> SceneContext::SpawnModel(const std::string& path, const ImportOptions& importOpt, const SpawnModelOptions& spawnOpt)
 {
     auto imported = assets.ImportModel(path, importOpt);
@@ -24,6 +41,15 @@ Result<EntityId> SceneContext::SpawnModel(const std::string& path, const ImportO
     if (!spawned.IsOk())
         return Result<EntityId>::Fail(spawned.error->message);
 
+    scope.Track(spawned.value);
+    return spawned;
+}
+
+Result<EntityId> SceneContext::SpawnModel(const ModelAsset& asset, const SpawnModelOptions& spawnOpt)
+{
+    auto spawned = assets.InstantiateModel(world, asset, spawnOpt);
+    if (!spawned.IsOk())
+        return Result<EntityId>::Fail(spawned.error->message);
     scope.Track(spawned.value);
     return spawned;
 }

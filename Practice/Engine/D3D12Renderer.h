@@ -12,6 +12,7 @@
 #include <string>
 #include <DirectXMath.h>
 #include "IRenderer.h"
+#include "TextureCubeCpuData.h"
 
 class MeshManager;
 struct MeshCPUData;
@@ -51,6 +52,8 @@ struct TextureGPUData
     uint32_t width = 0;
     uint32_t height = 0;
     DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+
+    bool isCubemap = false;
 };
 
 struct PendingTextureRelease
@@ -73,7 +76,7 @@ class D3D12Renderer final : public IRenderer
 public:
     void Initialize(HWND hwnd, uint32_t width, uint32_t height) override;
     void Resize(uint32_t width, uint32_t height) override;
-    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text) override;
+    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam, TextureHandle skybox, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text) override;
     void RenderUI(const std::vector<UIDrawItem>& ui) override;
     void Shutdown() override;
 
@@ -116,6 +119,7 @@ private:
     // ---- Mesh GPU cache ----
     MeshGPUData& GetOrCreateGPUMesh(uint32_t meshId);
     void CreateGPUMeshFromCPU(const MeshCPUData& cpu, MeshGPUData& out);
+    void CreateGPUCubeTextureFromCPU(const TextureCubeCpuData& cpu, TextureGPUData& out);
 
     void RetireMesh(uint32_t meshId);
     void ProcessPendingMeshReleases();
@@ -135,6 +139,10 @@ private:
 
     // 기본 텍스처(slot0) 생성
     void CreateDefaultTexture_Checkerboard();
+
+	// ---- Skybox ----
+    void CreateSkyboxPipeline();
+    void CreateSkyboxMesh();
 
 private:
     static constexpr uint32_t FrameCount = 2;
@@ -270,5 +278,16 @@ private:
 
     Microsoft::WRL::ComPtr<ID3D11Resource> m_wrappedBackBuffers[FrameCount];
     Microsoft::WRL::ComPtr<ID2D1Bitmap1> m_d2dTargets[FrameCount];
+
+	// ---------------------------
+	// Skybox
+	// ---------------------------
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_skyPso;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_skyVB;
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_skyIB;
+    D3D12_VERTEX_BUFFER_VIEW m_skyVBView{};
+    D3D12_INDEX_BUFFER_VIEW  m_skyIBView{};
+    uint32_t m_skyIndexCount = 0;
 
 };

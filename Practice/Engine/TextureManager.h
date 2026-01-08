@@ -1,23 +1,30 @@
 #pragma once
 #include "TextureHandle.h"
 #include "TextureCpuData.h"
+#include "TextureCubeCPUData.h"
 #include "Utilities.h"
 #include <unordered_map>
 #include <functional>
 #include <string>
+#include <array>
 
 class TextureManager
 {
 public:
-    // 1) CPU 데이터로 직접 등록(테스트용/절차 분리용)
     TextureHandle Create(const TextureCpuData& tex);
 
-    // 2) 파일에서 로드 + 등록(보통은 이걸 씀)
     Result<TextureHandle> Load(const std::string& utf8Path,
         ImageColorSpace colorSpace = ImageColorSpace::SRGB,
         bool flipY = false);
 
+    // Cubemap load + register. Faces order: +X, -X, +Y, -Y, +Z, -Z
+    Result<TextureHandle> LoadCubemap(const std::array<std::string, 6>& utf8Paths,
+        ImageColorSpace colorSpace = ImageColorSpace::SRGB,
+        bool flipY = false);
+
     const TextureCpuData& Get(TextureHandle h) const;
+    const TextureCubeCpuData& GetCube(TextureHandle h) const;
+    bool IsCubemap(TextureHandle h) const;
     bool IsValid(TextureHandle h) const;
 
     void Destroy(TextureHandle h);
@@ -28,11 +35,11 @@ public:
 private:
     uint32_t m_nextId = 1;
 
-    // id -> CPU texture
     std::unordered_map<uint32_t, TextureCpuData> m_textures;
+    std::unordered_map<uint32_t, TextureCubeCpuData> m_cubemaps;
 
-    // (선택) path 캐시: 같은 파일은 한 번만 로드하고 같은 핸들 반환
     std::unordered_map<std::string, uint32_t> m_pathToId;
+    std::unordered_map<std::string, uint32_t> m_cubePathToId;
 
     OnDestroyCallback m_onDestroy;
 };

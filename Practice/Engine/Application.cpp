@@ -13,6 +13,7 @@
 #include "TestScene.h"
 #include "PhysicsTestScene.h"
 #endif
+#include "PlayScene.h"
 
 Application::~Application() = default;
 
@@ -42,7 +43,7 @@ void Application::Initialize(HINSTANCE hInstance)
 	// 6) 폰트/텍스트 렌더러 초기화
     
     // 7) 첫 Scene 로드
-    m_sceneManager.Load(std::make_unique<PhysicsTestScene>());
+    m_sceneManager.Load(std::make_unique<PlayScene>());
 
 	// 8) 마지막 창 크기 저장
     m_lastW = m_window.GetWidth();
@@ -225,7 +226,10 @@ void Application::RenderFrame()
     RenderCamera cam{};
     cam = BuildRenderCamera();
 
-    m_renderer->Render(m_renderItems, cam, m_uiItems, m_textItems);
+	// 스카이박스
+    TextureHandle sky = m_sceneManager.GetSkybox();
+
+    m_renderer->Render(m_renderItems, cam, sky, m_uiItems, m_textItems);
 }
 
 void Application::EndFrame()

@@ -143,6 +143,9 @@ public:
     DirectX::XMFLOAT4 GetLocalRotation(EntityId e) const; // quat
     void SetLocalRotation(EntityId e, const DirectX::XMFLOAT4& q);
 
+    DirectX::XMFLOAT3 GetLocalRotationEuler(EntityId e) const;     // (pitch, yaw, roll) radians
+    void SetLocalRotationEuler(EntityId e, const DirectX::XMFLOAT3& eulerRad);
+
     DirectX::XMFLOAT3 GetLocalScale(EntityId e) const;
     void SetLocalScale(EntityId e, const DirectX::XMFLOAT3& s);
 
