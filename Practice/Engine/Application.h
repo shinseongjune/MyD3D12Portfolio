@@ -19,6 +19,7 @@
 #include "UIHudSystem.h"
 #include "UIDrawItem.h"
 #include "UITextDraw.h"
+#include "FrameLights.h"
 
 class Application
 {
@@ -56,6 +57,8 @@ private:
     std::vector<UIDrawItem> m_uiItems;
     UIHudSystem m_uiHud;
 
+	FrameLights m_frameLights;
+
 
 public:
     Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_soundManager, m_audioSystem, m_input, m_physics, m_textItems) { }
@@ -76,4 +79,6 @@ private:
 	void UpdateSystems();                    // RenderSystem.Build °°Àº °Í
 	void RenderFrame();                      // Renderer.Render
     void EndFrame();                         // FlushDestroy
+
+    FrameLights BuildFrameLights(const RenderCamera& cam) const;
 };

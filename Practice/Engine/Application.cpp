@@ -118,6 +118,7 @@ RenderCamera Application::BuildRenderCamera() const
 
         XMStoreFloat4x4(&out.view, V);
         XMStoreFloat4x4(&out.proj, P);
+        out.positionWS = DirectX::XMFLOAT3(0.f, 0.f, -6.f);
         return out;
     }
 
@@ -127,6 +128,7 @@ RenderCamera Application::BuildRenderCamera() const
     // 2) camera pos/rot로 LookToLH 뷰 구성 (관례 꼬임 방지)
     XMFLOAT3 p = camT.position;
     XMFLOAT4 q = camT.rotation;
+    out.positionWS = p;
 
     XMVECTOR pos = XMVectorSet(p.x, p.y, p.z, 1.0f);
     XMVECTOR quat = XMVectorSet(q.x, q.y, q.z, q.w);
@@ -148,6 +150,58 @@ RenderCamera Application::BuildRenderCamera() const
     return out;
 }
 
+
+
+FrameLights Application::BuildFrameLights(const RenderCamera& cam) const
+{
+    using namespace DirectX;
+
+    FrameLights out{};
+    out.cameraPosWS = cam.positionWS;
+
+    const auto& ents = m_world.GetLightEntities();
+    const auto& dense = m_world.GetLightsDense();
+
+    const uint32_t n = (uint32_t)std::min<size_t>(ents.size(), dense.size());
+
+    for (uint32_t i = 0; i < n && out.numLights < MaxLightsPerFrame; ++i)
+    {
+        const EntityId e = ents[i];
+        const LightComponent& lc = dense[i];
+        if (!lc.enabled) continue;
+        if (!m_world.HasTransform(e)) continue;
+
+        const auto& tr = m_world.GetTransform(e);
+
+        FrameLight& L = out.lights[out.numLights++];
+        L.type = (uint32_t)lc.type;
+
+        // Color/intensity
+        L.color = lc.color;
+        L.intensity = lc.intensity;
+
+        // World-space position (translation of world matrix)
+        const XMFLOAT3 posWS = XMFLOAT3(tr.world._41, tr.world._42, tr.world._43);
+        L.positionWS = posWS;
+        L.range = lc.range;
+
+        // World-space direction: transform +Z by world matrix
+        XMMATRIX W = XMLoadFloat4x4(&tr.world);
+        XMVECTOR dir = XMVector3TransformNormal(XMVectorSet(0, 0, 1, 0), W);
+        dir = XMVector3Normalize(dir);
+        XMFLOAT3 dirWS;
+        XMStoreFloat3(&dirWS, dir);
+        L.directionWS = dirWS;
+
+        // Spot cone (cos of half angles)
+        const float innerCos = cosf(lc.innerAngleRad * 0.5f);
+        const float outerCos = cosf(lc.outerAngleRad * 0.5f);
+		L.innerCos = innerCos;
+		L.outerCos = outerCos;
+    }
+
+    return out;
+}
 void Application::Resize()
 {
     // 리사이즈 감지 (WM_SIZE에서 width/height 갱신됨)
@@ -229,7 +283,9 @@ void Application::RenderFrame()
 	// 스카이박스
     TextureHandle sky = m_sceneManager.GetSkybox();
 
-    m_renderer->Render(m_renderItems, cam, sky, m_uiItems, m_textItems);
+    m_frameLights = BuildFrameLights(cam);
+
+    m_renderer->Render(m_renderItems, cam, m_frameLights, sky, m_uiItems, m_textItems);
 }
 
 void Application::EndFrame()

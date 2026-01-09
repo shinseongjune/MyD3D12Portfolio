@@ -76,7 +76,7 @@ class D3D12Renderer final : public IRenderer
 public:
     void Initialize(HWND hwnd, uint32_t width, uint32_t height) override;
     void Resize(uint32_t width, uint32_t height) override;
-    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam, TextureHandle skybox, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text) override;
+    void Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const FrameLights& lights, TextureHandle skybox, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text) override;
     void RenderUI(const std::vector<UIDrawItem>& ui) override;
     void Shutdown() override;
 
@@ -200,9 +200,24 @@ private:
     struct DrawCB
     {
         DirectX::XMFLOAT4X4 mvp;
+        DirectX::XMFLOAT4X4 world;
         DirectX::XMFLOAT4   color;
     };
 
+
+    // Per-frame constant buffer (camera + lights)
+    struct FrameCB
+    {
+        DirectX::XMFLOAT4X4 view;
+        DirectX::XMFLOAT4X4 proj;
+        DirectX::XMFLOAT4 cameraPos_numLights; // xyz=cameraPos, w=numLights
+        // Packed lights (FrameLights.h)
+        FrameLight lights[MaxLightsPerFrame];
+    };
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> m_frameCB;
+    uint8_t* m_frameCBMapped = nullptr;
+    uint32_t  m_frameCBStride = 0;
     Microsoft::WRL::ComPtr<ID3D12Resource> m_cb;
     uint8_t* m_cbMapped = nullptr;
     uint32_t  m_cbStride = 0;

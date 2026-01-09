@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="헤더 파일\Scenes">
-      <UniqueIdentifier>{a3cf4a6f-381b-4ff6-a7ff-46116350e567}</UniqueIdentifier>
-    </Filter>
     <Filter Include="헤더 파일\Engine">
       <UniqueIdentifier>{a52c4689-d164-493d-b542-d2b2519cafeb}</UniqueIdentifier>
     </Filter>
@@ -124,9 +121,6 @@
     <Filter Include="소스 파일\Engine\07_Physics">
       <UniqueIdentifier>{a45c50e3-e81f-4313-bc1d-a092f3952447}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\Scenes\Test">
-      <UniqueIdentifier>{19863151-d8d1-4f9a-87ca-2bbd1b62502f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="소스 파일\Scenes\Test">
       <UniqueIdentifier>{96096585-b2a2-46d6-9a4e-998c2d7862ab}</UniqueIdentifier>
     </Filter>
@@ -138,6 +132,21 @@
     </Filter>
     <Filter Include="헤더 파일\Engine\09_UI\Font\Interface">
       <UniqueIdentifier>{942e8d6c-d949-4c90-97d4-358316346093}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Game">
+      <UniqueIdentifier>{ef27a31d-6181-4472-8103-faf1359dab18}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Game\Camera">
+      <UniqueIdentifier>{e9a57f32-5d04-45d8-92d9-d79e733a14a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Game\Scenes">
+      <UniqueIdentifier>{a3cf4a6f-381b-4ff6-a7ff-46116350e567}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Game\Scenes\Test">
+      <UniqueIdentifier>{19863151-d8d1-4f9a-87ca-2bbd1b62502f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\10_Light">
+      <UniqueIdentifier>{ceb484bd-f1cd-4dc1-adf5-21ed369b9c67}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -298,13 +307,13 @@
       <Filter>헤더 파일\Engine\06_World\Components</Filter>
     </ClInclude>
     <ClInclude Include="TestScene.h">
-      <Filter>헤더 파일\Scenes\Test</Filter>
+      <Filter>헤더 파일\Game\Scenes\Test</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsTestScene.h">
-      <Filter>헤더 파일\Scenes\Test</Filter>
+      <Filter>헤더 파일\Game\Scenes\Test</Filter>
     </ClInclude>
     <ClInclude Include="PlayScene.h">
-      <Filter>헤더 파일\Scenes</Filter>
+      <Filter>헤더 파일\Game\Scenes</Filter>
     </ClInclude>
     <ClInclude Include="IFontFace.h">
       <Filter>헤더 파일\Engine\09_UI\Font\Interface</Filter>
@@ -326,6 +335,12 @@
     </ClInclude>
     <ClInclude Include="TextureCubeCpuData.h">
       <Filter>헤더 파일\Engine\02_Assets\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="LightComponent.h">
+      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="FrameLights.h">
+      <Filter>헤더 파일\Engine\10_Light</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

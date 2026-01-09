@@ -12,6 +12,7 @@
 #include "ColliderComponent.h"
 #include "CollisionEvents.h"
 #include "AudioSourceComponent.h"
+#include "LightComponent.h"
 #include "UIElementComponent.h"
 
 class World
@@ -128,6 +129,14 @@ private:
 
     void EnsureAudioSourceSparseSize(uint32_t entityIndex);
 
+
+    // Light storage (dense/sparse)
+    std::vector<LightComponent>     m_lights;
+    std::vector<EntityId>           m_lightDenseEntities;
+    std::vector<uint32_t>           m_lightSparse;
+
+    void EnsureLightSparseSize(uint32_t entityIndex);
+
     // UIElement storage (dense/sparse)
     std::vector<UIElementComponent> m_uiElements;
     std::vector<EntityId>           m_uiElementDenseEntities;
@@ -184,6 +193,16 @@ public:
     void RemoveAudioSource(EntityId e);
 
     const std::vector<EntityId>& GetAudioSourceEntities() const { return m_audioSourceDenseEntities; }
+
+    // --- Light API ---
+    void AddLight(EntityId e, const LightComponent& c);
+    bool HasLight(EntityId e) const;
+    LightComponent& GetLight(EntityId e);
+    const LightComponent& GetLight(EntityId e) const;
+    void RemoveLight(EntityId e);
+
+    const std::vector<EntityId>& GetLightEntities() const { return m_lightDenseEntities; }
+    const std::vector<LightComponent>& GetLightsDense() const;
 
     // --- UIElement API ---
     void AddUIElement(EntityId e, const UIElementComponent& c);

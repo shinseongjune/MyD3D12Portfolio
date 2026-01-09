@@ -36,6 +36,7 @@ EntityId World::CreateEntity(const std::string& name)
     EnsureMeshSparseSize(index);
     EnsureMaterialSparseSize(index);
     EnsureCameraSparseSize(index);
+    EnsureLightSparseSize(index);
 
     if (!name.empty())
         m_nameToEntity[name] = e;
@@ -57,6 +58,7 @@ void World::DestroyEntity(EntityId e)
 	RemoveCollider(e);
 	RemoveRigidBody(e);
     RemoveAudioSource(e);
+    RemoveLight(e);
 
     Slot& s = m_slots[e.index];
     s.alive = false;
@@ -915,6 +917,13 @@ void World::EnsureAudioSourceSparseSize(uint32_t entityIndex)
         m_audioSourceSparse.resize(entityIndex + 1, InvalidDenseIndex);
 }
 
+
+void World::EnsureLightSparseSize(uint32_t entityIndex)
+{
+    if (m_lightSparse.size() <= entityIndex)
+        m_lightSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
 void World::AddAudioSource(EntityId e, const AudioSourceComponent& c)
 {
     if (!IsAlive(e)) return;
@@ -982,6 +991,62 @@ void World::RemoveAudioSource(EntityId e)
     m_audioSourceDenseEntities.pop_back();
     m_audioSourceSparse[e.index] = InvalidDenseIndex;
 }
+
+void World::AddLight(EntityId e, const LightComponent& c)
+{
+    EnsureLightSparseSize(e.index);
+
+    if (HasLight(e))
+    {
+        m_lights[m_lightSparse[e.index]] = c;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_lights.size();
+    m_lights.push_back(c);
+    m_lightDenseEntities.push_back(e);
+    m_lightSparse[e.index] = denseIndex;
+}
+
+bool World::HasLight(EntityId e) const
+{
+    if (e.index >= m_lightSparse.size()) return false;
+    const uint32_t denseIndex = m_lightSparse[e.index];
+    if (denseIndex == InvalidDenseIndex) return false;
+    if (denseIndex >= m_lightDenseEntities.size()) return false;
+    return m_lightDenseEntities[denseIndex].index == e.index && m_lightDenseEntities[denseIndex].generation == e.generation;
+}
+
+LightComponent& World::GetLight(EntityId e)
+{
+    return m_lights[m_lightSparse[e.index]];
+}
+
+const LightComponent& World::GetLight(EntityId e) const
+{
+    return m_lights[m_lightSparse[e.index]];
+}
+
+void World::RemoveLight(EntityId e)
+{
+    if (!HasLight(e)) return;
+
+    const uint32_t denseIndex = m_lightSparse[e.index];
+    const uint32_t last = (uint32_t)m_lights.size() - 1;
+
+    if (denseIndex != last)
+    {
+        m_lights[denseIndex] = m_lights[last];
+        m_lightDenseEntities[denseIndex] = m_lightDenseEntities[last];
+        m_lightSparse[m_lightDenseEntities[denseIndex].index] = denseIndex;
+    }
+
+    m_lights.pop_back();
+    m_lightDenseEntities.pop_back();
+    m_lightSparse[e.index] = InvalidDenseIndex;
+}
+
+const std::vector<LightComponent>& World::GetLightsDense() const { return m_lights; }
 
 void World::EnsureUIElementSparseSize(uint32_t entityIndex)
 {

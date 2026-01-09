@@ -139,6 +139,7 @@
     <ClInclude Include="ColliderComponent.h" />
     <ClInclude Include="CollisionEvents.h" />
     <ClInclude Include="DWriteFontFace.h" />
+    <ClInclude Include="FrameLights.h" />
     <ClInclude Include="IFontFace.h" />
     <ClInclude Include="ImportTypes.h" />
     <ClInclude Include="CameraComponent.h" />
@@ -151,6 +152,7 @@
     <ClInclude Include="ImportRegistry.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="IRenderer.h" />
+    <ClInclude Include="LightComponent.h" />
     <ClInclude Include="PhysicsSystem.h" />
     <ClInclude Include="PhysicsTestScene.h" />
     <ClInclude Include="PhysicsTypes.h" />

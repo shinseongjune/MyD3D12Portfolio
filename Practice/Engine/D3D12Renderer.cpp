@@ -9,6 +9,7 @@
 #include "TextureManager.h"
 #include "TextureHandle.h"
 #include "TextureCpuData.h"
+#include "FrameLights.h"
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -195,7 +196,7 @@ void D3D12Renderer::Resize(uint32_t width, uint32_t height)
     m_scissor = { 0, 0, (LONG)width, (LONG)height };
 }
 
-void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam, TextureHandle skybox, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text)
+void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCamera& cam, const FrameLights& lights, TextureHandle skybox, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text)
 {
     ProcessPendingMeshReleases();
     ProcessPendingTextureUploadReleases();
@@ -245,6 +246,25 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     XMMATRIX V = XMLoadFloat4x4(&cam.view);
     XMMATRIX P = XMLoadFloat4x4(&cam.proj);
 
+    // -------- Per-frame CB upload (camera + lights)
+    {
+        FrameCB fcb{};
+        fcb.view = cam.view;
+        fcb.proj = cam.proj;
+        fcb.cameraPos_numLights = DirectX::XMFLOAT4(
+            lights.cameraPosWS.x, lights.cameraPosWS.y, lights.cameraPosWS.z,
+            (float)lights.numLights);
+        std::memcpy(fcb.lights, lights.lights, sizeof(fcb.lights));
+
+        const uint32_t frameSlot = m_frameIndex;
+        std::memcpy(m_frameCBMapped + frameSlot * m_frameCBStride, &fcb, sizeof(FrameCB));
+
+        const D3D12_GPU_VIRTUAL_ADDRESS fcbAddr =
+            m_frameCB->GetGPUVirtualAddress() + (UINT64)frameSlot * (UINT64)m_frameCBStride;
+
+        m_commandList->SetGraphicsRootConstantBufferView(1, fcbAddr);
+    }
+
     const uint32_t maxOpaque = MaxDrawsPerFrame - 1; // 마지막 1개는 skybox용
     const uint32_t drawCount = std::min<uint32_t>((uint32_t)items.size(), maxOpaque);
     const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
@@ -257,12 +277,19 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         m_commandList->SetPipelineState(m_skyPso.Get());
         m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
 
+        // FrameCB is root parameter [1]
+        {
+            const D3D12_GPU_VIRTUAL_ADDRESS fcbAddr =
+                m_frameCB->GetGPUVirtualAddress() + (UINT64)m_frameIndex * (UINT64)m_frameCBStride;
+            m_commandList->SetGraphicsRootConstantBufferView(1, fcbAddr);
+        }
+
         // SRV (cubemap)
         const uint32_t srvIndex = GetOrCreateSrvIndex(skybox);
 
         D3D12_GPU_DESCRIPTOR_HANDLE gh = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
         gh.ptr += (SIZE_T)srvIndex * m_srvDescriptorSize;
-        m_commandList->SetGraphicsRootDescriptorTable(1, gh);
+        m_commandList->SetGraphicsRootDescriptorTable(2, gh);
 
         // view translation 제거한 viewProj
         using namespace DirectX;
@@ -274,6 +301,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
 
         DrawCB cb{};
         XMStoreFloat4x4(&cb.mvp, VP);
+        DirectX::XMStoreFloat4x4(&cb.world, DirectX::XMMatrixIdentity());
         cb.color = XMFLOAT4(1, 1, 1, 1);
 
         std::memcpy(m_cbMapped + skySlot * m_cbStride, &cb, sizeof(DrawCB));
@@ -337,7 +365,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         {
             D3D12_GPU_DESCRIPTOR_HANDLE h = srvBase;
             h.ptr += (UINT64)srvIndex * (UINT64)m_srvDescriptorSize;
-            m_commandList->SetGraphicsRootDescriptorTable(1, h);
+            m_commandList->SetGraphicsRootDescriptorTable(2, h);
             lastSrvIndex = srvIndex;
         }
 
@@ -356,6 +384,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
 
         DrawCB cb{};
         XMStoreFloat4x4(&cb.mvp, MVP);
+        XMStoreFloat4x4(&cb.world, W);
         cb.color = it.color;
 
         const uint32_t slot = frameBase + k;
@@ -410,6 +439,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
 
             DrawCB cb{};
             XMStoreFloat4x4(&cb.mvp, VP);
+            DirectX::XMStoreFloat4x4(&cb.world, DirectX::XMMatrixIdentity());
             cb.color = { 1,1,1,1 };
 
             const uint32_t debugSlot = frameBase + drawCount;
@@ -530,6 +560,29 @@ void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
     m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
     m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+    // Root[1] FrameCB (안전: UI만 단독 호출되는 경우 대비)
+    {
+        const D3D12_GPU_VIRTUAL_ADDRESS fcbAddr =
+            m_frameCB->GetGPUVirtualAddress() + (UINT64)m_frameIndex * (UINT64)m_frameCBStride;
+        m_commandList->SetGraphicsRootConstantBufferView(1, fcbAddr);
+    }
+
+    // Root[0] DrawCB (UI에서는 사용하지 않지만, 바인딩 값은 유효하게 유지)
+    {
+        const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
+        const uint32_t slot = frameBase + MaxDrawsPerFrame - 1;
+
+        DrawCB cb{};
+        DirectX::XMStoreFloat4x4(&cb.mvp, DirectX::XMMatrixIdentity());
+        DirectX::XMStoreFloat4x4(&cb.world, DirectX::XMMatrixIdentity());
+        cb.color = DirectX::XMFLOAT4(1,1,1,1);
+
+        std::memcpy(m_cbMapped + slot * m_cbStride, &cb, sizeof(DrawCB));
+        const D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
+            m_cb->GetGPUVirtualAddress() + (UINT64)slot * (UINT64)m_cbStride;
+        m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
+    }
+
     // UI VB view (프레임 슬라이스)
     D3D12_VERTEX_BUFFER_VIEW vbv{};
     vbv.BufferLocation = m_uiVB->GetGPUVirtualAddress() + (UINT64)baseVertex * (UINT64)m_uiVBStride;
@@ -553,10 +606,10 @@ void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
         {
             if (vCount == 0) return;
 
-            // SRV 바인딩 (root param 1이 SRV descriptor table인 건 기존 Render()랑 동일)
+            // SRV 바인딩 (root param 2가 SRV descriptor table)
             D3D12_GPU_DESCRIPTOR_HANDLE h = srvBase;
             h.ptr += (UINT64)srvIndex * (UINT64)m_srvDescriptorSize;
-            m_commandList->SetGraphicsRootDescriptorTable(1, h);
+            m_commandList->SetGraphicsRootDescriptorTable(2, h);
 
             // DrawInstanced: startVertexLocation은 vbv 기준
             m_commandList->DrawInstanced(vCount, 1, startV, 0);
@@ -737,14 +790,19 @@ void D3D12Renderer::CreateDepthStencil(uint32_t width, uint32_t height)
 void D3D12Renderer::CreatePipeline()
 {
     // Root Signature:
-    // [0] CBV(b0)
-    // [1] DescriptorTable(SRV t0) 1개
+    // [0] CBV(b0) : DrawCB
+    // [1] CBV(b1) : FrameCB
+    // [2] DescriptorTable(SRV t0) 1개
     // StaticSampler(s0)
-    D3D12_ROOT_PARAMETER rp[2]{};
+    D3D12_ROOT_PARAMETER rp[3]{};
 
     rp[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     rp[0].Descriptor.ShaderRegister = 0;
     rp[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+    rp[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    rp[1].Descriptor.ShaderRegister = 1;
+    rp[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     D3D12_DESCRIPTOR_RANGE range{};
     range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -752,10 +810,10 @@ void D3D12Renderer::CreatePipeline()
     range.BaseShaderRegister = 0;
     range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-    rp[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    rp[1].DescriptorTable.NumDescriptorRanges = 1;
-    rp[1].DescriptorTable.pDescriptorRanges = &range;
-    rp[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    rp[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    rp[2].DescriptorTable.NumDescriptorRanges = 1;
+    rp[2].DescriptorTable.pDescriptorRanges = &range;
+    rp[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
     D3D12_STATIC_SAMPLER_DESC ss{};
     ss.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -788,24 +846,39 @@ void D3D12Renderer::CreatePipeline()
     cbuffer DrawCB : register(b0)
     {
         row_major float4x4 mvp;
+        row_major float4x4 world;
         float4 color;
+    };
+
+    cbuffer FrameCB : register(b1)
+    {
+        row_major float4x4 view;
+        row_major float4x4 proj;
+        float4 cameraPos_numLights; // xyz=cameraPos, w=numLights
     };
 
     struct VSIn
     {
         float3 pos : POSITION;
+        float3 nrm : NORMAL;
         float2 uv  : TEXCOORD0;
     };
 
     struct VSOut
     {
-        float4 pos : SV_POSITION;
-        float2 uv  : TEXCOORD0;
+        float4 pos       : SV_POSITION;
+        float2 uv        : TEXCOORD0;
+        float3 worldPos  : TEXCOORD1;
+        float3 worldNrm  : TEXCOORD2;
     };
 
     VSOut main(VSIn i)
     {
         VSOut o;
+        float4 wp = mul(float4(i.pos, 1.0), world);
+        o.worldPos = wp.xyz;
+        // normal: use upper-left 3x3 of world, good enough for now
+        o.worldNrm = normalize(mul(i.nrm, (float3x3)world));
         o.pos = mul(float4(i.pos, 1.0), mvp);
         o.uv = i.uv;
         return o;
@@ -816,7 +889,30 @@ void D3D12Renderer::CreatePipeline()
     cbuffer DrawCB : register(b0)
     {
         row_major float4x4 mvp;
+        row_major float4x4 world;
         float4 color;
+    };
+
+    struct Light
+    {
+        uint type; // 0=Directional,1=Point,2=Spot
+        uint3 _pad0;
+        float3 positionWS;
+        float range;
+        float3 directionWS;
+        float intensity;
+        float3 color;
+        float innerCos;
+        float outerCos;
+        float3 _pad1;
+    };
+
+    cbuffer FrameCB : register(b1)
+    {
+        row_major float4x4 view;
+        row_major float4x4 proj;
+        float4 cameraPos_numLights; // xyz=cameraPos, w=numLights
+        Light lights[32];
     };
 
     Texture2D    gTex  : register(t0);
@@ -824,14 +920,64 @@ void D3D12Renderer::CreatePipeline()
 
     struct PSIn
     {
-        float4 pos : SV_POSITION;
-        float2 uv  : TEXCOORD0;
+        float4 pos       : SV_POSITION;
+        float2 uv        : TEXCOORD0;
+        float3 worldPos  : TEXCOORD1;
+        float3 worldNrm  : TEXCOORD2;
     };
+
+    float3 EvalLight(uint idx, float3 P, float3 N)
+    {
+        Light L = lights[idx];
+        float3 result = 0;
+
+        if (L.type == 0)
+        {
+            float3 dir = normalize(-L.directionWS); // direction light points *toward* surface
+            float ndl = saturate(dot(N, dir));
+            result = L.color * (L.intensity * ndl);
+        }
+        else
+        {
+            float3 toL = L.positionWS - P;
+            float dist = length(toL);
+            if (dist <= 1e-4) return 0;
+            float3 dir = toL / dist;
+            float atten = saturate(1.0 - dist / max(L.range, 1e-3));
+            atten *= atten;
+
+            if (L.type == 2)
+            {
+                float cosA = dot(dir, normalize(-L.directionWS));
+                float spot = saturate((cosA - L.outerCos) / max(L.innerCos - L.outerCos, 1e-3));
+                atten *= spot;
+            }
+
+            float ndl = saturate(dot(N, dir));
+            result = L.color * (L.intensity * ndl * atten);
+        }
+
+        return result;
+    }
 
     float4 main(PSIn i) : SV_TARGET
     {
-        float4 tex = gTex.Sample(gSamp, i.uv);
-        return tex * color;
+        float4 albedo = gTex.Sample(gSamp, i.uv) * color;
+        float3 N = normalize(i.worldNrm);
+        float3 P = i.worldPos;
+
+        float ambient = 0.12; // simple constant ambient
+        float3 lit = albedo.rgb * ambient;
+
+        uint n = (uint)cameraPos_numLights.w;
+        n = min(n, 32u);
+        [loop]
+        for (uint li = 0; li < n; ++li)
+        {
+            lit += albedo.rgb * EvalLight(li, P, N);
+        }
+
+        return float4(lit, albedo.a);
     }
     )";
 
@@ -858,7 +1004,8 @@ void D3D12Renderer::CreatePipeline()
     D3D12_INPUT_ELEMENT_DESC il[] =
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     };
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
@@ -904,6 +1051,7 @@ void D3D12Renderer::CreateDebugLinePipeline()
     cbuffer DrawCB : register(b0)
     {
         row_major float4x4 mvp;
+        row_major float4x4 world;
         float4 color;
     };
 
@@ -982,8 +1130,9 @@ void D3D12Renderer::CreateUIPipeline()
     const char* vsCode = R"(
     cbuffer DrawCB : register(b0)
     {
-        row_major float4x4 mvp; // UI에서는 사실상 안 써도 되지만, 기존 루트시그니처 재사용 위해 유지
-        float4 color;           // UI 버텍스 컬러를 쓰면 여기 color는 굳이 안 써도 됨
+        row_major float4x4 mvp;
+        row_major float4x4 world;
+        float4 color;
     };
 
     struct VSIn
@@ -1162,6 +1311,30 @@ void D3D12Renderer::CreateUIVertexBuffer()
 
 void D3D12Renderer::CreateConstantBuffer()
 {
+    // Per-frame CB (camera + lights)
+    m_frameCBStride = Align256((uint32_t)sizeof(FrameCB));
+    {
+        const uint64_t frameTotal = (uint64_t)m_frameCBStride * (uint64_t)FrameCount;
+
+        D3D12_HEAP_PROPERTIES heap{};
+        heap.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        desc.Width = frameTotal;
+        desc.Height = 1;
+        desc.DepthOrArraySize = 1;
+        desc.MipLevels = 1;
+        desc.SampleDesc.Count = 1;
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        ThrowIfFailed(m_device->CreateCommittedResource(
+            &heap, D3D12_HEAP_FLAG_NONE, &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_frameCB)));
+
+        ThrowIfFailed(m_frameCB->Map(0, nullptr, (void**)&m_frameCBMapped));
+    }
+
     m_cbStride = Align256((uint32_t)sizeof(DrawCB));
     const uint64_t totalSize =
         (uint64_t)m_cbStride * (uint64_t)MaxDrawsPerFrame * (uint64_t)FrameCount;
@@ -1231,22 +1404,24 @@ MeshGPUData& D3D12Renderer::GetOrCreateGPUMesh(uint32_t meshId)
 
 void D3D12Renderer::CreateGPUMeshFromCPU(const MeshCPUData& cpu, MeshGPUData& out)
 {
-    struct VertexPU
+    struct VertexPNU
     {
         XMFLOAT3 pos;
+        XMFLOAT3 nrm;
         XMFLOAT2 uv;
     };
 
-    std::vector<VertexPU> verts;
+    std::vector<VertexPNU> verts;
     verts.resize(cpu.positions.size());
 
     for (size_t i = 0; i < verts.size(); ++i)
     {
         verts[i].pos = cpu.positions[i];
-        verts[i].uv = (i < cpu.uvs.size()) ? cpu.uvs[i] : XMFLOAT2{ 0,0 };
+        verts[i].nrm = (i < cpu.normals.size()) ? cpu.normals[i] : XMFLOAT3{ 0,1,0 };
+        verts[i].uv  = (i < cpu.uvs.size()) ? cpu.uvs[i] : XMFLOAT2{ 0,0 };
     }
 
-    const UINT vbSize = (UINT)(verts.size() * sizeof(VertexPU));
+    const UINT vbSize = (UINT)(verts.size() * sizeof(VertexPNU));
     const UINT ibSize = (UINT)(cpu.indices.size() * sizeof(uint16_t));
 
     out.indexCount = (uint32_t)cpu.indices.size();
@@ -1275,7 +1450,7 @@ void D3D12Renderer::CreateGPUMeshFromCPU(const MeshCPUData& cpu, MeshGPUData& ou
 
     out.vbView.BufferLocation = out.vb->GetGPUVirtualAddress();
     out.vbView.SizeInBytes = vbSize;
-    out.vbView.StrideInBytes = sizeof(VertexPU);
+    out.vbView.StrideInBytes = sizeof(VertexPNU);
 
     // IB
     D3D12_RESOURCE_DESC ibDesc = vbDesc;
@@ -1712,6 +1887,7 @@ void D3D12Renderer::CreateSkyboxPipeline()
     cbuffer DrawCB : register(b0)
     {
         row_major float4x4 mvp;
+        row_major float4x4 world;
         float4 color;
     };
 
@@ -1736,6 +1912,7 @@ void D3D12Renderer::CreateSkyboxPipeline()
     cbuffer DrawCB : register(b0)
     {
         row_major float4x4 mvp;
+        row_major float4x4 world;
         float4 color;
     };
 
