@@ -13,12 +13,13 @@ class Input;
 class PhysicsSystem;
 class SoundManager;
 class AudioSystem;
+class ScriptSystem;
 
 class SceneManager
 {
 public:
-    SceneManager(World& w, AssetPipeline& ap, MeshManager& mm, TextureManager& tm, SoundManager& sm, AudioSystem& au, Input& ip, PhysicsSystem& ps, std::vector<UITextDraw>& textItems)
-		: m_world(w), m_assets(ap), m_meshes(mm), m_textures(tm), m_input(ip), m_physics(ps), m_sounds(sm), m_audio(au), m_textItems(textItems)
+    SceneManager(World& w, AssetPipeline& ap, MeshManager& mm, TextureManager& tm, SoundManager& sm, AudioSystem& au, Input& ip, PhysicsSystem& ps, std::vector<UITextDraw>& textItems, ScriptSystem& ss)
+		: m_world(w), m_assets(ap), m_meshes(mm), m_textures(tm), m_input(ip), m_physics(ps), m_sounds(sm), m_audio(au), m_textItems(textItems), m_scripts(ss)
     {
     }
 
@@ -41,6 +42,7 @@ private:
     SoundManager& m_sounds;
     AudioSystem& m_audio;
     std::vector<UITextDraw>& m_textItems;
+    ScriptSystem& m_scripts;
 
     SceneScope m_scope;
     std::unique_ptr<Scene> m_current;

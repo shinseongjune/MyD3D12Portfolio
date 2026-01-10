@@ -2,6 +2,7 @@
 #include <cassert>
 #include <algorithm>
 #include <DirectXMath.h>
+#include "Behaviour.h"
 
 using namespace DirectX;
 
@@ -45,10 +46,25 @@ EntityId World::CreateEntity(const std::string& name)
     return e;
 }
 
+bool World::IsPendingDestroy(EntityId e) const
+{
+    return std::find(m_pendingDestroy.begin(), m_pendingDestroy.end(), e) != m_pendingDestroy.end();
+}
+
 void World::DestroyEntity(EntityId e)
 {
     if (!IsAlive(e))
         return;
+
+    if (HasScript(e))
+    {
+        auto& sc = GetScript(e);
+
+        for (auto& s : sc.scripts)
+            if (s.ptr) s.ptr->OnDestroy();
+
+        RemoveScriptComponent(e);
+    }
 
     RemoveNameMapping(e);
     RemoveTransform(e);
@@ -610,6 +626,42 @@ bool World::TransformsUpdatedThisFrame() const
     return m_transformUpdatedFrame == m_frameIndex;
 }
 
+void World::EnsureScriptSparseSize(uint32_t entityIndex)
+{
+    if (m_scriptSparse.size() <= entityIndex)
+		m_scriptSparse.resize(entityIndex + 1, InvalidDenseIndex);
+}
+
+void World::RemoveScript(EntityId e, Behaviour* which)
+{
+    if (!IsAlive(e) || !which) return;
+    if (!HasScript(e)) return;
+
+    auto& sc = GetScript(e);
+    sc.pendingRemove.push_back({ which });
+}
+
+void World::RemoveScriptComponent(EntityId e)
+{
+    if (!HasScript(e)) return;
+
+    const uint32_t di = m_scriptSparse[e.index];
+    const uint32_t last = (uint32_t)m_scripts.size() - 1;
+
+    if (di != last)
+    {
+        m_scripts[di] = std::move(m_scripts[last]);
+        m_scriptDenseEntities[di] = m_scriptDenseEntities[last];
+
+        EntityId moved = m_scriptDenseEntities[di];
+        m_scriptSparse[moved.index] = di;
+    }
+
+    m_scripts.pop_back();
+    m_scriptDenseEntities.pop_back();
+    m_scriptSparse[e.index] = InvalidDenseIndex;
+}
+
 XMFLOAT3 World::GetLocalPosition(EntityId e) const
 {
     if (!HasTransform(e)) return XMFLOAT3{ 0,0,0 };
@@ -911,6 +963,117 @@ void World::DrainCollisionEvents(std::vector<CollisionEvent>& out)
     out.swap(m_collisionEvents); // 빠르게 넘기고 내부 비움
 }
 
+ScriptComponent& World::EnsureScriptComponent(EntityId e)
+{
+    EnsureScriptSparseSize(e.index);
+
+    uint32_t di = m_scriptSparse[e.index];
+    if (di != InvalidDenseIndex)
+        return m_scripts[di];
+
+    di = (uint32_t)m_scripts.size();
+    m_scriptSparse[e.index] = di;
+    m_scriptDenseEntities.push_back(e);
+    m_scripts.emplace_back();          // empty ScriptComponent
+    return m_scripts.back();
+}
+
+void World::AddScript(EntityId e, std::unique_ptr<Behaviour> b, bool enabled)
+{
+    if (!IsAlive(e) || !b) return;
+
+    b->_SetEntity(e);
+
+    auto& sc = EnsureScriptComponent(e);
+    sc.pendingAdd.push_back({ std::move(b), enabled });
+}
+
+bool World::HasScript(EntityId e) const
+{
+    if (!IsAlive(e)) return false;
+    if (e.index >= m_scriptSparse.size()) return false;
+
+    const uint32_t di = m_scriptSparse[e.index];
+    if (di == InvalidDenseIndex) return false;
+    if (di >= m_scriptDenseEntities.size()) return false;
+	return m_scriptDenseEntities[di] == e;
+}
+
+ScriptComponent& World::GetScript(EntityId e)
+{
+    #if defined(_DEBUG)
+	assert(HasScript(e));
+    #endif
+    const uint32_t denseIndex = m_scriptSparse[e.index];
+	return m_scripts[denseIndex];
+}
+
+void World::FlushScripts()
+{
+    // ScriptComponent를 가진 엔티티만 순회
+    for (size_t di = 0; di < m_scripts.size(); ++di)
+    {
+        EntityId e = m_scriptDenseEntities[di];
+        if (!IsAlive(e)) continue;
+        if (IsPendingDestroy(e)) continue;
+
+        auto& sc = m_scripts[di];
+
+        // 1) pendingRemove 처리 (OnDestroy 1회 보장)
+        if (!sc.pendingRemove.empty())
+        {
+            for (auto& r : sc.pendingRemove)
+            {
+                Behaviour* target = r.ptr;
+                if (!target) continue;
+
+                for (size_t i = 0; i < sc.scripts.size(); ++i)
+                {
+                    auto& entry = sc.scripts[i];
+                    if (entry.ptr.get() != target) continue;
+
+                    // Unity는 RemoveComponent면 OnDestroy 호출됨.
+                    entry.ptr->OnDestroy();
+
+                    // swap-remove로 안전하게 제거
+                    const size_t last = sc.scripts.size() - 1;
+                    if (i != last) sc.scripts[i] = std::move(sc.scripts[last]);
+                    sc.scripts.pop_back();
+                    break;
+                }
+            }
+            sc.pendingRemove.clear();
+        }
+
+        // 2) pendingAdd 처리
+        if (!sc.pendingAdd.empty())
+        {
+            sc.scripts.reserve(sc.scripts.size() + sc.pendingAdd.size());
+            for (auto& a : sc.pendingAdd)
+            {
+                if (!a.ptr) continue;
+                ScriptEntry se;
+                se.ptr = std::move(a.ptr);
+                se.enabled = a.enabled;
+                // awoken/started = false로 시작 → 다음 프레임에 Awake/Start 보장
+                sc.scripts.push_back(std::move(se));
+            }
+            sc.pendingAdd.clear();
+        }
+
+        // scripts도 비고, pending도 비면 ScriptComponent 제거
+        if (sc.scripts.empty() && sc.pendingAdd.empty())
+        {
+            RemoveScriptComponent(e);
+
+            // RemoveScriptComponent가 swap-remove를 하니까,
+            // 현재 di에는 다른 엔티티가 들어왔을 수 있음 -> di-- 해서 재검사
+            --di;
+            continue;
+        }
+    }
+}
+
 void World::EnsureAudioSourceSparseSize(uint32_t entityIndex)
 {
     if (m_audioSourceSparse.size() <= entityIndex)
@@ -994,6 +1157,7 @@ void World::RemoveAudioSource(EntityId e)
 
 void World::AddLight(EntityId e, const LightComponent& c)
 {
+	if (!IsAlive(e)) return;
     EnsureLightSparseSize(e.index);
 
     if (HasLight(e))

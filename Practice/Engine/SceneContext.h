@@ -11,12 +11,11 @@
 #include "Utilities.h"
 #include "Input.h"
 #include "SoundManager.h"
-#include "SoundImporterMF.h"
 #include "SoundHandle.h"
 #include "AudioSystem.h"
-#include "AudioCommand.h"
 #include "TextureHandle.h"
 #include "UITextDraw.h"
+#include "Behaviour.h"
 
 class PhysicsSystem;
 
@@ -89,5 +88,14 @@ struct SceneContext
                   float sizePx = 16.0f,
                   const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4(1, 1, 1, 1),
                   const std::wstring& fontFamily = L"Segoe UI");
+
+    template<class T, class... Args>
+    T& AddScript(EntityId e, Args&&... args)
+    {
+        auto p = std::make_unique<T>(std::forward<Args>(args)...);
+        T& ref = *p;
+        world.AddScript(e, std::move(p));
+        return ref;
+    }
 
 };

@@ -1,4 +1,5 @@
 #include "SceneContext.h"
+#include "SoundImporterMF.h"
 
 Result<TextureHandle> SceneContext::LoadCubemapScoped(const std::array<std::string, 6>& utf8Paths)
 {

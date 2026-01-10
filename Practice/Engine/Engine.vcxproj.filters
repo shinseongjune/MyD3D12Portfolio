@@ -55,9 +55,6 @@
     <Filter Include="헤더 파일\Engine\06_World">
       <UniqueIdentifier>{5a749e4f-4d79-410f-84d5-085f86264447}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\Engine\06_World\Components">
-      <UniqueIdentifier>{e33cda14-6f97-42e4-ab27-f422b84530f8}</UniqueIdentifier>
-    </Filter>
     <Filter Include="헤더 파일\Engine\07_Physics">
       <UniqueIdentifier>{59120faf-2462-4a0c-ba40-0fc45cbece34}</UniqueIdentifier>
     </Filter>
@@ -148,6 +145,15 @@
     <Filter Include="헤더 파일\Engine\10_Light">
       <UniqueIdentifier>{ceb484bd-f1cd-4dc1-adf5-21ed369b9c67}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\Engine\06_World\Components">
+      <UniqueIdentifier>{5203647d-5574-495e-8eb4-647176fb7540}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\06_World\Components\DefaultComponents">
+      <UniqueIdentifier>{e33cda14-6f97-42e4-ab27-f422b84530f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\06_World\Components\Behavior">
+      <UniqueIdentifier>{a2a7d217-e474-480a-bcd5-31bc95c35225}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -196,16 +202,16 @@
       <Filter>헤더 파일\Engine\04_Render\Interface</Filter>
     </ClInclude>
     <ClInclude Include="CameraComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="MaterialComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="MeshComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="TransformComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="RenderCamera.h">
       <Filter>헤더 파일\Engine\04_Render</Filter>
@@ -250,10 +256,10 @@
       <Filter>헤더 파일\Engine\07_Physics</Filter>
     </ClInclude>
     <ClInclude Include="RigidBodyComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="ColliderComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsSystem.h">
       <Filter>헤더 파일\Engine\05_Systems</Filter>
@@ -295,7 +301,7 @@
       <Filter>헤더 파일\Engine\02_Assets\Sound</Filter>
     </ClInclude>
     <ClInclude Include="AudioSourceComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="AudioCommand.h">
       <Filter>헤더 파일\Engine\05_Systems</Filter>
@@ -304,7 +310,7 @@
       <Filter>헤더 파일\Engine\05_Systems</Filter>
     </ClInclude>
     <ClInclude Include="UIElementComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="TestScene.h">
       <Filter>헤더 파일\Game\Scenes\Test</Filter>
@@ -337,10 +343,19 @@
       <Filter>헤더 파일\Engine\02_Assets\Texture</Filter>
     </ClInclude>
     <ClInclude Include="LightComponent.h">
-      <Filter>헤더 파일\Engine\06_World\Components</Filter>
+      <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="FrameLights.h">
       <Filter>헤더 파일\Engine\10_Light</Filter>
+    </ClInclude>
+    <ClInclude Include="Behaviour.h">
+      <Filter>헤더 파일\Engine\06_World\Components\Behavior</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptComponent.h">
+      <Filter>헤더 파일\Engine\06_World\Components\Behavior</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptSystem.h">
+      <Filter>헤더 파일\Engine\05_Systems</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -427,6 +442,9 @@
     </ClCompile>
     <ClCompile Include="UIHudSystem.cpp">
       <Filter>소스 파일\Engine\09_UI</Filter>
+    </ClCompile>
+    <ClCompile Include="ScriptSystem.cpp">
+      <Filter>소스 파일\Engine\05_Systems</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

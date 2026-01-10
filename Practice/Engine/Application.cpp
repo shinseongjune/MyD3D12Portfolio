@@ -290,6 +290,8 @@ void Application::RenderFrame()
 
 void Application::EndFrame()
 {
+	// 지연 파괴된 스크립트 실제 삭제
+    m_world.FlushScripts();
     // 지연 파괴된 Entity 실제 삭제
     m_world.FlushDestroy();
 }

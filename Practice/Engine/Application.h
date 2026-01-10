@@ -20,6 +20,7 @@
 #include "UIDrawItem.h"
 #include "UITextDraw.h"
 #include "FrameLights.h"
+#include "ScriptSystem.h"
 
 class Application
 {
@@ -49,6 +50,7 @@ private:
     AudioSystem  m_audioSystem;
     Input m_input;
     std::vector<UITextDraw> m_textItems;
+	ScriptSystem m_scriptSystem;
 
     SceneManager m_sceneManager;
 
@@ -61,7 +63,7 @@ private:
 
 
 public:
-    Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_soundManager, m_audioSystem, m_input, m_physics, m_textItems) { }
+    Application() : m_pipeline(m_registry, m_meshManager), m_sceneManager(m_world, m_pipeline, m_meshManager, m_textureManager, m_soundManager, m_audioSystem, m_input, m_physics, m_textItems, m_scriptSystem) { }
 
     ~Application();
 

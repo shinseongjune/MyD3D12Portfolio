@@ -462,7 +462,16 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
 	// --- UI ---
     RenderUI(ui);
 
-    // (Skip RT->Present here; Direct2D overlay will transition to PRESENT)
+    if (text.empty())
+    {
+        D3D12_RESOURCE_BARRIER b{};
+        b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        b.Transition.pResource = m_renderTargets[m_frameIndex].Get();
+        b.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+        b.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+        b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        m_commandList->ResourceBarrier(1, &b);
+    }
 
     ThrowIfFailed(m_commandList->Close());
 
@@ -472,6 +481,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     ID3D12CommandList* lists[] = { m_commandList.Get() };
     m_commandQueue->ExecuteCommandLists(1, lists);
 
+    // (Direct2D overlay will transition to PRESENT if 'text' is not empty)
     DrawTextOverlay(text);
 
     ThrowIfFailed(m_swapChain->Present(1, 0));
@@ -1995,7 +2005,7 @@ void D3D12Renderer::CreateSkyboxPipeline()
     pso.SampleMask = UINT_MAX;
     pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     pso.NumRenderTargets = 1;
-    pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    pso.RTVFormats[0] = DXGI_FORMAT_B8G8R8A8_UNORM;
     pso.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     pso.SampleDesc.Count = 1;
 

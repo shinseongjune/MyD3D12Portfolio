@@ -14,6 +14,7 @@
 #include "AudioSourceComponent.h"
 #include "LightComponent.h"
 #include "UIElementComponent.h"
+#include "ScriptComponent.h"
 
 class World
 {
@@ -144,6 +145,13 @@ private:
 
     void EnsureUIElementSparseSize(uint32_t entityIndex);
 
+	// Script storage (dense/sparse)
+    std::vector<ScriptComponent>    m_scripts;
+    std::vector<EntityId>           m_scriptDenseEntities;
+    std::vector<uint32_t>           m_scriptSparse;
+    void EnsureScriptSparseSize(uint32_t entityIndex);
+	void RemoveScript(EntityId e, Behaviour* which);
+
 public:
     // --- Transform Public API ---
     DirectX::XMFLOAT3 GetLocalPosition(EntityId e) const;
@@ -244,4 +252,13 @@ public:
     void PushCollisionEvent(const CollisionEvent& ev);
     void DrainCollisionEvents(std::vector<CollisionEvent>& out); // out으로 옮기고 내부 비움
 
+	// --- Script API ---
+    ScriptComponent& EnsureScriptComponent(EntityId e);
+    void AddScript(EntityId e, std::unique_ptr<Behaviour> b, bool enabled = true);
+    bool HasScript(EntityId e) const;
+    ScriptComponent& GetScript(EntityId e);
+    const std::vector<EntityId>& GetScriptEntities() const { return m_scriptDenseEntities; }
+    void FlushScripts();
+    void RemoveScriptComponent(EntityId e);
+    bool IsPendingDestroy(EntityId e) const;
 };

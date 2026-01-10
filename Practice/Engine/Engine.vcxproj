@@ -136,6 +136,7 @@
     <ClInclude Include="AudioCommand.h" />
     <ClInclude Include="AudioSourceComponent.h" />
     <ClInclude Include="AudioSystem.h" />
+    <ClInclude Include="Behaviour.h" />
     <ClInclude Include="ColliderComponent.h" />
     <ClInclude Include="CollisionEvents.h" />
     <ClInclude Include="DWriteFontFace.h" />
@@ -157,6 +158,8 @@
     <ClInclude Include="PhysicsTestScene.h" />
     <ClInclude Include="PhysicsTypes.h" />
     <ClInclude Include="PlayScene.h" />
+    <ClInclude Include="ScriptComponent.h" />
+    <ClInclude Include="ScriptSystem.h" />
     <ClInclude Include="SoundHandle.h" />
     <ClInclude Include="SoundManager.h" />
     <ClInclude Include="TextRenderer.h" />
@@ -171,6 +174,7 @@
     <ClInclude Include="SoundClip.h" />
     <ClCompile Include="DWriteFontFace.cpp" />
     <ClCompile Include="PlayScene.cpp" />
+    <ClCompile Include="ScriptSystem.cpp" />
     <ClCompile Include="SoundImporterMF.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
