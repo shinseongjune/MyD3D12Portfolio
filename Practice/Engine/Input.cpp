@@ -1,51 +1,69 @@
 #include "Input.h"
-#include <Windows.h>
 #include <cstring>
 
 static int ToVK(Key k)
 {
-    switch (k)
-    {
-    case Key::W: return 'W';
-    case Key::A: return 'A';
-    case Key::S: return 'S';
-    case Key::D: return 'D';
-    case Key::Q: return 'Q';
-    case Key::E: return 'E';
-	case Key::R: return 'R';
-	case Key::G: return 'G';
-    case Key::Up: return VK_UP;
-    case Key::Down: return VK_DOWN;
-    case Key::Left: return VK_LEFT;
-    case Key::Right: return VK_RIGHT;
-    case Key::Escape: return VK_ESCAPE;
-	case Key::Space: return VK_SPACE;
-    }
-    return 0;
+    return static_cast<int>(k);
 }
 
-void Input::Update()
+void Input::BeginFrame()
 {
-    memcpy(s_prev, s_curr, sizeof(s_curr));
-
-    for (int i = 0; i < 256; ++i)
-        s_curr[i] = (GetAsyncKeyState(i) & 0x8000) != 0;
+    m_mouseDX = 0;
+    m_mouseDY = 0;
 }
+
+void Input::EndFrame()
+{
+    memcpy(m_prev, m_curr, sizeof(m_curr));
+    memcpy(m_mousePrev, m_mouseCurr, sizeof(m_mouseCurr));
+}
+
+void Input::Clear()
+{
+    memset(m_curr, 0, sizeof(m_curr));
+    memset(m_prev, 0, sizeof(m_prev));
+    memset(m_mouseCurr, 0, sizeof(m_mouseCurr));
+    memset(m_mousePrev, 0, sizeof(m_mousePrev));
+    m_mouseDX = m_mouseDY = 0;
+}
+
+void Input::OnKeyDown(uint32_t vk, bool isRepeat)
+{
+    if (vk < 256)
+        m_curr[vk] = true;
+}
+
+void Input::OnKeyUp(uint32_t vk)
+{
+    if (vk < 256)
+        m_curr[vk] = false;
+}
+
+void Input::OnMouseMove(int x, int y)
+{
+    m_mouseDX += (x - m_mouseX);
+    m_mouseDY += (y - m_mouseY);
+    m_mouseX = x;
+    m_mouseY = y;
+}
+
+void Input::OnMouseButtonDown(int btn) { if (btn < 8) m_mouseCurr[btn] = true; }
+void Input::OnMouseButtonUp(int btn) { if (btn < 8) m_mouseCurr[btn] = false; }
 
 bool Input::IsKeyDown(Key k) const
 {
     int vk = ToVK(k);
-    return vk ? s_curr[vk] : false;
+    return vk ? m_curr[vk] : false;
 }
 
 bool Input::IsKeyPressed(Key k) const
 {
     int vk = ToVK(k);
-    return vk ? (s_curr[vk] && !s_prev[vk]) : false;
+    return vk ? (m_curr[vk] && !m_prev[vk]) : false;
 }
 
 bool Input::IsKeyReleased(Key k) const
 {
     int vk = ToVK(k);
-    return vk ? (!s_curr[vk] && s_prev[vk]) : false;
+    return vk ? (!m_curr[vk] && m_prev[vk]) : false;
 }

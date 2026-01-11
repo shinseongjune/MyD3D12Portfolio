@@ -1,4 +1,6 @@
 #include "Win32Window.h"
+#include <windowsx.h>
+#include "Input.h"
 
 bool Win32Window::RegisterWindowClass()
 {
@@ -115,6 +117,35 @@ LRESULT Win32Window::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 {
     switch (msg)
     {
+    case WM_KILLFOCUS:
+        if (m_input) m_input->Clear(); // 포커스 잃으면 눌림 상태 초기화
+        return 0;
+
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+        if (m_input)
+        {
+            const bool isRepeat = (lParam & (1 << 30)) != 0;
+            m_input->OnKeyDown((uint32_t)wParam, isRepeat);
+        }
+        return 0;
+
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+        if (m_input) m_input->OnKeyUp((uint32_t)wParam);
+        return 0;
+
+    case WM_MOUSEMOVE:
+        if (m_input)
+        {
+            int x = GET_X_LPARAM(lParam);
+            int y = GET_Y_LPARAM(lParam);
+            m_input->OnMouseMove(x, y);
+        }
+        return 0;
+
+    case WM_LBUTTONDOWN: if (m_input) m_input->OnMouseButtonDown(0); return 0;
+    case WM_LBUTTONUP:   if (m_input) m_input->OnMouseButtonUp(0);   return 0;
     case WM_SIZE:
     {
         // 최소화 등에서도 들어오므로 0일 수 있음

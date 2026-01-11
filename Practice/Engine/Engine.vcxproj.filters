@@ -64,9 +64,6 @@
     <Filter Include="헤더 파일\Engine\09_UI">
       <UniqueIdentifier>{01c32b3f-7bc2-462f-aad4-3aac53ffec88}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\Scenes">
-      <UniqueIdentifier>{9b44784b-39fb-4ba3-a84d-1aaec1b942e5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="소스 파일\Engine">
       <UniqueIdentifier>{a296d923-0521-4bf5-98ef-ac6fec2ef426}</UniqueIdentifier>
     </Filter>
@@ -118,9 +115,6 @@
     <Filter Include="소스 파일\Engine\07_Physics">
       <UniqueIdentifier>{a45c50e3-e81f-4313-bc1d-a092f3952447}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\Scenes\Test">
-      <UniqueIdentifier>{96096585-b2a2-46d6-9a4e-998c2d7862ab}</UniqueIdentifier>
-    </Filter>
     <Filter Include="소스 파일\Engine\09_UI\Font">
       <UniqueIdentifier>{1d60edaa-097c-4bdf-9f37-0a74366103c4}</UniqueIdentifier>
     </Filter>
@@ -133,15 +127,6 @@
     <Filter Include="헤더 파일\Game">
       <UniqueIdentifier>{ef27a31d-6181-4472-8103-faf1359dab18}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\Game\Camera">
-      <UniqueIdentifier>{e9a57f32-5d04-45d8-92d9-d79e733a14a1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\Game\Scenes">
-      <UniqueIdentifier>{a3cf4a6f-381b-4ff6-a7ff-46116350e567}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="헤더 파일\Game\Scenes\Test">
-      <UniqueIdentifier>{19863151-d8d1-4f9a-87ca-2bbd1b62502f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="헤더 파일\Engine\10_Light">
       <UniqueIdentifier>{ceb484bd-f1cd-4dc1-adf5-21ed369b9c67}</UniqueIdentifier>
     </Filter>
@@ -153,6 +138,36 @@
     </Filter>
     <Filter Include="헤더 파일\Engine\06_World\Components\Behavior">
       <UniqueIdentifier>{a2a7d217-e474-480a-bcd5-31bc95c35225}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Engine\11_Input">
+      <UniqueIdentifier>{b8dd875e-80f6-457c-b6ea-34addc5d74fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\10_Light">
+      <UniqueIdentifier>{9c898034-0257-43fe-a120-40384e4e988d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Engine\11_Input">
+      <UniqueIdentifier>{17b107a6-1eb9-4998-91b0-7dbf87ffa79d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Game\01_Scenes">
+      <UniqueIdentifier>{a3cf4a6f-381b-4ff6-a7ff-46116350e567}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Game\01_Scenes\Test">
+      <UniqueIdentifier>{19863151-d8d1-4f9a-87ca-2bbd1b62502f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\Game\02_Camera">
+      <UniqueIdentifier>{e9a57f32-5d04-45d8-92d9-d79e733a14a1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game">
+      <UniqueIdentifier>{b795a033-2ffd-4f8f-9d7b-5f1547c2c6f2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game\01_Scenes">
+      <UniqueIdentifier>{9b44784b-39fb-4ba3-a84d-1aaec1b942e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game\01_Scenes\Test">
+      <UniqueIdentifier>{96096585-b2a2-46d6-9a4e-998c2d7862ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game\02_Camera">
+      <UniqueIdentifier>{f9a30d45-bcb5-4729-a635-90fc2f1df1dc}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -215,9 +230,6 @@
     </ClInclude>
     <ClInclude Include="RenderCamera.h">
       <Filter>헤더 파일\Engine\04_Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Input.h">
-      <Filter>헤더 파일\Engine\01_Core</Filter>
     </ClInclude>
     <ClInclude Include="DebugDraw.h">
       <Filter>헤더 파일\Engine\00_Debug</Filter>
@@ -313,13 +325,13 @@
       <Filter>헤더 파일\Engine\06_World\Components\DefaultComponents</Filter>
     </ClInclude>
     <ClInclude Include="TestScene.h">
-      <Filter>헤더 파일\Game\Scenes\Test</Filter>
+      <Filter>헤더 파일\Game\01_Scenes\Test</Filter>
     </ClInclude>
     <ClInclude Include="PhysicsTestScene.h">
-      <Filter>헤더 파일\Game\Scenes\Test</Filter>
+      <Filter>헤더 파일\Game\01_Scenes\Test</Filter>
     </ClInclude>
     <ClInclude Include="PlayScene.h">
-      <Filter>헤더 파일\Game\Scenes</Filter>
+      <Filter>헤더 파일\Game\01_Scenes</Filter>
     </ClInclude>
     <ClInclude Include="IFontFace.h">
       <Filter>헤더 파일\Engine\09_UI\Font\Interface</Filter>
@@ -357,6 +369,12 @@
     <ClInclude Include="ScriptSystem.h">
       <Filter>헤더 파일\Engine\05_Systems</Filter>
     </ClInclude>
+    <ClInclude Include="Input.h">
+      <Filter>헤더 파일\Engine\11_Input</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraRig.h">
+      <Filter>헤더 파일\Game\02_Camera</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -376,9 +394,6 @@
     </ClCompile>
     <ClCompile Include="D3D12Renderer.cpp">
       <Filter>소스 파일\Engine\04_Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Input.cpp">
-      <Filter>소스 파일\Engine\01_Core</Filter>
     </ClCompile>
     <ClCompile Include="MeshManager.cpp">
       <Filter>소스 파일\Engine\04_Render\Mesh</Filter>
@@ -429,13 +444,13 @@
       <Filter>소스 파일\Engine\02_Assets\Sound</Filter>
     </ClCompile>
     <ClCompile Include="PhysicsTestScene.cpp">
-      <Filter>소스 파일\Scenes\Test</Filter>
+      <Filter>소스 파일\Game\01_Scenes\Test</Filter>
     </ClCompile>
     <ClCompile Include="TestScene.cpp">
-      <Filter>소스 파일\Scenes\Test</Filter>
+      <Filter>소스 파일\Game\01_Scenes\Test</Filter>
     </ClCompile>
     <ClCompile Include="PlayScene.cpp">
-      <Filter>소스 파일\Scenes</Filter>
+      <Filter>소스 파일\Game\01_Scenes</Filter>
     </ClCompile>
     <ClCompile Include="DWriteFontFace.cpp">
       <Filter>소스 파일\Engine\09_UI\Font</Filter>
@@ -445,6 +460,12 @@
     </ClCompile>
     <ClCompile Include="ScriptSystem.cpp">
       <Filter>소스 파일\Engine\05_Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="Input.cpp">
+      <Filter>소스 파일\Engine\11_Input</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraRig.cpp">
+      <Filter>소스 파일\Game\02_Camera</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

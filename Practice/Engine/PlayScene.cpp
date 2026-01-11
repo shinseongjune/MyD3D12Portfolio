@@ -26,7 +26,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
 
 	// 테스트 인스턴스 생성
 	SpawnModelOptions spawnOpt{};
-	spawnOpt.name = "SpaceFighter";
+	spawnOpt.name = "Player";
 	auto spawned_spacefighter = ctx.SpawnModel(res_model_spacefighter.value, spawnOpt);
 	if (!spawned_spacefighter.IsOk())
 	{
@@ -37,6 +37,8 @@ void PlayScene::OnLoad(SceneContext& ctx)
 	ctx.world.AddMaterial(fighter, mat_spacefighter);
 	ctx.world.SetLocalPosition(fighter, { 0.0f, 0.0f, 0.0f });
 
+	m_player = fighter;
+
 	// Camera
 	{
 		EntityId cam = ctx.Instantiate("MainCamera");
@@ -46,6 +48,11 @@ void PlayScene::OnLoad(SceneContext& ctx)
 
 		ctx.world.SetLocalPosition(cam, { 0.f, 0.f, -6.f });
 		ctx.world.GetCamera(cam).active = true;
+		m_cam = cam;
+
+		m_cameraRig.SetCamera(m_cam);
+		m_cameraRig.SetTarget(fighter);
+		m_cameraRig.SetFollowEnabled(true);
 	}
 }
 
@@ -55,21 +62,10 @@ void PlayScene::OnUnload(SceneContext& ctx)
 
 void PlayScene::OnUpdate(SceneContext& ctx)
 {
-	// test camera control
-	EntityId cam = ctx.world.FindActiveCamera();
-	if (!ctx.world.IsAlive(cam)) return;
+	BuildShooterCommands(ctx.input, m_cmds);
 
-	const float speed = 3.0f * ctx.dt;
-
-	XMFLOAT3 delta{ 0,0,0 };
-	if (ctx.input.IsKeyDown(Key::W)) delta.z += speed;
-	if (ctx.input.IsKeyDown(Key::S)) delta.z -= speed;
-	if (ctx.input.IsKeyDown(Key::A)) delta.x -= speed;
-	if (ctx.input.IsKeyDown(Key::D)) delta.x += speed;
-	if (ctx.input.IsKeyDown(Key::Q)) delta.y -= speed;
-	if (ctx.input.IsKeyDown(Key::E)) delta.y += speed;
-
-	ctx.world.TranslateLocal(cam, delta);
+	ExecuteCommand(ctx);
+	m_cameraRig.Update(ctx.world, ctx.dt);
 }
 
 void PlayScene::SetSkybox(SceneContext& ctx)
@@ -134,17 +130,18 @@ Result<ModelAsset> PlayScene::ImportModel(SceneContext& ctx, const std::string& 
 	importOpt.uniformScale = 1.0f;
 
 	auto imported = ctx.ImportModel(path, importOpt);
+#if defined(_DEBUG)
 	if (!imported.IsOk())
 	{
 		LOG_ERROR("Failed to import %s: %s", path, imported.error->message.c_str());
 	}
+#endif
 	return imported;
 }
 
 TextureHandle PlayScene::LoadTexture(SceneContext& ctx, const std::string& path)
 {
-	auto tex_res = LoadTextureRGBA8_WIC("Assets/Texture/space_fighter_diffuse.png",
-		ImageColorSpace::SRGB, /*flipY=*/false);
+	auto tex_res = LoadTextureRGBA8_WIC(path, ImageColorSpace::SRGB, /*flipY=*/false);
 	TextureHandle tex{};
 	if (tex_res.IsOk())
 	{
@@ -152,9 +149,10 @@ TextureHandle PlayScene::LoadTexture(SceneContext& ctx, const std::string& path)
 	}
 	else
 	{
+#if defined(_DEBUG)
 		LOG_ERROR("Failed to load texture: %s", tex_res.error->message.c_str());
 	}
-
+#endif
 	return tex;
 }
 
@@ -169,4 +167,23 @@ MaterialComponent PlayScene::CreateMaterial(SceneContext& ctx, const TextureHand
 	}
 
 	return mat;
+}
+
+void PlayScene::ExecuteCommand(SceneContext& ctx)
+{
+	for (const auto& cmd : m_cmds)
+	{
+		switch (cmd.action)
+		{
+		case ShooterAction::Move:
+			break;
+		case ShooterAction::FireGun:
+			break;
+		case ShooterAction::FireMissile:
+			break;
+		case ShooterAction::CameraLook:
+			m_cameraRig.OnLook(cmd.camX, cmd.camY);
+			break;
+		}
+	}
 }

@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <Windows.h>
 
+class Input;
+
 class Win32Window
 {
 public:
@@ -24,6 +26,8 @@ public:
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
 
+    void SetInput(Input* in) { m_input = in; }
+
 private:
     static LRESULT CALLBACK StaticWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
     LRESULT HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -39,4 +43,6 @@ private:
 
     uint32_t m_width = 1280;
     uint32_t m_height = 720;
+
+    Input* m_input;
 };

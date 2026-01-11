@@ -22,6 +22,7 @@ void Application::Initialize(HINSTANCE hInstance)
     // 1) 창 만들기
     if (!m_window.Create(hInstance, L"Engine", 1280, 720))
         throw std::runtime_error("Failed to create window.");
+	m_window.SetInput(&m_input); // 입력 시스템 연결
 
     // 2) time 초기화
     Time::Initialize();
@@ -231,7 +232,7 @@ void Application::BeginFrame()
     m_textItems.clear();
 
     // Input 갱신
-    m_input.Update();
+    m_input.BeginFrame();
 }
 
 void Application::UpdateScene(const double dt)
@@ -294,5 +295,8 @@ void Application::EndFrame()
     m_world.FlushScripts();
     // 지연 파괴된 Entity 실제 삭제
     m_world.FlushDestroy();
+
+	// Input 정리
+	m_input.EndFrame();
 }
 

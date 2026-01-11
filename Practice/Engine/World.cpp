@@ -687,10 +687,27 @@ XMFLOAT4 World::GetLocalRotation(EntityId e) const
 
 void World::SetLocalRotation(EntityId e, const XMFLOAT4& q)
 {
+    using namespace DirectX;
+
     if (!HasTransform(e)) return;
 
+    // Normalize to avoid drift / invalid rotations
+    XMVECTOR vq = XMLoadFloat4(&q);
+
+    // If near-zero length, fall back to identity
+    float lsq = XMVectorGetX(XMVector4LengthSq(vq));
+    if (lsq < 1e-8f)
+    {
+        TransformComponent& t = GetTransform(e);
+        t.rotation = XMFLOAT4{ 0.f, 0.f, 0.f, 1.f };
+        MarkDirtyRecursive(e);
+        return;
+    }
+
+    vq = XMQuaternionNormalize(vq);
+
     TransformComponent& t = GetTransform(e);
-    t.rotation = q;
+    XMStoreFloat4(&t.rotation, vq);
     MarkDirtyRecursive(e);
 }
 
