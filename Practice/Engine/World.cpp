@@ -596,6 +596,27 @@ void World::UpdateWorldRecursive(EntityId e, const DirectX::XMMATRIX& parentWorl
         if (HasTransform(c)) UpdateWorldRecursive(c, worldM);
 }
 
+void World::UpdateTransformNow(EntityId e)
+{
+    using namespace DirectX;
+    if (!HasTransform(e)) return;
+
+    // Find root ancestor
+    EntityId root = e;
+    while (HasTransform(root))
+    {
+        const TransformComponent& t = GetTransform(root);
+        if (!t.parent.IsValid()) break;
+        root = t.parent;
+    }
+
+    const XMMATRIX I = XMMatrixIdentity();
+    if (HasTransform(root))
+        UpdateWorldRecursive(root, I);
+
+    m_transformUpdatedFrame = m_frameIndex; // treat as updated for this frame
+}
+
 void World::UpdateTransforms()
 {
     // 루트들부터 갱신 (parent가 invalid인 transform)

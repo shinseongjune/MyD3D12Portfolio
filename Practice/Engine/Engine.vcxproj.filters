@@ -169,6 +169,12 @@
     <Filter Include="소스 파일\Game\02_Camera">
       <UniqueIdentifier>{f9a30d45-bcb5-4729-a635-90fc2f1df1dc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\Game\03_Flight">
+      <UniqueIdentifier>{dfe7e1c9-bb64-475d-bc7f-13e955070346}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game\03_Flight">
+      <UniqueIdentifier>{9198afa1-89b6-4ff0-88fa-5e66fa41b652}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -375,6 +381,15 @@
     <ClInclude Include="CameraRig.h">
       <Filter>헤더 파일\Game\02_Camera</Filter>
     </ClInclude>
+    <ClInclude Include="FlightRigComponent.h">
+      <Filter>헤더 파일\Game\03_Flight</Filter>
+    </ClInclude>
+    <ClInclude Include="FlightRigSystem.h">
+      <Filter>헤더 파일\Game\03_Flight</Filter>
+    </ClInclude>
+    <ClInclude Include="CameraRigComponent.h">
+      <Filter>헤더 파일\Game\02_Camera</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -465,6 +480,15 @@
       <Filter>소스 파일\Engine\11_Input</Filter>
     </ClCompile>
     <ClCompile Include="CameraRig.cpp">
+      <Filter>소스 파일\Game\02_Camera</Filter>
+    </ClCompile>
+    <ClCompile Include="FlightRigSystem.cpp">
+      <Filter>소스 파일\Game\03_Flight</Filter>
+    </ClCompile>
+    <ClCompile Include="FlightRigComponent.cpp">
+      <Filter>소스 파일\Game\03_Flight</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraRigComponent.cpp">
       <Filter>소스 파일\Game\02_Camera</Filter>
     </ClCompile>
   </ItemGroup>

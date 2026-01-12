@@ -2,6 +2,37 @@
 #include <windowsx.h>
 #include "Input.h"
 
+static uint32_t NormalizeNumpadVK(uint32_t vk, LPARAM lParam)
+{
+    const bool extended = (lParam & (1 << 24)) != 0;
+    const uint32_t sc = (uint32_t)((lParam >> 16) & 0xFF); // scan code
+
+    // ë„˜íŒ¨ë“œ ìˆ«ìí‚¤(NumLock/Shift ìƒíƒœì— ë”°ë¼ VKê°€ ë°”ë€Œì–´ë„) scancodeëŠ” ë™ì¼í•œ í¸
+    // ê·¸ë¦¬ê³  "ì§„ì§œ ë°©í–¥í‚¤"ëŠ” ë³´í†µ extended(E0)ê°€ ì¼œì ¸ ë“¤ì–´ì˜¨ë‹¤.
+    if (!extended)
+    {
+        switch (sc)
+        {
+        case 0x47: return VK_NUMPAD7; // Home
+        case 0x48: return VK_NUMPAD8; // Up
+        case 0x49: return VK_NUMPAD9; // PgUp
+        case 0x4B: return VK_NUMPAD4; // Left
+        case 0x4C: return VK_NUMPAD5; // Clear
+        case 0x4D: return VK_NUMPAD6; // Right
+        case 0x4F: return VK_NUMPAD1; // End
+        case 0x50: return VK_NUMPAD2; // Down
+        case 0x51: return VK_NUMPAD3; // PgDn
+        case 0x52: return VK_NUMPAD0; // Ins
+        case 0x53: return VK_DECIMAL; // Del (.)
+        default: break;
+        }
+    }
+
+    // ë‚˜ë¨¸ì§€ëŠ” ì›ë˜ vk ìœ ì§€
+    return vk;
+}
+
+
 bool Win32Window::RegisterWindowClass()
 {
     WNDCLASSEXW wc{};
@@ -14,11 +45,11 @@ bool Win32Window::RegisterWindowClass()
     wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszMenuName = nullptr;         // ¸Ş´º ¾øÀ½(ÅÛÇÃ¸´ Á¦°Å)
+    wc.lpszMenuName = nullptr;         // Ş´ (Ã¸ )
     wc.lpszClassName = m_className;
     wc.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
 
-    // ÀÌ¹Ì µî·ÏµÅÀÖÀ» ¼öµµ ÀÖÀ¸´Ï ½ÇÆĞ¸¦ ¾ö°İÈ÷ º¸Áö ¸»°í È®ÀÎ
+    // Ì¹ Ïµ   Ğ¸    È®
     ATOM atom = RegisterClassExW(&wc);
     if (atom == 0)
     {
@@ -39,7 +70,7 @@ bool Win32Window::Create(HINSTANCE hInstance, const wchar_t* title, uint32_t wid
     if (!RegisterWindowClass())
         return false;
 
-    // Å¬¶óÀÌ¾ğÆ® ¿µ¿ªÀÌ width/height°¡ µÇµµ·Ï ÀüÃ¼ Ã¢ Å©±â º¸Á¤
+    // Å¬Ì¾Æ®  width/height Çµ Ã¼ Ã¢ Å© 
     RECT rc{ 0, 0, (LONG)m_width, (LONG)m_height };
     AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
@@ -56,7 +87,7 @@ bool Win32Window::Create(HINSTANCE hInstance, const wchar_t* title, uint32_t wid
         nullptr,
         nullptr,
         m_hInstance,
-        this // ¡Ú this¸¦ Àü´ŞÇØ¼­ WndProc¿¡¼­ ¿¬°á
+        this //  this Ø¼ WndProc 
     );
 
     if (!m_hwnd)
@@ -94,7 +125,7 @@ LRESULT CALLBACK Win32Window::StaticWndProc(HWND hwnd, UINT msg, WPARAM wParam, 
 {
     Win32Window* self = nullptr;
 
-    // WM_NCCREATE¿¡¼­ this¸¦ ÀúÀå
+    // WM_NCCREATE this 
     if (msg == WM_NCCREATE)
     {
         const CREATESTRUCTW* cs = reinterpret_cast<CREATESTRUCTW*>(lParam);
@@ -118,7 +149,7 @@ LRESULT Win32Window::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
     switch (msg)
     {
     case WM_KILLFOCUS:
-        if (m_input) m_input->Clear(); // Æ÷Ä¿½º ÀÒÀ¸¸é ´­¸² »óÅÂ ÃÊ±âÈ­
+        if (m_input) m_input->Clear(); // Ä¿    Ê±È­
         return 0;
 
     case WM_KEYDOWN:
@@ -126,13 +157,17 @@ LRESULT Win32Window::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         if (m_input)
         {
             const bool isRepeat = (lParam & (1 << 30)) != 0;
-            m_input->OnKeyDown((uint32_t)wParam, isRepeat);
+            const uint32_t vk = NormalizeNumpadVK((uint32_t)wParam, lParam);
+            m_input->OnKeyDown(vk, isRepeat);
         }
         return 0;
 
     case WM_KEYUP:
     case WM_SYSKEYUP:
-        if (m_input) m_input->OnKeyUp((uint32_t)wParam);
+        {
+            const uint32_t vk = NormalizeNumpadVK((uint32_t)wParam, lParam);
+            m_input->OnKeyUp(vk);
+        }
         return 0;
 
     case WM_MOUSEMOVE:
@@ -148,7 +183,7 @@ LRESULT Win32Window::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
     case WM_LBUTTONUP:   if (m_input) m_input->OnMouseButtonUp(0);   return 0;
     case WM_SIZE:
     {
-        // ÃÖ¼ÒÈ­ µî¿¡¼­µµ µé¾î¿À¹Ç·Î 0ÀÏ ¼ö ÀÖÀ½
+        // Ö¼È­ î¿¡ Ç· 0  
         const uint32_t w = (uint32_t)LOWORD(lParam);
         const uint32_t h = (uint32_t)HIWORD(lParam);
         if (w != 0 && h != 0)

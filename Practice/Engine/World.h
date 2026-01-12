@@ -24,7 +24,7 @@ public:
     EntityId CreateEntity(const std::string& name = "");
     bool IsAlive(EntityId e) const;
 
-    // 이름 관련(소켓 찾기용으로 유용)
+	// Name API
     EntityId FindByName(const std::string& name) const;
     const std::string& GetName(EntityId e) const;
 
@@ -36,15 +36,19 @@ public:
     TransformComponent& GetTransform(EntityId e);
     const TransformComponent& GetTransform(EntityId e) const;
 
-    // parent/child 연결 (기존 parent 있으면 자동 분리)
+    // parent/child
     void SetParent(EntityId child, EntityId newParent);
 	inline void Detach(EntityId child) { SetParent(child, EntityId::Invalid()); }
     bool IsDescendant(EntityId node, EntityId potentialAncestor) const;
 
-    // 매 프레임 호출(또는 필요할 때 호출): dirty 트리 갱신
+	// Mark the given entity and its subtree as dirty (world matrix needs update).
     void UpdateTransforms();
 
-    // 순서 가드
+    // Force-refresh the world matrix for the given entity (and its subtree) immediately.
+    // Useful for scripts that need up-to-date world transforms before the global UpdateTransforms() pass.
+    void UpdateTransformNow(EntityId e);
+
+	// Frame management
     void BeginFrame();
     bool TransformsUpdatedThisFrame() const;
 
@@ -57,14 +61,13 @@ private:
     };
 
     std::vector<Slot> m_slots;
-    std::vector<uint32_t> m_freeList; // 재사용할 index 스택
+    std::vector<uint32_t> m_freeList;
     std::unordered_map<std::string, EntityId> m_nameToEntity;
 
     uint32_t m_aliveCount = 0;
 
-	std::vector<EntityId> m_pendingDestroy; // 지연 파괴 대상
+	std::vector<EntityId> m_pendingDestroy;
 
-    // 순서 가드
     uint64_t m_frameIndex = 0;
     uint64_t m_transformUpdatedFrame = UINT64_MAX;
 
@@ -184,13 +187,13 @@ public:
     MaterialComponent& GetMaterial(EntityId e);
     const MaterialComponent& GetMaterial(EntityId e) const;
 
-    // --- Camera API (아직 렌더러에서 미사용, 뼈대만) ---
+    // --- Camera API ---
     void AddCamera(EntityId e);
     bool HasCamera(EntityId e) const;
     CameraComponent& GetCamera(EntityId e);
     const CameraComponent& GetCamera(EntityId e) const;
 
-    // 단순한 "활성 카메라" 찾기(첫 active 카메라)
+	// Find the first active camera in the world (or Invalid if none)
     EntityId FindActiveCamera() const;
 
     // --- AudioSource API ---
@@ -221,11 +224,10 @@ public:
 
     const std::vector<EntityId>& GetUIElementEntities() const { return m_uiElementDenseEntities; }
 
-    // ---- Debug/Iteration ----
-    // (임시) dense transform 엔티티 목록을 반환(시스템들이 순회하기 위해 필요)
+	// --- Transform Entities ---
     const std::vector<EntityId>& GetTransformEntities() const { return m_transformDenseEntities; }
 
-	// ---- 파괴 지연 처리 ----
+	// --- Destroy API ---
     void RequestDestroy(EntityId e);
     void FlushDestroy();
 
@@ -245,12 +247,12 @@ public:
     const ColliderComponent& GetCollider(EntityId e) const;
 	void RemoveCollider(EntityId e);
 
-    // 물리 시스템이 후보를 빠르게 순회할 수 있게
+	// Collider Entities
     const std::vector<EntityId>& GetColliderEntities() const { return m_colliderDenseEntities; }
 
     // Collision Events
     void PushCollisionEvent(const CollisionEvent& ev);
-    void DrainCollisionEvents(std::vector<CollisionEvent>& out); // out으로 옮기고 내부 비움
+    void DrainCollisionEvents(std::vector<CollisionEvent>& out);
 
 	// --- Script API ---
     ScriptComponent& EnsureScriptComponent(EntityId e);
