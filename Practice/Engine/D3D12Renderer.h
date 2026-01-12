@@ -181,6 +181,7 @@ private:
     // Pipeline
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pso;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_psoAlpha;
 
     // Debug line pipeline
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_psoDebugLine;
@@ -202,6 +203,7 @@ private:
         DirectX::XMFLOAT4X4 mvp;
         DirectX::XMFLOAT4X4 world;
         DirectX::XMFLOAT4   color;
+        DirectX::XMFLOAT4   material; // x = unlit
     };
 
 

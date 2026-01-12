@@ -13,6 +13,11 @@ struct RenderItem
     TextureHandle albedo;
     DirectX::XMFLOAT4 color{ 1,1,1,1 };
 
+	// flags
+    bool transparent = false;
+	bool unlit = false;
+	uint8_t _pad0[2]{}; // 패딩
+
     // Per-draw (submesh)
     uint32_t startIndex = 0;
     uint32_t indexCount = 0; // 0이면 "전체"로 취급

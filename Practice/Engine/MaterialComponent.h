@@ -8,6 +8,10 @@ struct MaterialSlot
 {
     DirectX::XMFLOAT4 color{ 1,1,1,1 };
     TextureHandle albedo{ 0 };     // 0 = checker / default
+
+    bool transparent = false;
+    bool unlit = false;
+	uint8_t _pad0[2]{};            // ÆÐµù
 };
 
 struct MaterialComponent

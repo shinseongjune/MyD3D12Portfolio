@@ -102,4 +102,47 @@ namespace PrimitiveMeshes
 
         return mesh;
     }
+    MeshCPUData MakeUnitQuad(bool flipV)
+    {
+        MeshCPUData m;
+
+        // 정점 4개
+        m.positions = {
+            {-0.5f, +0.5f, 0.f}, // 0 LT
+            {+0.5f, +0.5f, 0.f}, // 1 RT
+            {+0.5f, -0.5f, 0.f}, // 2 RB
+            {-0.5f, -0.5f, 0.f}, // 3 LB
+        };
+
+        m.normals = {
+            {0.f, 0.f, +1.f},
+            {0.f, 0.f, +1.f},
+            {0.f, 0.f, +1.f},
+            {0.f, 0.f, +1.f},
+        };
+
+        if (!flipV)
+        {
+            m.uvs = {
+                {0.f, 0.f},
+                {1.f, 0.f},
+                {1.f, 1.f},
+                {0.f, 1.f},
+            };
+        }
+        else
+        {
+            m.uvs = {
+                {0.f, 1.f},
+                {1.f, 1.f},
+                {1.f, 0.f},
+                {0.f, 0.f},
+            };
+        }
+
+        // CW front 기준(중요): (0,2,1), (0,3,2)
+        m.indices = { 0,2,1, 0,3,2 };
+
+        return m;
+    }
 }

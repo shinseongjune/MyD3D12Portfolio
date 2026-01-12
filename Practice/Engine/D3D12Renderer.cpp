@@ -265,10 +265,14 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         m_commandList->SetGraphicsRootConstantBufferView(1, fcbAddr);
     }
 
-    const uint32_t maxOpaque = MaxDrawsPerFrame - 1; // 마지막 1개는 skybox용
-    const uint32_t drawCount = std::min<uint32_t>((uint32_t)items.size(), maxOpaque);
+    const uint32_t maxDraw3D = MaxDrawsPerFrame - 1; // 마지막 1개는 skybox용
+    const uint32_t drawCountTotal = std::min<uint32_t>((uint32_t)items.size(), maxDraw3D);
+
     const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
     const uint32_t skySlot = frameBase + MaxDrawsPerFrame - 1;
+
+    // 카메라 위치
+    const DirectX::XMFLOAT3 camPosWS = lights.cameraPosWS;
 
     // Skybox (if set)
     if (skybox.IsValid())
@@ -326,85 +330,133 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         uint32_t itemIndex = 0;
         uint32_t srvIndex = 0;
         uint32_t meshId = 0;
-        uint64_t key = 0;
+        uint64_t key = 0;      // opaque용 (srv, mesh)
+        float dist2 = 0.f;     // transparent용
     };
 
-    std::vector<DrawKey> order;
-    order.resize(drawCount);
+    std::vector<DrawKey> opaque;
+    std::vector<DrawKey> trans;
+    opaque.reserve(drawCountTotal);
+    trans.reserve(drawCountTotal);
 
-    for (uint32_t i = 0; i < drawCount; ++i)
+    auto getWorldPos = [](const DirectX::XMFLOAT4X4& W)
+        {
+            // row-major translation: _41,_42,_43
+            return DirectX::XMFLOAT3(W._41, W._42, W._43);
+        };
+
+    auto distSq = [&](const DirectX::XMFLOAT3& a, const DirectX::XMFLOAT3& b)
+        {
+            const float dx = a.x - b.x;
+            const float dy = a.y - b.y;
+            const float dz = a.z - b.z;
+            return dx * dx + dy * dy + dz * dz;
+        };
+
+    // (1) 분리 + 키 생성
+    for (uint32_t i = 0; i < drawCountTotal; ++i)
     {
         const RenderItem& it = items[i];
 
-        // TextureHandle -> srvIndex 를 renderer가 해결
-        uint32_t srvIndex = 0;
-        srvIndex = GetOrCreateSrvIndex(it.albedo); // TextureHandle이 없으면 0(기본)
+        const uint32_t srvIndex = GetOrCreateSrvIndex(it.albedo);
 
-        order[i].itemIndex = i;
-        order[i].srvIndex = srvIndex;
-        order[i].meshId = it.mesh.id;
-        order[i].key = (uint64_t(srvIndex) << 32) | uint64_t(it.mesh.id);
+        DrawKey dk{};
+        dk.itemIndex = i;
+        dk.srvIndex = srvIndex;
+        dk.meshId = it.mesh.id;
+        dk.key = (uint64_t(srvIndex) << 32) | uint64_t(it.mesh.id);
+
+        if (it.transparent)
+        {
+            const auto p = getWorldPos(it.world);
+            dk.dist2 = distSq(p, camPosWS);
+            trans.push_back(dk);
+        }
+        else
+        {
+            opaque.push_back(dk);
+        }
     }
 
-    std::sort(order.begin(), order.end(),
-        [&](const DrawKey& a, const DrawKey& b) { return a.key < b.key; });
+    // (2) 정렬
+    std::sort(opaque.begin(), opaque.end(),
+        [](const DrawKey& a, const DrawKey& b) { return a.key < b.key; });
 
-    // (2) Cached state
-    uint32_t lastSrvIndex = 0xFFFFFFFFu;
-    uint32_t lastMeshId = 0xFFFFFFFFu;
+    // 투명: back-to-front(먼 것 먼저)
+    std::sort(trans.begin(), trans.end(),
+        [](const DrawKey& a, const DrawKey& b) { return a.dist2 > b.dist2; });
 
-    D3D12_GPU_DESCRIPTOR_HANDLE srvBase = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
-
-    for (uint32_t k = 0; k < drawCount; ++k)
-    {
-        const RenderItem& it = items[order[k].itemIndex];
-        const uint32_t srvIndex = order[k].srvIndex;
-
-        // (A) SRV 바뀔 때만 DescriptorTable 세팅
-        if (srvIndex != lastSrvIndex)
+    // (3) 공통 드로우 함수(상태 캐시 유지)
+    auto drawList = [&](const std::vector<DrawKey>& list, uint32_t slotBase, ID3D12PipelineState* pso)
         {
-            D3D12_GPU_DESCRIPTOR_HANDLE h = srvBase;
-            h.ptr += (UINT64)srvIndex * (UINT64)m_srvDescriptorSize;
-            m_commandList->SetGraphicsRootDescriptorTable(2, h);
-            lastSrvIndex = srvIndex;
-        }
+            m_commandList->SetPipelineState(pso);
 
-        // (B) Mesh 바뀔 때만 IA 설정
-        if (it.mesh.id != lastMeshId)
-        {
-            MeshGPUData& mesh = GetOrCreateGPUMesh(it.mesh.id);
-            m_commandList->IASetVertexBuffers(0, 1, &mesh.vbView);
-            m_commandList->IASetIndexBuffer(&mesh.ibView);
-            lastMeshId = it.mesh.id;
-        }
+            uint32_t lastSrvIndex = 0xFFFFFFFFu;
+            uint32_t lastMeshId = 0xFFFFFFFFu;
 
-        // (C) Per-draw CB
-        XMMATRIX W = XMLoadFloat4x4(&it.world);
-        XMMATRIX MVP = W * V * P;
+            D3D12_GPU_DESCRIPTOR_HANDLE srvBase = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
 
-        DrawCB cb{};
-        XMStoreFloat4x4(&cb.mvp, MVP);
-        XMStoreFloat4x4(&cb.world, W);
-        cb.color = it.color;
+            for (uint32_t k = 0; k < (uint32_t)list.size(); ++k)
+            {
+                const RenderItem& it = items[list[k].itemIndex];
+                const uint32_t srvIndex = list[k].srvIndex;
 
-        const uint32_t slot = frameBase + k;
-        std::memcpy(m_cbMapped + slot * m_cbStride, &cb, sizeof(DrawCB));
+                // SRV 바뀔 때만
+                if (srvIndex != lastSrvIndex)
+                {
+                    D3D12_GPU_DESCRIPTOR_HANDLE h = srvBase;
+                    h.ptr += (UINT64)srvIndex * (UINT64)m_srvDescriptorSize;
+                    m_commandList->SetGraphicsRootDescriptorTable(2, h);
+                    lastSrvIndex = srvIndex;
+                }
 
-        D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
-            m_cb->GetGPUVirtualAddress() + (UINT64)slot * (UINT64)m_cbStride;
+                // Mesh 바뀔 때만
+                if (it.mesh.id != lastMeshId)
+                {
+                    MeshGPUData& mesh = GetOrCreateGPUMesh(it.mesh.id);
+                    m_commandList->IASetVertexBuffers(0, 1, &mesh.vbView);
+                    m_commandList->IASetIndexBuffer(&mesh.ibView);
+                    lastMeshId = it.mesh.id;
+                }
 
-        m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
+                // Per-draw CB
+                DirectX::XMMATRIX W = DirectX::XMLoadFloat4x4(&it.world);
+                DirectX::XMMATRIX MVP = W * V * P;
 
-        // Draw
-        MeshGPUData& mesh = GetOrCreateGPUMesh(it.mesh.id);
+                DrawCB cb{};
+                DirectX::XMStoreFloat4x4(&cb.mvp, MVP);
+                DirectX::XMStoreFloat4x4(&cb.world, W);
+                cb.color = it.color;
+                cb.material = DirectX::XMFLOAT4(it.unlit ? 1.0f : 0.0f, 0, 0, 0);
 
-        // count 결정: it.indexCount==0이면 mesh 전체
-        const uint32_t count = (it.indexCount != 0) ? it.indexCount : mesh.indexCount;
-        const uint32_t start = it.startIndex;
+                const uint32_t slot = slotBase + k;
+                std::memcpy(m_cbMapped + slot * m_cbStride, &cb, sizeof(DrawCB));
 
-        // Draw
-        m_commandList->DrawIndexedInstanced(count, 1, start, 0, 0);
-    }
+                D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
+                    m_cb->GetGPUVirtualAddress() + (UINT64)slot * (UINT64)m_cbStride;
+
+                m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
+
+                // Draw
+                MeshGPUData& mesh = GetOrCreateGPUMesh(it.mesh.id);
+                const uint32_t count = (it.indexCount != 0) ? it.indexCount : mesh.indexCount;
+                const uint32_t start = it.startIndex;
+
+                m_commandList->DrawIndexedInstanced(count, 1, start, 0, 0);
+            }
+        };
+
+    // (4) 2-pass 실행 + CB 슬롯 관리
+    // slot 0..opaqueCount-1 : opaque
+    // slot opaqueCount..opaqueCount+transCount-1 : transparent
+    const uint32_t opaqueSlotBase = frameBase;
+    const uint32_t transSlotBase = frameBase + (uint32_t)opaque.size();
+
+    drawList(opaque, opaqueSlotBase, m_pso.Get());
+    drawList(trans, transSlotBase, m_psoAlpha.Get());
+
+    const uint32_t drawCount = (uint32_t)(opaque.size() + trans.size());
+
 
 #if defined(_DEBUG)
     // --- Debug Lines ---
@@ -857,7 +909,8 @@ void D3D12Renderer::CreatePipeline()
     {
         row_major float4x4 mvp;
         row_major float4x4 world;
-        float4 color;
+        float4 color;       // rgb=틴트, a=알파
+        float4 material;    // x=unlit(0/1), y,z,w unused
     };
 
     cbuffer FrameCB : register(b1)
@@ -900,7 +953,8 @@ void D3D12Renderer::CreatePipeline()
     {
         row_major float4x4 mvp;
         row_major float4x4 world;
-        float4 color;
+        float4 color;       // rgb=틴트, a=알파
+        float4 material;    // x=unlit(0/1), y,z,w unused
     };
 
     struct Light
@@ -973,6 +1027,13 @@ void D3D12Renderer::CreatePipeline()
     float4 main(PSIn i) : SV_TARGET
     {
         float4 albedo = gTex.Sample(gSamp, i.uv) * color;
+
+        if (material.x > 0.5)
+        {
+            // unlit
+            return albedo;
+        }
+
         float3 N = normalize(i.worldNrm);
         float3 P = i.worldPos;
 
@@ -1053,6 +1114,26 @@ void D3D12Renderer::CreatePipeline()
     pso.SampleDesc.Count = 1;
 
     ThrowIfFailed(m_device->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&m_pso)));
+
+    // Transparent PSO (alpha blending ON, depth write OFF)
+    {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC tpso = pso;
+
+        D3D12_RENDER_TARGET_BLEND_DESC b = tpso.BlendState.RenderTarget[0];
+        b.BlendEnable = TRUE;
+        b.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+        b.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+        b.BlendOp = D3D12_BLEND_OP_ADD;
+        b.SrcBlendAlpha = D3D12_BLEND_ONE;
+        b.DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+        b.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+        b.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+        tpso.BlendState.RenderTarget[0] = b;
+
+        tpso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // 핵심
+
+        ThrowIfFailed(m_device->CreateGraphicsPipelineState(&tpso, IID_PPV_ARGS(&m_psoAlpha)));
+    }
 }
 
 void D3D12Renderer::CreateDebugLinePipeline()

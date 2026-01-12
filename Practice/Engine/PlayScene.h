@@ -88,10 +88,12 @@ public:
 private:
     std::vector<ShooterCommand> m_cmds;
 
+    // Camera follow lives as a Behaviour on the camera entity (CameraRigComponent).
     EntityId m_cam;
     EntityId m_player;
 
-    // Camera follow lives as a Behaviour on the camera entity (CameraRigComponent).
+    MeshHandle m_quad;
+    TextureHandle m_bulletTex;
 
 private:
     void SetSkybox(SceneContext& ctx);
@@ -99,6 +101,8 @@ private:
     Result<ModelAsset> ImportModel(SceneContext& ctx, const std::string& path);
     TextureHandle LoadTexture(SceneContext& ctx, const std::string& path);
     MaterialComponent CreateMaterial(SceneContext& ctx, const TextureHandle& tex);
+	MeshHandle CreateQuadMesh(SceneContext& ctx);
+	TextureHandle CreateBulletTexture(SceneContext& ctx);
 
     void ExecuteCommand(SceneContext& ctx);
 

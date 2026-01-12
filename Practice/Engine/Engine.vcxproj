@@ -137,6 +137,7 @@
     <ClInclude Include="AudioSourceComponent.h" />
     <ClInclude Include="AudioSystem.h" />
     <ClInclude Include="Behaviour.h" />
+    <ClInclude Include="BillboardBehaviour.h" />
     <ClInclude Include="CameraRig.h" />
     <ClInclude Include="CameraRigComponent.h" />
     <ClInclude Include="ColliderComponent.h" />
@@ -176,6 +177,7 @@
     <ClInclude Include="SceneContext.h" />
     <ClInclude Include="SceneScope.h" />
     <ClInclude Include="SoundClip.h" />
+    <ClCompile Include="BillboardBehaviour.cpp" />
     <ClCompile Include="CameraRig.cpp" />
     <ClCompile Include="CameraRigComponent.cpp" />
     <ClCompile Include="DWriteFontFace.cpp" />

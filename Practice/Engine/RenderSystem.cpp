@@ -36,6 +36,8 @@ void RenderSystem::Build(const World& world, std::vector<RenderItem>& outItem) c
                 const auto& slot = mat->slots.empty() ? mat->Primary() : mat->slots[idx];
                 it.color = slot.color;
                 it.albedo = slot.albedo;
+                it.transparent = slot.transparent;
+				it.unlit = slot.unlit;
             }
             else
             {

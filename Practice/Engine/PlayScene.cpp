@@ -1,14 +1,31 @@
 #include "PlayScene.h"
 
+#include <DirectXMath.h>
+#include <memory>
 #include "World.h"
 #include "SceneContext.h"
-#include <DirectXMath.h>
+#include "FlightRigComponent.h"
+#include "CameraRigComponent.h"
+#include "BillboardBehaviour.h"
 
 
 void PlayScene::OnLoad(SceneContext& ctx)
 {
     SetSkybox(ctx);
     SetDirectionalLight(ctx);
+	m_quad = CreateQuadMesh(ctx);
+	m_bulletTex = CreateBulletTexture(ctx);
+
+    //test
+    EntityId e = ctx.Instantiate("bulletSprite");
+    ctx.world.AddTransform(e);
+    ctx.world.AddMesh(e, MeshComponent{ m_quad });
+    ctx.world.AddMaterial(e, MaterialComponent{ DirectX::XMFLOAT4(1,1,1,1), m_bulletTex });
+	ctx.world.GetMaterial(e).Primary().transparent = true;
+	ctx.world.GetMaterial(e).Primary().unlit = true;
+    ctx.world.SetLocalPosition(e, { 0.f, 1.f, 100.f });
+	ctx.world.SetLocalRotationEuler(e, { 0.f, 180.f, 0.f });
+	ctx.world.AddScript(e, std::make_unique<BillboardBehaviour>(BillboardMode::Spherical) );
 
     // Import models
     Result<ModelAsset> res_model_spacefighter = ImportModel(ctx, "Assets/Model/space_fighter.obj");
@@ -279,4 +296,18 @@ MaterialComponent PlayScene::CreateMaterial(SceneContext& ctx, const TextureHand
         s.albedo = tex.IsValid() ? tex : TextureHandle{ 0 };
     }
     return mat;
+}
+
+MeshHandle PlayScene::CreateQuadMesh(SceneContext& ctx)
+{
+    MeshHandle quad = ctx.meshes.Create(PrimitiveMeshes::MakeUnitQuad(/*flipV=*/false));
+    ctx.scope.Track(quad);
+    return quad;
+}
+
+TextureHandle PlayScene::CreateBulletTexture(SceneContext& ctx)
+{
+    auto texR = ctx.LoadTextureScoped("assets/texture/bullet.png");
+    TextureHandle bulletTex = texR.IsOk() ? texR.value : TextureHandle{ 0 };
+	return bulletTex;
 }
