@@ -149,15 +149,14 @@ void CameraRig::Update(World& world, float dt)
     if (!world.IsAlive(m_cam) || !world.IsAlive(m_target)) return;
     if (!world.HasTransform(m_target)) return;
 
-    // 1) return-to-center: delay 지나면 즉시 0으로 (스무딩 X)
     if (!m_hadLookInputThisFrame)
     {
         m_remainingTime -= dt;
         if (m_remainingTime <= 0.f)
         {
             m_remainingTime = 0.f;
-            m_orbitYaw = 0.f;
-            m_orbitPitch = XMConvertToRadians(-20.0f);
+            m_orbitYaw = m_orbitYaw + (0 - m_orbitYaw) * 0.5f;
+            m_orbitPitch = m_orbitPitch + (XMConvertToRadians(-20.0f) - m_orbitPitch) * 0.5f;
         }
     }
     m_hadLookInputThisFrame = false;
