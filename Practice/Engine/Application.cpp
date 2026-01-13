@@ -12,6 +12,7 @@
 #if defined(_DEBUG)
 #include "TestScene.h"
 #include "PhysicsTestScene.h"
+#include <crtdbg.h>
 #endif
 #include "PlayScene.h"
 
@@ -19,6 +20,9 @@ Application::~Application() = default;
 
 void Application::Initialize(HINSTANCE hInstance)
 {
+#if defined(_DEBUG)
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF);
+#endif
     // 1) 창 만들기
     if (!m_window.Create(hInstance, L"Engine", 1280, 720))
         throw std::runtime_error("Failed to create window.");
@@ -65,6 +69,13 @@ void Application::Run()
             break;
         }
 
+#if defined(_DEBUG)
+        static int s_frame = 0;
+        if ((++s_frame % 120) == 0) // 2초에 1번 (60fps 기준)
+        {
+            _CrtCheckMemory();
+        }
+#endif
         Resize();
         BeginFrame();
         UpdateScene(m_dt);
@@ -291,6 +302,9 @@ void Application::RenderFrame()
 
 void Application::EndFrame()
 {
+    // Update/FixedUpdate 동안 요청된 Add/Remove를 여기서만 반영
+    m_world.FlushStructuralChanges();
+
 	// 지연 파괴된 스크립트 실제 삭제
     m_world.FlushScripts();
     // 지연 파괴된 Entity 실제 삭제

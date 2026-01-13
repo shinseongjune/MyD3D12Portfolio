@@ -1,4 +1,4 @@
-#include "BillboardBehaviour.h"
+#include "BillboardComponent.h"
 #include "SceneContext.h"
 #include "World.h"
 #include "TransformComponent.h"
@@ -11,7 +11,7 @@ static XMFLOAT3 GetWorldPos(const TransformComponent& t)
     return { t.world._41, t.world._42, t.world._43 };
 }
 
-void BillboardBehaviour::Update(SceneContext& ctx)
+void BillboardComponent::Update(SceneContext& ctx)
 {
     auto& w = ctx.world;
 

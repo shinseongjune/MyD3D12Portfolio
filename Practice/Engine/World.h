@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
+#include <memory>
 #include "EntityId.h"
 #include "TransformComponent.h"
 #include "MeshComponent.h"
@@ -15,6 +16,8 @@
 #include "LightComponent.h"
 #include "UIElementComponent.h"
 #include "ScriptComponent.h"
+
+class Behaviour;
 
 class World
 {
@@ -31,10 +34,13 @@ public:
     uint32_t AliveCount() const { return m_aliveCount; }
 
     // --- Transform API ---
-    void AddTransform(EntityId e);
+    void AddTransform(EntityId e, const TransformComponent& init = TransformComponent{});
+    TransformComponent& GetPendingTransform(EntityId e);
     bool HasTransform(EntityId e) const;
     TransformComponent& GetTransform(EntityId e);
     const TransformComponent& GetTransform(EntityId e) const;
+    bool IsTransformPending(EntityId e) const;
+    bool HasOrPendingTransform(EntityId e) const;
 
     // parent/child
     void SetParent(EntityId child, EntityId newParent);
@@ -67,6 +73,29 @@ private:
     uint32_t m_aliveCount = 0;
 
 	std::vector<EntityId> m_pendingDestroy;
+
+    // Structural change queues (applied only in FlushStructuralChanges)
+    struct PendingScriptAdd { EntityId e; std::unique_ptr<Behaviour> b; bool enabled; };
+    std::vector<PendingScriptAdd> m_pendingScriptAdd;
+
+    std::vector<std::pair<EntityId, TransformComponent>> m_pendingAddTransform;
+    std::vector<std::pair<EntityId, MeshComponent>> m_pendingAddMesh;
+    std::vector<std::pair<EntityId, MaterialComponent>> m_pendingAddMaterial;
+    std::vector<std::pair<EntityId, CameraComponent>> m_pendingAddCamera;
+
+    std::vector<std::pair<EntityId, RigidBodyComponent>> m_pendingAddRigidBody;
+    std::vector<std::pair<EntityId, ColliderComponent>> m_pendingAddCollider;
+
+    std::vector<std::pair<EntityId, AudioSourceComponent>> m_pendingAddAudioSource;
+    std::vector<std::pair<EntityId, LightComponent>> m_pendingAddLight;
+    std::vector<std::pair<EntityId, UIElementComponent>> m_pendingAddUIElement;
+
+    // Remove도 public API로 열려있는 것들만 큐잉
+    std::vector<EntityId> m_pendingRemoveAudioSource;
+    std::vector<EntityId> m_pendingRemoveLight;
+    std::vector<EntityId> m_pendingRemoveUIElement;
+    std::vector<EntityId> m_pendingRemoveRigidBody;
+    std::vector<EntityId> m_pendingRemoveCollider;
 
     uint64_t m_frameIndex = 0;
     uint64_t m_transformUpdatedFrame = UINT64_MAX;
@@ -155,6 +184,24 @@ private:
     void EnsureScriptSparseSize(uint32_t entityIndex);
 	void RemoveScript(EntityId e, Behaviour* which);
 
+    // Add Immediate
+    void AddTransform_Immediate(EntityId e, const TransformComponent& comp);
+    void AddMesh_Immediate(EntityId e, const MeshComponent& comp);
+    void AddMaterial_Immediate(EntityId e, const MaterialComponent& comp);
+    void AddCamera_Immediate(EntityId e, const CameraComponent& c);
+    void AddRigidBody_Immediate(EntityId e, const RigidBodyComponent& comp);
+    void AddCollider_Immediate(EntityId e, const ColliderComponent& comp);
+    void AddAudioSource_Immediate(EntityId e, const AudioSourceComponent& c);
+    void AddLight_Immediate(EntityId e, const LightComponent& c);
+    void AddUIElement_Immediate(EntityId e, const UIElementComponent& c);
+
+    // Remove Immediate
+    void RemoveAudioSource_Immediate(EntityId e);
+    void RemoveLight_Immediate(EntityId e);
+    void RemoveUIElement_Immediate(EntityId e);
+    void RemoveRigidBody_Immediate(EntityId e);
+    void RemoveCollider_Immediate(EntityId e);
+
 public:
     // --- Transform Public API ---
     DirectX::XMFLOAT3 GetLocalPosition(EntityId e) const;
@@ -188,7 +235,7 @@ public:
     const MaterialComponent& GetMaterial(EntityId e) const;
 
     // --- Camera API ---
-    void AddCamera(EntityId e);
+    void AddCamera(EntityId e, const CameraComponent& c = CameraComponent{});
     bool HasCamera(EntityId e) const;
     CameraComponent& GetCamera(EntityId e);
     const CameraComponent& GetCamera(EntityId e) const;
@@ -230,6 +277,8 @@ public:
 	// --- Destroy API ---
     void RequestDestroy(EntityId e);
     void FlushDestroy();
+
+    void FlushStructuralChanges();
 
     // Rigidbody
 	void EnsureRigidBodySparseSize(uint32_t entityIndex);

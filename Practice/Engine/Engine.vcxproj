@@ -137,7 +137,8 @@
     <ClInclude Include="AudioSourceComponent.h" />
     <ClInclude Include="AudioSystem.h" />
     <ClInclude Include="Behaviour.h" />
-    <ClInclude Include="BillboardBehaviour.h" />
+    <ClInclude Include="BillboardComponent.h" />
+    <ClInclude Include="BulletComponent.h" />
     <ClInclude Include="CameraRig.h" />
     <ClInclude Include="CameraRigComponent.h" />
     <ClInclude Include="ColliderComponent.h" />
@@ -146,6 +147,7 @@
     <ClInclude Include="FlightRigComponent.h" />
     <ClInclude Include="FlightRigSystem.h" />
     <ClInclude Include="FrameLights.h" />
+    <ClInclude Include="GunComponent.h" />
     <ClInclude Include="IFontFace.h" />
     <ClInclude Include="ImportTypes.h" />
     <ClInclude Include="CameraComponent.h" />
@@ -177,12 +179,14 @@
     <ClInclude Include="SceneContext.h" />
     <ClInclude Include="SceneScope.h" />
     <ClInclude Include="SoundClip.h" />
-    <ClCompile Include="BillboardBehaviour.cpp" />
+    <ClCompile Include="BillboardComponent.cpp" />
+    <ClCompile Include="BulletComponent.cpp" />
     <ClCompile Include="CameraRig.cpp" />
     <ClCompile Include="CameraRigComponent.cpp" />
     <ClCompile Include="DWriteFontFace.cpp" />
     <ClCompile Include="FlightRigComponent.cpp" />
     <ClCompile Include="FlightRigSystem.cpp" />
+    <ClCompile Include="GunComponent.cpp" />
     <ClCompile Include="PlayScene.cpp" />
     <ClCompile Include="ScriptSystem.cpp" />
     <ClCompile Include="SoundImporterMF.cpp">

@@ -5,10 +5,10 @@
 #include "MaterialComponent.h"
 #include "TextureHandle.h"
 #include "ModelAsset.h"
-#include "FlightRigComponent.h"
 
-// Scene-level camera rig behaviour wrapper (keeps camera follow in ScriptSystem order).
-#include "CameraRigComponent.h"
+class FlightRigComponent;
+class CameraRigComponent;
+class GunComponent;
 
 enum class ShooterAction
 {
@@ -111,4 +111,8 @@ private:
 
     // Finds the attached CameraRigComponent (if any).
     CameraRigComponent* GetCameraRig(SceneContext& ctx);
+
+    // Finds the attached GunComponent
+    GunComponent* GetGun(SceneContext& ctx);
+
 };

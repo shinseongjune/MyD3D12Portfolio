@@ -208,6 +208,9 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
     ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), m_pso.Get()));
 
+    QueueTexturesFromRenderLists(items, skybox, ui, text);
+    PrepareTextures();
+
     // Transition: Present -> RenderTarget
     {
         D3D12_RESOURCE_BARRIER b{};
@@ -265,11 +268,82 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         m_commandList->SetGraphicsRootConstantBufferView(1, fcbAddr);
     }
 
-    const uint32_t maxDraw3D = MaxDrawsPerFrame - 1; // 마지막 1개는 skybox용
-    const uint32_t drawCountTotal = std::min<uint32_t>((uint32_t)items.size(), maxDraw3D);
+    auto WriteDrawCB = [&](uint32_t slot, const DrawCB& cb)
+        {
+            const uint64_t offset = uint64_t(slot) * uint64_t(m_cbStride);
+            if (offset + sizeof(DrawCB) > m_cbSize || m_cbMapped == nullptr)
+            {
+                OutputDebugStringA("CB OOB or null mapping detected\n");
+                __debugbreak();
+                return;
+            }
+            std::memcpy(m_cbMapped + offset, &cb, sizeof(DrawCB));
+        };
+
+    auto ValidateCBAddr = [&](D3D12_GPU_VIRTUAL_ADDRESS addr)
+        {
+#if defined(_DEBUG)
+            if (!m_cb)
+            {
+                OutputDebugStringA("m_cb is null\n");
+                __debugbreak();
+                return;
+            }
+
+            const D3D12_GPU_VIRTUAL_ADDRESS base = m_cb->GetGPUVirtualAddress();
+            const D3D12_GPU_VIRTUAL_ADDRESS end = base + (D3D12_GPU_VIRTUAL_ADDRESS)m_cbSize;
+
+            if ((addr & 255ull) != 0ull)
+            {
+                OutputDebugStringA("CBV addr not 256-byte aligned\n");
+                __debugbreak();
+            }
+
+            if (addr < base || addr + sizeof(DrawCB) > end)
+            {
+                OutputDebugStringA("CBV addr out of range\n");
+                __debugbreak();
+            }
+#endif
+        };
+
+    auto ValidateFrameCBAddr = [&](D3D12_GPU_VIRTUAL_ADDRESS addr)
+        {
+#if defined(_DEBUG)
+            if (!m_frameCB)
+            {
+                OutputDebugStringA("m_frameCB is null\n");
+                __debugbreak();
+                return;
+            }
+
+            const D3D12_GPU_VIRTUAL_ADDRESS base = m_frameCB->GetGPUVirtualAddress();
+            const D3D12_GPU_VIRTUAL_ADDRESS end =
+                base + (D3D12_GPU_VIRTUAL_ADDRESS)(m_frameCBStride * FrameCount); // <- 이 파일에 FrameCount 존재
+
+            if ((addr & 255ull) != 0ull)
+            {
+                OutputDebugStringA("FrameCB addr not 256-byte aligned\n");
+                __debugbreak();
+            }
+
+            if (addr < base || addr + sizeof(FrameCB) > end)
+            {
+                OutputDebugStringA("FrameCB addr out of range\n");
+                __debugbreak();
+            }
+#endif
+        };
 
     const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
-    const uint32_t skySlot = frameBase + MaxDrawsPerFrame - 1;
+
+    // 예약 슬롯 3개
+    const uint32_t skySlot = frameBase + MaxDraws3D + 0;
+    const uint32_t debugSlot = frameBase + MaxDraws3D + 1;
+    const uint32_t uiSlot = frameBase + MaxDraws3D + 2;
+
+    // 3D에서 실제로 쓸 수 있는 최대 드로우 수
+    const uint32_t drawCountTotal = std::min<uint32_t>((uint32_t)items.size(), MaxDraws3D);
 
     // 카메라 위치
     const DirectX::XMFLOAT3 camPosWS = lights.cameraPosWS;
@@ -285,11 +359,20 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         {
             const D3D12_GPU_VIRTUAL_ADDRESS fcbAddr =
                 m_frameCB->GetGPUVirtualAddress() + (UINT64)m_frameIndex * (UINT64)m_frameCBStride;
+            ValidateFrameCBAddr(fcbAddr);
             m_commandList->SetGraphicsRootConstantBufferView(1, fcbAddr);
         }
 
         // SRV (cubemap)
-        const uint32_t srvIndex = GetOrCreateSrvIndex(skybox);
+        const uint32_t srvIndex = GetSrvIndex(skybox);
+
+#if defined(_DEBUG)
+        if (srvIndex >= m_srvCapacity)
+        {
+            OutputDebugStringA("SRV index overflow (skybox)\n");
+            __debugbreak();
+        }
+#endif
 
         D3D12_GPU_DESCRIPTOR_HANDLE gh = m_srvHeap->GetGPUDescriptorHandleForHeapStart();
         gh.ptr += (SIZE_T)srvIndex * m_srvDescriptorSize;
@@ -308,10 +391,11 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
         DirectX::XMStoreFloat4x4(&cb.world, DirectX::XMMatrixIdentity());
         cb.color = XMFLOAT4(1, 1, 1, 1);
 
-        std::memcpy(m_cbMapped + skySlot * m_cbStride, &cb, sizeof(DrawCB));
+        WriteDrawCB(skySlot, cb);
         D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
             m_cb->GetGPUVirtualAddress() + (UINT64)skySlot * (UINT64)m_cbStride;
 
+        ValidateCBAddr(cbAddr);
         m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
 
         // IA
@@ -358,7 +442,7 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
     {
         const RenderItem& it = items[i];
 
-        const uint32_t srvIndex = GetOrCreateSrvIndex(it.albedo);
+        const uint32_t srvIndex = GetSrvIndex(it.albedo);
 
         DrawKey dk{};
         dk.itemIndex = i;
@@ -404,6 +488,14 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
                 // SRV 바뀔 때만
                 if (srvIndex != lastSrvIndex)
                 {
+#if defined(_DEBUG)
+                    if (srvIndex >= m_srvCapacity)
+                    {
+                        OutputDebugStringA("SRV index overflow (srvIndex >= m_srvCapacity)\n");
+                        __debugbreak();
+                        break;
+                    }
+#endif
                     D3D12_GPU_DESCRIPTOR_HANDLE h = srvBase;
                     h.ptr += (UINT64)srvIndex * (UINT64)m_srvDescriptorSize;
                     m_commandList->SetGraphicsRootDescriptorTable(2, h);
@@ -430,10 +522,13 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
                 cb.material = DirectX::XMFLOAT4(it.unlit ? 1.0f : 0.0f, 0, 0, 0);
 
                 const uint32_t slot = slotBase + k;
-                std::memcpy(m_cbMapped + slot * m_cbStride, &cb, sizeof(DrawCB));
+                if (slot >= frameBase + MaxDraws3D) { OutputDebugStringA("3D CB slot overflow\n"); __debugbreak(); break; }
+                WriteDrawCB(slot, cb);
 
                 D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
                     m_cb->GetGPUVirtualAddress() + (UINT64)slot * (UINT64)m_cbStride;
+
+                ValidateCBAddr(cbAddr);
 
                 m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
 
@@ -494,12 +589,11 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
             DirectX::XMStoreFloat4x4(&cb.world, DirectX::XMMatrixIdentity());
             cb.color = { 1,1,1,1 };
 
-            const uint32_t debugSlot = frameBase + drawCount;
-            std::memcpy(m_cbMapped + debugSlot * m_cbStride, &cb, sizeof(DrawCB));
+            WriteDrawCB(debugSlot, cb);
 
             D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
                 m_cb->GetGPUVirtualAddress() + (UINT64)debugSlot * (UINT64)m_cbStride;
-
+            ValidateCBAddr(cbAddr);
             m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
 
             m_commandList->DrawInstanced(vertexCount, 1, 0, 0);
@@ -551,6 +645,45 @@ void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
 {
     if (ui.empty())
         return;
+
+    auto WriteDrawCB = [&](uint32_t slot, const DrawCB& cb)
+        {
+            const uint64_t offset = uint64_t(slot) * uint64_t(m_cbStride);
+            if (offset + sizeof(DrawCB) > m_cbSize || m_cbMapped == nullptr)
+            {
+                OutputDebugStringA("CB OOB or null mapping detected\n");
+                __debugbreak();
+                return;
+            }
+            std::memcpy(m_cbMapped + offset, &cb, sizeof(DrawCB));
+        };
+
+    auto ValidateCBAddr = [&](D3D12_GPU_VIRTUAL_ADDRESS addr)
+        {
+#if defined(_DEBUG)
+            if (!m_cb)
+            {
+                OutputDebugStringA("m_cb is null\n");
+                __debugbreak();
+                return;
+            }
+
+            const D3D12_GPU_VIRTUAL_ADDRESS base = m_cb->GetGPUVirtualAddress();
+            const D3D12_GPU_VIRTUAL_ADDRESS end = base + (D3D12_GPU_VIRTUAL_ADDRESS)m_cbSize;
+
+            if ((addr & 255ull) != 0ull)
+            {
+                OutputDebugStringA("CBV addr not 256-byte aligned\n");
+                __debugbreak();
+            }
+
+            if (addr < base || addr + sizeof(DrawCB) > end)
+            {
+                OutputDebugStringA("CBV addr out of range\n");
+                __debugbreak();
+            }
+#endif
+        };
 
     // 안전 상한
     const uint32_t quadCount = std::min<uint32_t>((uint32_t)ui.size(), MaxUIQuadsPerFrame);
@@ -614,7 +747,7 @@ void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
         dst[v + 5] = { { l, b }, { u0, v1 }, c };
 
         // TextureHandle -> SRV index (없으면 0 = default)
-        srvIndexPerQuad[i] = GetOrCreateSrvIndex(it.tex);
+        srvIndexPerQuad[i] = GetSrvIndex(it.tex);
     }
 
     // ---- (2) 파이프라인 세팅 ----
@@ -626,22 +759,23 @@ void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
     {
         const D3D12_GPU_VIRTUAL_ADDRESS fcbAddr =
             m_frameCB->GetGPUVirtualAddress() + (UINT64)m_frameIndex * (UINT64)m_frameCBStride;
+
+        ValidateCBAddr(fcbAddr);
         m_commandList->SetGraphicsRootConstantBufferView(1, fcbAddr);
     }
 
     // Root[0] DrawCB (UI에서는 사용하지 않지만, 바인딩 값은 유효하게 유지)
     {
-        const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
-        const uint32_t slot = frameBase + MaxDrawsPerFrame - 1;
-
         DrawCB cb{};
         DirectX::XMStoreFloat4x4(&cb.mvp, DirectX::XMMatrixIdentity());
         DirectX::XMStoreFloat4x4(&cb.world, DirectX::XMMatrixIdentity());
         cb.color = DirectX::XMFLOAT4(1,1,1,1);
 
-        std::memcpy(m_cbMapped + slot * m_cbStride, &cb, sizeof(DrawCB));
-        const D3D12_GPU_VIRTUAL_ADDRESS cbAddr =
-            m_cb->GetGPUVirtualAddress() + (UINT64)slot * (UINT64)m_cbStride;
+        const uint32_t frameBase = m_frameIndex * MaxDrawsPerFrame;
+        const uint32_t uiSlot = frameBase + MaxDraws3D + 2; // Reserved UI slot
+        WriteDrawCB(uiSlot, cb);
+        const D3D12_GPU_VIRTUAL_ADDRESS cbAddr = m_cb->GetGPUVirtualAddress() + (UINT64)uiSlot * (UINT64)m_cbStride;
+        ValidateCBAddr(cbAddr);
         m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
     }
 
@@ -792,12 +926,13 @@ void D3D12Renderer::CreateDescriptorHeaps()
     // SRV heap (shader-visible)
     D3D12_DESCRIPTOR_HEAP_DESC sh{};
     sh.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    sh.NumDescriptors = 256;
+    sh.NumDescriptors = 2048;
     sh.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&sh, IID_PPV_ARGS(&m_srvHeap)));
     m_srvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     m_nextSrvIndex = 0; // slot0은 기본 텍스처가 쓸 예정
+    m_srvCapacity = sh.NumDescriptors;
 }
 
 void D3D12Renderer::CreateRenderTargets()
@@ -1427,8 +1562,8 @@ void D3D12Renderer::CreateConstantBuffer()
     }
 
     m_cbStride = Align256((uint32_t)sizeof(DrawCB));
-    const uint64_t totalSize =
-        (uint64_t)m_cbStride * (uint64_t)MaxDrawsPerFrame * (uint64_t)FrameCount;
+    const uint64_t totalSize = (uint64_t)m_cbStride * (uint64_t)MaxDrawsPerFrame * (uint64_t)FrameCount;
+    m_cbSize = totalSize;
 
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -1566,7 +1701,7 @@ void D3D12Renderer::CreateGPUCubeTextureFromCPU(const TextureCubeCpuData& cpu, T
         throw std::runtime_error("CreateGPUCubeTextureFromCPU: invalid cpu cubemap.");
 
     const uint32_t srvIndex = m_nextSrvIndex++;
-    if (srvIndex >= 256)
+    if (srvIndex >= m_srvCapacity)
         throw std::runtime_error("SRV heap is full (>=256).");
 
     const DXGI_FORMAT fmt =
@@ -1716,12 +1851,77 @@ void D3D12Renderer::ProcessPendingMeshReleases()
     m_pendingMeshReleases.resize(write);
 }
 
+void D3D12Renderer::RequestTexture(TextureHandle h)
+{
+    if (!h.IsValid()) return;
+
+    // 이미 GPU에 있으면 끝
+    if (m_gpuTextures.find(h.id) != m_gpuTextures.end())
+        return;
+
+    // dedup
+    if (m_pendingTextureDedup.insert(h.id).second)
+        m_pendingTextureIds.push_back(h.id);
+}
+
+void D3D12Renderer::QueueTexturesFromRenderLists(const std::vector<RenderItem>& items, TextureHandle skybox, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text)
+{
+    // 3D
+    for (const auto& it : items)
+    {
+        RequestTexture(it.albedo);
+        // it.normal, it.metallic ...
+    }
+
+    // skybox
+    RequestTexture(skybox);
+
+    // UI
+    for (const auto& u : ui)
+    {
+        RequestTexture(u.tex);
+    }
+}
+
+void D3D12Renderer::PrepareTextures()
+{
+    if (m_pendingTextureIds.empty())
+        return;
+
+    for (auto id : m_pendingTextureIds)
+    {
+        // 없을 때만 생성 (한 프레임 안에서도 중복 방어)
+        if (m_gpuTextures.find(id) != m_gpuTextures.end())
+            continue;
+
+        TextureHandle h{};
+        h.id = id;
+
+        TextureGPUData gpu{};
+        if (m_textureManager->IsCubemap(h))
+        {
+            const TextureCubeCpuData& cpu = m_textureManager->GetCube(h);
+            CreateGPUCubeTextureFromCPU(cpu, gpu);   // 여기서 gpu.srvIndex 세팅 + SRV 생성
+        }
+        else
+        {
+            const TextureCpuData& cpu = m_textureManager->Get(h);
+            CreateGPUTextureFromCPU(cpu, gpu);       // 여기서 gpu.srvIndex 세팅 + SRV 생성
+        }
+
+        m_gpuTextures.emplace(id, std::move(gpu));
+    }
+
+    m_pendingTextureIds.clear();
+    m_pendingTextureDedup.clear();
+}
+
 // ---------------------------
 // Texture cache
 // ---------------------------
-uint32_t D3D12Renderer::GetOrCreateSrvIndex(const TextureHandle& h)
+uint32_t D3D12Renderer::GetSrvIndex(const TextureHandle& h)
 {
-    // invalid -> default slot 0
+    // invalid -> default
     if (!h.IsValid())
         return 0;
 
@@ -1729,23 +1929,9 @@ uint32_t D3D12Renderer::GetOrCreateSrvIndex(const TextureHandle& h)
     if (it != m_gpuTextures.end())
         return it->second.srvIndex;
 
-    assert(m_textureManager && "TextureManager not set");
-
-    TextureGPUData gpu{};
-    if (m_textureManager->IsCubemap(h))
-    {
-        const TextureCubeCpuData& cpu = m_textureManager->GetCube(h);
-        CreateGPUCubeTextureFromCPU(cpu, gpu);
-    }
-    else
-    {
-        const TextureCpuData& cpu = m_textureManager->Get(h);
-        CreateGPUTextureFromCPU(cpu, gpu);
-    }
-
-    auto [iter, inserted] = m_gpuTextures.emplace(h.id, std::move(gpu));
-    m_texturesCreatedThisFrame.push_back(h.id);
-    return iter->second.srvIndex;
+    // Render 중에는 생성 금지
+    // 아직 GPU에 없으면 기본 텍스처 사용
+    return 0;
 }
 
 void D3D12Renderer::CreateGPUTextureFromCPU(const TextureCpuData& cpu, TextureGPUData& out)
@@ -1755,8 +1941,8 @@ void D3D12Renderer::CreateGPUTextureFromCPU(const TextureCpuData& cpu, TextureGP
 
     // SRV 슬롯 할당
     const uint32_t srvIndex = m_nextSrvIndex++;
-    if (srvIndex >= 256)
-        throw std::runtime_error("SRV heap is full (>=256).");
+    if (srvIndex >= m_srvCapacity)
+        throw std::runtime_error("SRV heap is full.");
 
     const DXGI_FORMAT fmt =
         (cpu.colorSpace == ImageColorSpace::SRGB)

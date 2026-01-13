@@ -25,6 +25,9 @@ void SceneManager::Load(std::unique_ptr<Scene> scene)
     {
         SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, 0.0f, &m_skybox };
         m_current->OnLoad(ctx);
+
+        m_world.FlushStructuralChanges();
+        m_world.FlushScripts();
     }
 }
 

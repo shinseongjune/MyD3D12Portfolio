@@ -181,6 +181,12 @@
     <Filter Include="소스 파일\Game\04_BillBoard">
       <UniqueIdentifier>{6835dc4d-c9a3-4859-a29d-4da1c1f9b5d3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\Game\05_Combat">
+      <UniqueIdentifier>{9dc5493f-828e-463c-81d3-01f7c615b1a2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game\05_Combat">
+      <UniqueIdentifier>{af2a39e1-e88d-40eb-a752-3a4840f906a0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -396,8 +402,14 @@
     <ClInclude Include="PrimitiveMeshes.h">
       <Filter>헤더 파일\Engine\02_Assets\Model</Filter>
     </ClInclude>
-    <ClInclude Include="BillboardBehaviour.h">
+    <ClInclude Include="BillboardComponent.h">
       <Filter>헤더 파일\Game\04_BillBoard</Filter>
+    </ClInclude>
+    <ClInclude Include="GunComponent.h">
+      <Filter>헤더 파일\Game\05_Combat</Filter>
+    </ClInclude>
+    <ClInclude Include="BulletComponent.h">
+      <Filter>헤더 파일\Game\05_Combat</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -500,8 +512,14 @@
     <ClCompile Include="PrimitiveMeshes.cpp">
       <Filter>소스 파일\Engine\02_Assets\Model</Filter>
     </ClCompile>
-    <ClCompile Include="BillboardBehaviour.cpp">
+    <ClCompile Include="BillboardComponent.cpp">
       <Filter>소스 파일\Game\04_BillBoard</Filter>
+    </ClCompile>
+    <ClCompile Include="BulletComponent.cpp">
+      <Filter>소스 파일\Game\05_Combat</Filter>
+    </ClCompile>
+    <ClCompile Include="GunComponent.cpp">
+      <Filter>소스 파일\Game\05_Combat</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

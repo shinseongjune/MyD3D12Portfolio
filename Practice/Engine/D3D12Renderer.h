@@ -6,11 +6,11 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <d3d11on12.h>
-#include <d3d11_4.h>
 #include <d2d1_3.h>
 #include <dwrite.h>
 #include <string>
 #include <DirectXMath.h>
+#include <unordered_set>
 #include "IRenderer.h"
 #include "TextureCubeCpuData.h"
 
@@ -124,10 +124,16 @@ private:
     void RetireMesh(uint32_t meshId);
     void ProcessPendingMeshReleases();
 
-private:
+public:
     // ---- Texture GPU cache ----
-    // (1) TextureHandle -> srvIndex (필요하면 업로드하고 생성)
-    uint32_t GetOrCreateSrvIndex(const TextureHandle& h);
+    // (1) TextureHandle -> srvIndex
+    std::vector<uint32_t> m_pendingTextureIds;
+    std::unordered_set<uint32_t> m_pendingTextureDedup;
+    void RequestTexture(TextureHandle h) override;
+    void QueueTexturesFromRenderLists(const std::vector<RenderItem>& items, TextureHandle skybox, const std::vector<UIDrawItem>& ui, const std::vector<UITextDraw>& text) override;
+    void PrepareTextures() override;
+private:
+    uint32_t GetSrvIndex(const TextureHandle& h);
 
     // (2) CPU 텍스처 -> GPU 텍스처 + SRV 생성 (커맨드리스트에 copy/transition 기록)
     void CreateGPUTextureFromCPU(const TextureCpuData& cpu, TextureGPUData& out);
@@ -145,6 +151,8 @@ private:
     void CreateSkyboxMesh();
 
 private:
+    uint32_t m_srvCapacity = 0;
+
     static constexpr uint32_t FrameCount = 2;
 
     HWND m_hwnd = nullptr;
@@ -223,8 +231,14 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Resource> m_cb;
     uint8_t* m_cbMapped = nullptr;
     uint32_t  m_cbStride = 0;
+    uint64_t  m_cbSize = 0; // bytes
 
-    static constexpr uint32_t MaxDrawsPerFrame = 2048;
+    // 탄막, 다중 오브젝트 고려해서 넉넉히
+    static constexpr uint32_t MaxDrawsPerFrame = 8192;
+
+    // 3D/디버그/UI/스카이박스가 서로 CB 슬롯을 절대 공유하지 않게 예약
+    static constexpr uint32_t ReservedCBSlots = 3; // skybox, debug, uiDummy
+    static constexpr uint32_t MaxDraws3D = MaxDrawsPerFrame - ReservedCBSlots;
 
     // ---------------------------
     // Debug VB (persist-mapped upload)

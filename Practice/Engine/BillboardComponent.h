@@ -4,10 +4,10 @@
 
 enum class BillboardMode { Spherical, CylindricalY };
 
-class BillboardBehaviour : public Behaviour
+class BillboardComponent : public Behaviour
 {
 public:
-    explicit BillboardBehaviour(BillboardMode m = BillboardMode::Spherical) : mode(m) {}
+    explicit BillboardComponent(BillboardMode m = BillboardMode::Spherical) : mode(m) {}
     void Update(SceneContext& ctx) override;
 
     BillboardMode mode;

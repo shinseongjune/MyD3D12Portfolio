@@ -53,24 +53,6 @@ void FlightRigComponent::Update(SceneContext& ctx)
     auto& tr = ctx.world.GetTransform(Entity());
     FlightRigSystem::Step(tr, *this, m_input, ctx.dt);
 
-    // Debug: draw current velocity direction as a red line.
-    {
-        DirectX::XMVECTOR v = DirectX::XMLoadFloat3(&velocity);
-        float speed = DirectX::XMVectorGetX(DirectX::XMVector3Length(v));
-        if (speed > 0.1f)
-        {
-            DirectX::XMVECTOR dir = DirectX::XMVector3Normalize(v);
-            constexpr float kLen = 6.0f;
-            DirectX::XMVECTOR aV = DirectX::XMLoadFloat3(&tr.position);
-            DirectX::XMVECTOR bV = DirectX::XMVectorAdd(aV, DirectX::XMVectorScale(dir, kLen));
-
-            DirectX::XMFLOAT3 a, b;
-            DirectX::XMStoreFloat3(&a, aV);
-            DirectX::XMStoreFloat3(&b, bV);
-            DebugDraw::Line(a, b, { 1,0,0,1 });
-        }
-    }
-
     // Consume input so if the scene stops feeding it, we naturally return to neutral.
     m_input = {};
 }

@@ -2,6 +2,10 @@
 #include <cassert>
 #include <algorithm>
 #include <DirectXMath.h>
+#include <unordered_set>
+#if defined(_DEBUG)
+#include <windows.h>
+#endif
 #include "Behaviour.h"
 
 using namespace DirectX;
@@ -59,9 +63,6 @@ void World::DestroyEntity(EntityId e)
     if (HasScript(e))
     {
         auto& sc = GetScript(e);
-
-        for (auto& s : sc.scripts)
-            if (s.ptr) s.ptr->OnDestroy();
 
         RemoveScriptComponent(e);
     }
@@ -148,21 +149,7 @@ void World::EnsureMeshSparseSize(uint32_t entityIndex)
 void World::AddMesh(EntityId e, const MeshComponent& comp)
 {
     if (!IsAlive(e)) return;
-    EnsureMeshSparseSize(e.index);
-
-    // 이미 MeshComponent가 있으면 append
-    if (m_meshSparse[e.index] != InvalidDenseIndex)
-    {
-        const uint32_t di = m_meshSparse[e.index];
-        auto& dst = m_meshes[di].draws;
-        dst.insert(dst.end(), comp.draws.begin(), comp.draws.end());
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_meshes.size();
-    m_meshSparse[e.index] = denseIndex;
-    m_meshDenseEntities.push_back(e);
-    m_meshes.push_back(comp);
+    m_pendingAddMesh.push_back({ e, comp });
 }
 
 bool World::HasMesh(EntityId e) const
@@ -225,18 +212,7 @@ void World::EnsureMaterialSparseSize(uint32_t entityIndex)
 void World::AddMaterial(EntityId e, const MaterialComponent& comp)
 {
     if (!IsAlive(e)) return;
-    EnsureMaterialSparseSize(e.index);
-
-    if (m_materialSparse[e.index] != InvalidDenseIndex)
-    {
-        m_materials[m_materialSparse[e.index]] = comp; // ✅ 교체
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_materials.size();
-    m_materialSparse[e.index] = denseIndex;
-    m_materialDenseEntities.push_back(e);
-    m_materials.push_back(comp);
+    m_pendingAddMaterial.push_back({ e, comp });
 }
 
 bool World::HasMaterial(EntityId e) const
@@ -294,17 +270,10 @@ void World::EnsureCameraSparseSize(uint32_t entityIndex)
         m_cameraSparse.resize(entityIndex + 1, InvalidDenseIndex);
 }
 
-void World::AddCamera(EntityId e)
+void World::AddCamera(EntityId e, const CameraComponent& c)
 {
     if (!IsAlive(e)) return;
-    EnsureCameraSparseSize(e.index);
-    if (m_cameraSparse[e.index] != InvalidDenseIndex)
-        return;
-
-    const uint32_t denseIndex = (uint32_t)m_cameras.size();
-    m_cameraSparse[e.index] = denseIndex;
-    m_cameraDenseEntities.push_back(e);
-    m_cameras.emplace_back();
+    m_pendingAddCamera.push_back({ e, c });
 }
 
 bool World::HasCamera(EntityId e) const
@@ -403,23 +372,79 @@ void World::FlushDestroy()
     m_pendingDestroy.clear();
 }
 
-void World::AddTransform(EntityId e)
+void World::FlushStructuralChanges()
+{
+    // 0) Remove 먼저
+    for (EntityId e : m_pendingRemoveAudioSource) if (IsAlive(e)) RemoveAudioSource_Immediate(e);
+    for (EntityId e : m_pendingRemoveLight)       if (IsAlive(e)) RemoveLight_Immediate(e);
+    for (EntityId e : m_pendingRemoveUIElement)   if (IsAlive(e)) RemoveUIElement_Immediate(e);
+    for (EntityId e : m_pendingRemoveRigidBody)   if (IsAlive(e)) RemoveRigidBody_Immediate(e);
+    for (EntityId e : m_pendingRemoveCollider)    if (IsAlive(e)) RemoveCollider_Immediate(e);
+
+    m_pendingRemoveAudioSource.clear();
+    m_pendingRemoveLight.clear();
+    m_pendingRemoveUIElement.clear();
+    m_pendingRemoveRigidBody.clear();
+    m_pendingRemoveCollider.clear();
+
+    // 1) Add/Upsert 적용
+    for (auto& [e, c] : m_pendingAddTransform)   if (IsAlive(e)) AddTransform_Immediate(e, c);
+
+    for (auto& [e, c] : m_pendingAddMesh)        if (IsAlive(e)) AddMesh_Immediate(e, c);
+    for (auto& [e, c] : m_pendingAddMaterial)    if (IsAlive(e)) AddMaterial_Immediate(e, c);
+    for (auto& [e, c] : m_pendingAddCamera)      if (IsAlive(e)) AddCamera_Immediate(e, c);
+
+    for (auto& [e, rb] : m_pendingAddRigidBody)  if (IsAlive(e)) AddRigidBody_Immediate(e, rb);
+    for (auto& [e, col] : m_pendingAddCollider)  if (IsAlive(e)) AddCollider_Immediate(e, col);
+
+    for (auto& [e, a] : m_pendingAddAudioSource) if (IsAlive(e)) AddAudioSource_Immediate(e, a);
+    for (auto& [e, l] : m_pendingAddLight)       if (IsAlive(e)) AddLight_Immediate(e, l);
+    for (auto& [e, ui] : m_pendingAddUIElement)  if (IsAlive(e)) AddUIElement_Immediate(e, ui);
+
+    m_pendingAddTransform.clear();
+    m_pendingAddMesh.clear();
+    m_pendingAddMaterial.clear();
+    m_pendingAddCamera.clear();
+    m_pendingAddRigidBody.clear();
+    m_pendingAddCollider.clear();
+    m_pendingAddAudioSource.clear();
+    m_pendingAddLight.clear();
+    m_pendingAddUIElement.clear();
+
+    // 2) Script Add는 ScriptComponent를 여기서 “생성만” 하고, 실제 scripts 벡터 반영은 FlushScripts에서 하게 연결
+    for (auto& cmd : m_pendingScriptAdd)
+    {
+        if (!IsAlive(cmd.e) || !cmd.b) continue;
+
+        cmd.b->_SetEntity(cmd.e);
+        auto& sc = EnsureScriptComponent(cmd.e);          // 구조 변경이지만 이제 프레임 경계에서만 실행됨
+        sc.pendingAdd.push_back({ std::move(cmd.b), cmd.enabled });
+    }
+    m_pendingScriptAdd.clear();
+}
+
+void World::AddTransform(EntityId e, const TransformComponent& init)
 {
     if (!IsAlive(e)) return;
-    EnsureTransformSparseSize(e.index);
+    m_pendingAddTransform.push_back({ e, init });
+}
 
-    if (m_transformSparse[e.index] != InvalidDenseIndex)
-        return; // already has
+TransformComponent& World::GetPendingTransform(EntityId e)
+{
+    for (auto& [pe, tc] : m_pendingAddTransform)
+    {
+        if (pe == e)
+            return tc;
+    }
 
-    const uint32_t denseIndex = (uint32_t)m_transforms.size();
-    m_transformSparse[e.index] = denseIndex;
+#if defined(_DEBUG)
+    OutputDebugStringA("GetPendingTransform: pending transform not found\n");
+    __debugbreak();
+#endif
 
-    m_transformDenseEntities.push_back(e);
-    m_transforms.emplace_back();
-
-    // world를 identity로 초기화
-    XMStoreFloat4x4(&m_transforms.back().world, XMMatrixIdentity());
-    m_transforms.back().dirty = true;
+    // 절대 여기까지 오면 안 되지만 컴파일러용
+    static TransformComponent dummy{};
+    return dummy;
 }
 
 bool World::HasTransform(EntityId e) const
@@ -449,6 +474,19 @@ const TransformComponent& World::GetTransform(EntityId e) const
 #endif
     const uint32_t denseIndex = m_transformSparse[e.index];
     return m_transforms[denseIndex];
+}
+
+bool World::IsTransformPending(EntityId e) const
+{
+    for (const auto& p : m_pendingAddTransform)
+        if (p.first == e)
+            return true;
+    return false;
+}
+
+bool World::HasOrPendingTransform(EntityId e) const
+{
+    return HasTransform(e) || IsTransformPending(e);
 }
 
 void World::RemoveTransform(EntityId e)
@@ -619,20 +657,43 @@ void World::UpdateTransformNow(EntityId e)
 
 void World::UpdateTransforms()
 {
-    // 루트들부터 갱신 (parent가 invalid인 transform)
+    using namespace DirectX;
     const XMMATRIX I = XMMatrixIdentity();
 
-    for (size_t i = 0; i < m_transformDenseEntities.size(); ++i)
-    {
-        EntityId e = m_transformDenseEntities[i];
-        if (!HasTransform(e)) continue;
+    // dirty가 된 노드들의 "루트"를 모아서 중복 없이 갱신
+    std::vector<EntityId> roots;
+    roots.reserve(32);
 
-        const TransformComponent& t = GetTransform(e);
-        if (!t.parent.IsValid() && t.dirty)
+    std::unordered_set<uint32_t> seenRoots; // root.index로 중복 제거
+    seenRoots.reserve(64);
+
+    auto FindRoot = [&](EntityId e) -> EntityId
         {
-            UpdateWorldRecursive(e, I);
-        }
+            EntityId r = e;
+            while (HasTransform(r))
+            {
+                const TransformComponent& t = GetTransform(r);
+                if (!t.parent.IsValid()) break;
+                r = t.parent;
+            }
+            return r;
+        };
+
+    for (EntityId e : m_transformDenseEntities)
+    {
+        if (!HasTransform(e)) continue;
+        const TransformComponent& t = GetTransform(e);
+        if (!t.dirty) continue;
+
+        EntityId root = FindRoot(e);
+        if (!root.IsValid() || !HasTransform(root)) continue;
+
+        if (seenRoots.insert(root.index).second)
+            roots.push_back(root);
     }
+
+    for (EntityId root : roots)
+        UpdateWorldRecursive(root, I);
 
     m_transformUpdatedFrame = m_frameIndex;
 }
@@ -662,6 +723,278 @@ void World::RemoveScript(EntityId e, Behaviour* which)
     sc.pendingRemove.push_back({ which });
 }
 
+void World::AddTransform_Immediate(EntityId e, const TransformComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureTransformSparseSize(e.index);
+
+    if (m_transformSparse[e.index] != InvalidDenseIndex)
+        return; // already has
+
+    const uint32_t denseIndex = (uint32_t)m_transforms.size();
+    m_transformSparse[e.index] = denseIndex;
+
+    m_transformDenseEntities.push_back(e);
+    m_transforms.push_back(comp);
+
+    // world를 identity로 초기화
+    auto& t = m_transforms.back();
+    t.world = DirectX::XMFLOAT4X4{};
+    DirectX::XMStoreFloat4x4(&t.world, DirectX::XMMatrixIdentity());
+
+    t.dirty = true;
+}
+
+void World::AddMesh_Immediate(EntityId e, const MeshComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureMeshSparseSize(e.index);
+
+    // 이미 MeshComponent가 있으면 append
+    if (m_meshSparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_meshSparse[e.index];
+        auto& dst = m_meshes[di].draws;
+        dst.insert(dst.end(), comp.draws.begin(), comp.draws.end());
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_meshes.size();
+    m_meshSparse[e.index] = denseIndex;
+    m_meshDenseEntities.push_back(e);
+    m_meshes.push_back(comp);
+}
+
+void World::AddMaterial_Immediate(EntityId e, const MaterialComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureMaterialSparseSize(e.index);
+
+    if (m_materialSparse[e.index] != InvalidDenseIndex)
+    {
+        m_materials[m_materialSparse[e.index]] = comp;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_materials.size();
+    m_materialSparse[e.index] = denseIndex;
+    m_materialDenseEntities.push_back(e);
+    m_materials.push_back(comp);
+}
+
+void World::AddCamera_Immediate(EntityId e, const CameraComponent& c)
+{
+    if (!IsAlive(e)) return;
+    EnsureCameraSparseSize(e.index);
+    if (m_cameraSparse[e.index] != InvalidDenseIndex)
+        return;
+
+    const uint32_t denseIndex = (uint32_t)m_cameras.size();
+    m_cameraSparse[e.index] = denseIndex;
+    m_cameraDenseEntities.push_back(e);
+    m_cameras.push_back(c);
+}
+
+void World::AddRigidBody_Immediate(EntityId e, const RigidBodyComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureRigidBodySparseSize(e.index);
+
+    // 이미 있으면 갱신(덮어쓰기)
+    if (m_rigidBodySparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_rigidBodySparse[e.index];
+        m_rigidBodies[di] = comp;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_rigidBodies.size();
+    m_rigidBodySparse[e.index] = denseIndex;
+    m_rigidBodyDenseEntities.push_back(e);
+    m_rigidBodies.push_back(comp);
+}
+
+void World::AddCollider_Immediate(EntityId e, const ColliderComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureColliderSparseSize(e.index);
+
+    // 이미 있으면 갱신(덮어쓰기)
+    if (m_colliderSparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_colliderSparse[e.index];
+        m_colliders[di] = comp;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_colliders.size();
+    m_colliderSparse[e.index] = denseIndex;
+    m_colliderDenseEntities.push_back(e);
+    m_colliders.push_back(comp);
+}
+
+void World::AddAudioSource_Immediate(EntityId e, const AudioSourceComponent& c)
+{
+    if (!IsAlive(e)) return;
+    EnsureAudioSourceSparseSize(e.index);
+
+    // 이미 있으면 갱신(덮어쓰기)
+    if (m_audioSourceSparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_audioSourceSparse[e.index];
+        m_audioSources[di] = c;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_audioSources.size();
+    m_audioSourceSparse[e.index] = denseIndex;
+    m_audioSourceDenseEntities.push_back(e);
+    m_audioSources.push_back(c);
+}
+
+void World::AddLight_Immediate(EntityId e, const LightComponent& c)
+{
+    if (!IsAlive(e)) return;
+    EnsureLightSparseSize(e.index);
+
+    if (HasLight(e))
+    {
+        m_lights[m_lightSparse[e.index]] = c;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_lights.size();
+    m_lights.push_back(c);
+    m_lightDenseEntities.push_back(e);
+    m_lightSparse[e.index] = denseIndex;
+}
+
+void World::AddUIElement_Immediate(EntityId e, const UIElementComponent& c)
+{
+    if (!IsAlive(e)) return;
+    EnsureUIElementSparseSize(e.index);
+
+    // 이미 있으면 갱신(덮어쓰기)
+    if (m_uiElementSparse[e.index] != InvalidDenseIndex)
+    {
+        const uint32_t di = m_uiElementSparse[e.index];
+        m_uiElements[di] = c;
+        return;
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_uiElements.size();
+    m_uiElementSparse[e.index] = denseIndex;
+    m_uiElementDenseEntities.push_back(e);
+    m_uiElements.push_back(c);
+}
+
+void World::RemoveAudioSource_Immediate(EntityId e)
+{
+    if (!HasAudioSource(e)) return;
+
+    const uint32_t denseIndex = m_audioSourceSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_audioSources.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_audioSources[denseIndex] = std::move(m_audioSources[lastIndex]);
+        m_audioSourceDenseEntities[denseIndex] = m_audioSourceDenseEntities[lastIndex];
+
+        EntityId movedEntity = m_audioSourceDenseEntities[denseIndex];
+        EnsureAudioSourceSparseSize(movedEntity.index);
+        m_audioSourceSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_audioSources.pop_back();
+    m_audioSourceDenseEntities.pop_back();
+    m_audioSourceSparse[e.index] = InvalidDenseIndex;
+}
+
+void World::RemoveLight_Immediate(EntityId e)
+{
+    if (!HasLight(e)) return;
+
+    const uint32_t denseIndex = m_lightSparse[e.index];
+    const uint32_t last = (uint32_t)m_lights.size() - 1;
+
+    if (denseIndex != last)
+    {
+        m_lights[denseIndex] = m_lights[last];
+        m_lightDenseEntities[denseIndex] = m_lightDenseEntities[last];
+        m_lightSparse[m_lightDenseEntities[denseIndex].index] = denseIndex;
+    }
+
+    m_lights.pop_back();
+    m_lightDenseEntities.pop_back();
+    m_lightSparse[e.index] = InvalidDenseIndex;
+}
+
+void World::RemoveUIElement_Immediate(EntityId e)
+{
+    if (!HasUIElement(e)) return;
+
+    const uint32_t denseIndex = m_uiElementSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_uiElements.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_uiElements[denseIndex] = std::move(m_uiElements[lastIndex]);
+        m_uiElementDenseEntities[denseIndex] = m_uiElementDenseEntities[lastIndex];
+
+        EntityId movedEntity = m_uiElementDenseEntities[denseIndex];
+        EnsureUIElementSparseSize(movedEntity.index);
+        m_uiElementSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_uiElements.pop_back();
+    m_uiElementDenseEntities.pop_back();
+    m_uiElementSparse[e.index] = InvalidDenseIndex;
+}
+
+void World::RemoveRigidBody_Immediate(EntityId e)
+{
+    if (!HasRigidBody(e)) return;
+
+    const uint32_t denseIndex = m_rigidBodySparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_rigidBodies.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_rigidBodies[denseIndex] = std::move(m_rigidBodies[lastIndex]);
+        m_rigidBodyDenseEntities[denseIndex] = m_rigidBodyDenseEntities[lastIndex];
+
+        EntityId movedEntity = m_rigidBodyDenseEntities[denseIndex];
+        EnsureRigidBodySparseSize(movedEntity.index);
+        m_rigidBodySparse[movedEntity.index] = denseIndex;
+    }
+
+    m_rigidBodies.pop_back();
+    m_rigidBodyDenseEntities.pop_back();
+    m_rigidBodySparse[e.index] = InvalidDenseIndex;
+}
+
+void World::RemoveCollider_Immediate(EntityId e)
+{
+    if (!HasCollider(e)) return;
+
+    const uint32_t denseIndex = m_colliderSparse[e.index];
+    const uint32_t lastIndex = (uint32_t)m_colliders.size() - 1;
+
+    if (denseIndex != lastIndex)
+    {
+        m_colliders[denseIndex] = std::move(m_colliders[lastIndex]);
+        m_colliderDenseEntities[denseIndex] = m_colliderDenseEntities[lastIndex];
+
+        EntityId movedEntity = m_colliderDenseEntities[denseIndex];
+        EnsureColliderSparseSize(movedEntity.index);
+        m_colliderSparse[movedEntity.index] = denseIndex;
+    }
+
+    m_colliders.pop_back();
+    m_colliderDenseEntities.pop_back();
+    m_colliderSparse[e.index] = InvalidDenseIndex;
+}
+
 void World::RemoveScriptComponent(EntityId e)
 {
     if (!HasScript(e)) return;
@@ -669,6 +1002,24 @@ void World::RemoveScriptComponent(EntityId e)
     const uint32_t di = m_scriptSparse[e.index];
     const uint32_t last = (uint32_t)m_scripts.size() - 1;
 
+    // 1) 제거 대상 컴포넌트 정리 (pending 포함)
+    {
+        auto& sc = m_scripts[di];
+
+        // scripts 안에 들어간 Behaviour는 제거 시 OnDestroy 호출 보장
+        for (auto& s : sc.scripts)
+            if (s.ptr) s.ptr->OnDestroy();
+
+        sc.scripts.clear();
+
+        // 아직 편입 전인 unique_ptr들도 여기서 정리됨
+        sc.pendingAdd.clear();
+
+        // raw 포인터 큐는 반드시 비워서 댕글링 읽기 차단
+        sc.pendingRemove.clear();
+    }
+
+    // 2) dense swap-remove
     if (di != last)
     {
         m_scripts[di] = std::move(m_scripts[last]);
@@ -692,7 +1043,14 @@ XMFLOAT3 World::GetLocalPosition(EntityId e) const
 
 void World::SetLocalPosition(EntityId e, const XMFLOAT3& p)
 {
-    if (!HasTransform(e)) return;
+    if (!HasOrPendingTransform(e)) return;
+
+    if (!HasTransform(e))
+    {
+        auto& pend = GetPendingTransform(e);
+        pend.position = p;
+        return;
+    }
 
     TransformComponent& t = GetTransform(e);
     t.position = p;
@@ -710,26 +1068,29 @@ void World::SetLocalRotation(EntityId e, const XMFLOAT4& q)
 {
     using namespace DirectX;
 
-    if (!HasTransform(e)) return;
+    if (!HasOrPendingTransform(e)) return;
 
-    // Normalize to avoid drift / invalid rotations
     XMVECTOR vq = XMLoadFloat4(&q);
-
-    // If near-zero length, fall back to identity
     float lsq = XMVectorGetX(XMVector4LengthSq(vq));
-    if (lsq < 1e-8f)
+
+    XMFLOAT4 out = { 0.f, 0.f, 0.f, 1.f };
+    if (lsq >= 1e-8f)
     {
-        TransformComponent& t = GetTransform(e);
-        t.rotation = XMFLOAT4{ 0.f, 0.f, 0.f, 1.f };
-        MarkDirtyRecursive(e);
-        return;
+        vq = XMQuaternionNormalize(vq);
+        XMStoreFloat4(&out, vq);
     }
 
-    vq = XMQuaternionNormalize(vq);
-
-    TransformComponent& t = GetTransform(e);
-    XMStoreFloat4(&t.rotation, vq);
-    MarkDirtyRecursive(e);
+    if (HasTransform(e))
+    {
+        TransformComponent& t = GetTransform(e);
+        t.rotation = out;
+        MarkDirtyRecursive(e);
+    }
+    else
+    {
+        TransformComponent& t = GetPendingTransform(e);
+        t.rotation = out;
+    }
 }
 
 DirectX::XMFLOAT3 World::GetLocalRotationEuler(EntityId e) const
@@ -768,14 +1129,26 @@ void World::SetLocalRotationEuler(EntityId e, const DirectX::XMFLOAT3& eulerRad)
 {
     using namespace DirectX;
 
-    if (!HasTransform(e)) return;
+    if (!HasOrPendingTransform(e)) return;
 
-    XMVECTOR q = XMQuaternionRotationRollPitchYaw(eulerRad.x, eulerRad.y, eulerRad.z);
+    XMVECTOR q = XMQuaternionRotationRollPitchYaw(
+        eulerRad.x, eulerRad.y, eulerRad.z
+    );
 
-    TransformComponent& t = GetTransform(e);
-    XMStoreFloat4(&t.rotation, q);
+    XMFLOAT4 out;
+    XMStoreFloat4(&out, q);
 
-    MarkDirtyRecursive(e);
+    if (HasTransform(e))
+    {
+        TransformComponent& t = GetTransform(e);
+        t.rotation = out;
+        MarkDirtyRecursive(e);
+    }
+    else
+    {
+        TransformComponent& t = GetPendingTransform(e);
+        t.rotation = out;
+    }
 }
 
 XMFLOAT3 World::GetLocalScale(EntityId e) const
@@ -787,21 +1160,40 @@ XMFLOAT3 World::GetLocalScale(EntityId e) const
 
 void World::SetLocalScale(EntityId e, const XMFLOAT3& s)
 {
-    if (!HasTransform(e)) return;
+    if (!HasOrPendingTransform(e)) return;
 
-    TransformComponent& t = GetTransform(e);
-    t.scale = s;
-    MarkDirtyRecursive(e);
+    if (HasTransform(e))
+    {
+        TransformComponent& t = GetTransform(e);
+        t.scale = s;
+        MarkDirtyRecursive(e);
+    }
+    else
+    {
+        TransformComponent& t = GetPendingTransform(e);
+        t.scale = s;
+    }
 }
 
 void World::TranslateLocal(EntityId e, const XMFLOAT3& delta)
 {
-    if (!HasTransform(e)) return;
-    TransformComponent& t = GetTransform(e);
-    t.position.x += delta.x;
-    t.position.y += delta.y;
-    t.position.z += delta.z;
-    MarkDirtyRecursive(e);
+    if (!HasOrPendingTransform(e)) return;
+
+    if (HasTransform(e))
+    {
+        TransformComponent& t = GetTransform(e);
+        t.position.x += delta.x;
+        t.position.y += delta.y;
+        t.position.z += delta.z;
+        MarkDirtyRecursive(e);
+    }
+    else
+    {
+        TransformComponent& t = GetPendingTransform(e);
+        t.position.x += delta.x;
+        t.position.y += delta.y;
+        t.position.z += delta.z;
+    }
 }
 
 XMFLOAT4X4 World::GetWorldMatrix(EntityId e) const
@@ -846,20 +1238,7 @@ void World::EnsureRigidBodySparseSize(uint32_t entityIndex)
 void World::AddRigidBody(EntityId e, const RigidBodyComponent& comp)
 {
     if (!IsAlive(e)) return;
-    EnsureRigidBodySparseSize(e.index);
-
-    // 이미 있으면 갱신(덮어쓰기)
-    if (m_rigidBodySparse[e.index] != InvalidDenseIndex)
-    {
-        const uint32_t di = m_rigidBodySparse[e.index];
-        m_rigidBodies[di] = comp;
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_rigidBodies.size();
-    m_rigidBodySparse[e.index] = denseIndex;
-    m_rigidBodyDenseEntities.push_back(e);
-    m_rigidBodies.push_back(comp);
+    m_pendingAddRigidBody.push_back({ e, comp });
 }
 
 bool World::HasRigidBody(EntityId e) const
@@ -891,24 +1270,8 @@ const RigidBodyComponent& World::GetRigidBody(EntityId e) const
 
 void World::RemoveRigidBody(EntityId e)
 {
-    if (!HasRigidBody(e)) return;
-
-    const uint32_t denseIndex = m_rigidBodySparse[e.index];
-    const uint32_t lastIndex = (uint32_t)m_rigidBodies.size() - 1;
-
-    if (denseIndex != lastIndex)
-    {
-        m_rigidBodies[denseIndex] = std::move(m_rigidBodies[lastIndex]);
-        m_rigidBodyDenseEntities[denseIndex] = m_rigidBodyDenseEntities[lastIndex];
-
-        EntityId movedEntity = m_rigidBodyDenseEntities[denseIndex];
-        EnsureRigidBodySparseSize(movedEntity.index);
-        m_rigidBodySparse[movedEntity.index] = denseIndex;
-    }
-
-    m_rigidBodies.pop_back();
-    m_rigidBodyDenseEntities.pop_back();
-    m_rigidBodySparse[e.index] = InvalidDenseIndex;
+    if (!IsAlive(e)) return;
+    m_pendingRemoveRigidBody.push_back(e);
 }
 
 
@@ -925,20 +1288,7 @@ void World::EnsureColliderSparseSize(uint32_t entityIndex)
 void World::AddCollider(EntityId e, const ColliderComponent& comp)
 {
     if (!IsAlive(e)) return;
-    EnsureColliderSparseSize(e.index);
-
-    // 이미 있으면 갱신(덮어쓰기)
-    if (m_colliderSparse[e.index] != InvalidDenseIndex)
-    {
-        const uint32_t di = m_colliderSparse[e.index];
-        m_colliders[di] = comp;
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_colliders.size();
-    m_colliderSparse[e.index] = denseIndex;
-    m_colliderDenseEntities.push_back(e);
-    m_colliders.push_back(comp);
+    m_pendingAddCollider.push_back({ e, comp });
 }
 
 bool World::HasCollider(EntityId e) const
@@ -970,24 +1320,8 @@ const ColliderComponent& World::GetCollider(EntityId e) const
 
 void World::RemoveCollider(EntityId e)
 {
-    if (!HasCollider(e)) return;
-
-    const uint32_t denseIndex = m_colliderSparse[e.index];
-    const uint32_t lastIndex = (uint32_t)m_colliders.size() - 1;
-
-    if (denseIndex != lastIndex)
-    {
-        m_colliders[denseIndex] = std::move(m_colliders[lastIndex]);
-        m_colliderDenseEntities[denseIndex] = m_colliderDenseEntities[lastIndex];
-
-        EntityId movedEntity = m_colliderDenseEntities[denseIndex];
-        EnsureColliderSparseSize(movedEntity.index);
-        m_colliderSparse[movedEntity.index] = denseIndex;
-    }
-
-    m_colliders.pop_back();
-    m_colliderDenseEntities.pop_back();
-    m_colliderSparse[e.index] = InvalidDenseIndex;
+    if (!IsAlive(e)) return;
+    m_pendingRemoveCollider.push_back(e);
 }
 
 void World::PushCollisionEvent(const CollisionEvent& ev)
@@ -1020,10 +1354,7 @@ void World::AddScript(EntityId e, std::unique_ptr<Behaviour> b, bool enabled)
 {
     if (!IsAlive(e) || !b) return;
 
-    b->_SetEntity(e);
-
-    auto& sc = EnsureScriptComponent(e);
-    sc.pendingAdd.push_back({ std::move(b), enabled });
+    m_pendingScriptAdd.push_back({ e, std::move(b), enabled });
 }
 
 bool World::HasScript(EntityId e) const
@@ -1048,16 +1379,27 @@ ScriptComponent& World::GetScript(EntityId e)
 
 void World::FlushScripts()
 {
-    // ScriptComponent를 가진 엔티티만 순회
-    for (size_t di = 0; di < m_scripts.size(); ++di)
+#if defined(_DEBUG)
+    if (m_scripts.size() != m_scriptDenseEntities.size())
+    {
+        OutputDebugStringA("Script storage mismatch: m_scripts.size != m_scriptDenseEntities.size\n");
+        __debugbreak();
+    }
+#endif
+
+    size_t di = 0;
+    while (di < m_scripts.size())
     {
         EntityId e = m_scriptDenseEntities[di];
-        if (!IsAlive(e)) continue;
-        if (IsPendingDestroy(e)) continue;
+        if (!IsAlive(e) || IsPendingDestroy(e))
+        {
+            ++di;
+            continue;
+        }
 
         auto& sc = m_scripts[di];
 
-        // 1) pendingRemove 처리 (OnDestroy 1회 보장)
+        // 1) pendingRemove
         if (!sc.pendingRemove.empty())
         {
             for (auto& r : sc.pendingRemove)
@@ -1070,10 +1412,8 @@ void World::FlushScripts()
                     auto& entry = sc.scripts[i];
                     if (entry.ptr.get() != target) continue;
 
-                    // Unity는 RemoveComponent면 OnDestroy 호출됨.
                     entry.ptr->OnDestroy();
 
-                    // swap-remove로 안전하게 제거
                     const size_t last = sc.scripts.size() - 1;
                     if (i != last) sc.scripts[i] = std::move(sc.scripts[last]);
                     sc.scripts.pop_back();
@@ -1083,7 +1423,7 @@ void World::FlushScripts()
             sc.pendingRemove.clear();
         }
 
-        // 2) pendingAdd 처리
+        // 2) pendingAdd
         if (!sc.pendingAdd.empty())
         {
             sc.scripts.reserve(sc.scripts.size() + sc.pendingAdd.size());
@@ -1093,22 +1433,20 @@ void World::FlushScripts()
                 ScriptEntry se;
                 se.ptr = std::move(a.ptr);
                 se.enabled = a.enabled;
-                // awoken/started = false로 시작 → 다음 프레임에 Awake/Start 보장
                 sc.scripts.push_back(std::move(se));
             }
             sc.pendingAdd.clear();
         }
 
-        // scripts도 비고, pending도 비면 ScriptComponent 제거
+        // 3) empty => remove component
         if (sc.scripts.empty() && sc.pendingAdd.empty())
         {
             RemoveScriptComponent(e);
-
-            // RemoveScriptComponent가 swap-remove를 하니까,
-            // 현재 di에는 다른 엔티티가 들어왔을 수 있음 -> di-- 해서 재검사
-            --di;
+            // swap-remove로 현재 di 위치에 "새 엔티티"가 들어왔으니 di 증가 없이 재검사
             continue;
         }
+
+        ++di;
     }
 }
 
@@ -1128,20 +1466,7 @@ void World::EnsureLightSparseSize(uint32_t entityIndex)
 void World::AddAudioSource(EntityId e, const AudioSourceComponent& c)
 {
     if (!IsAlive(e)) return;
-    EnsureAudioSourceSparseSize(e.index);
-
-    // 이미 있으면 갱신(덮어쓰기)
-    if (m_audioSourceSparse[e.index] != InvalidDenseIndex)
-    {
-        const uint32_t di = m_audioSourceSparse[e.index];
-        m_audioSources[di] = c;
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_audioSources.size();
-    m_audioSourceSparse[e.index] = denseIndex;
-    m_audioSourceDenseEntities.push_back(e);
-    m_audioSources.push_back(c);
+    m_pendingAddAudioSource.push_back({ e, c });
 }
 
 bool World::HasAudioSource(EntityId e) const
@@ -1173,41 +1498,14 @@ const AudioSourceComponent& World::GetAudioSource(EntityId e) const
 
 void World::RemoveAudioSource(EntityId e)
 {
-    if (!HasAudioSource(e)) return;
-
-    const uint32_t denseIndex = m_audioSourceSparse[e.index];
-    const uint32_t lastIndex = (uint32_t)m_audioSources.size() - 1;
-
-    if (denseIndex != lastIndex)
-    {
-        m_audioSources[denseIndex] = std::move(m_audioSources[lastIndex]);
-        m_audioSourceDenseEntities[denseIndex] = m_audioSourceDenseEntities[lastIndex];
-
-        EntityId movedEntity = m_audioSourceDenseEntities[denseIndex];
-        EnsureAudioSourceSparseSize(movedEntity.index);
-        m_audioSourceSparse[movedEntity.index] = denseIndex;
-    }
-
-    m_audioSources.pop_back();
-    m_audioSourceDenseEntities.pop_back();
-    m_audioSourceSparse[e.index] = InvalidDenseIndex;
+    if (!IsAlive(e)) return;
+    m_pendingRemoveAudioSource.push_back(e);
 }
 
 void World::AddLight(EntityId e, const LightComponent& c)
 {
-	if (!IsAlive(e)) return;
-    EnsureLightSparseSize(e.index);
-
-    if (HasLight(e))
-    {
-        m_lights[m_lightSparse[e.index]] = c;
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_lights.size();
-    m_lights.push_back(c);
-    m_lightDenseEntities.push_back(e);
-    m_lightSparse[e.index] = denseIndex;
+    if (!IsAlive(e)) return;
+    m_pendingAddLight.push_back({ e, c });
 }
 
 bool World::HasLight(EntityId e) const
@@ -1231,21 +1529,8 @@ const LightComponent& World::GetLight(EntityId e) const
 
 void World::RemoveLight(EntityId e)
 {
-    if (!HasLight(e)) return;
-
-    const uint32_t denseIndex = m_lightSparse[e.index];
-    const uint32_t last = (uint32_t)m_lights.size() - 1;
-
-    if (denseIndex != last)
-    {
-        m_lights[denseIndex] = m_lights[last];
-        m_lightDenseEntities[denseIndex] = m_lightDenseEntities[last];
-        m_lightSparse[m_lightDenseEntities[denseIndex].index] = denseIndex;
-    }
-
-    m_lights.pop_back();
-    m_lightDenseEntities.pop_back();
-    m_lightSparse[e.index] = InvalidDenseIndex;
+    if (!IsAlive(e)) return;
+    m_pendingRemoveLight.push_back(e);
 }
 
 const std::vector<LightComponent>& World::GetLightsDense() const { return m_lights; }
@@ -1259,20 +1544,7 @@ void World::EnsureUIElementSparseSize(uint32_t entityIndex)
 void World::AddUIElement(EntityId e, const UIElementComponent& c)
 {
     if (!IsAlive(e)) return;
-    EnsureUIElementSparseSize(e.index);
-
-    // 이미 있으면 갱신(덮어쓰기)
-    if (m_uiElementSparse[e.index] != InvalidDenseIndex)
-    {
-        const uint32_t di = m_uiElementSparse[e.index];
-        m_uiElements[di] = c;
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_uiElements.size();
-    m_uiElementSparse[e.index] = denseIndex;
-    m_uiElementDenseEntities.push_back(e);
-    m_uiElements.push_back(c);
+    m_pendingAddUIElement.push_back({ e, c });
 }
 
 bool World::HasUIElement(EntityId e) const
@@ -1304,22 +1576,6 @@ const UIElementComponent& World::GetUIElement(EntityId e) const
 
 void World::RemoveUIElement(EntityId e)
 {
-    if (!HasUIElement(e)) return;
-
-    const uint32_t denseIndex = m_uiElementSparse[e.index];
-    const uint32_t lastIndex = (uint32_t)m_uiElements.size() - 1;
-
-    if (denseIndex != lastIndex)
-    {
-        m_uiElements[denseIndex] = std::move(m_uiElements[lastIndex]);
-        m_uiElementDenseEntities[denseIndex] = m_uiElementDenseEntities[lastIndex];
-
-        EntityId movedEntity = m_uiElementDenseEntities[denseIndex];
-        EnsureUIElementSparseSize(movedEntity.index);
-        m_uiElementSparse[movedEntity.index] = denseIndex;
-    }
-
-    m_uiElements.pop_back();
-    m_uiElementDenseEntities.pop_back();
-    m_uiElementSparse[e.index] = InvalidDenseIndex;
+    if (!IsAlive(e)) return;
+    m_pendingRemoveUIElement.push_back(e);
 }

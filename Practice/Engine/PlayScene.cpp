@@ -6,7 +6,8 @@
 #include "SceneContext.h"
 #include "FlightRigComponent.h"
 #include "CameraRigComponent.h"
-#include "BillboardBehaviour.h"
+#include "BillboardComponent.h"
+#include "GunComponent.h"
 
 
 void PlayScene::OnLoad(SceneContext& ctx)
@@ -16,16 +17,6 @@ void PlayScene::OnLoad(SceneContext& ctx)
 	m_quad = CreateQuadMesh(ctx);
 	m_bulletTex = CreateBulletTexture(ctx);
 
-    //test
-    EntityId e = ctx.Instantiate("bulletSprite");
-    ctx.world.AddTransform(e);
-    ctx.world.AddMesh(e, MeshComponent{ m_quad });
-    ctx.world.AddMaterial(e, MaterialComponent{ DirectX::XMFLOAT4(1,1,1,1), m_bulletTex });
-	ctx.world.GetMaterial(e).Primary().transparent = true;
-	ctx.world.GetMaterial(e).Primary().unlit = true;
-    ctx.world.SetLocalPosition(e, { 0.f, 1.f, 100.f });
-	ctx.world.SetLocalRotationEuler(e, { 0.f, 180.f, 0.f });
-	ctx.world.AddScript(e, std::make_unique<BillboardBehaviour>(BillboardMode::Spherical) );
 
     // Import models
     Result<ModelAsset> res_model_spacefighter = ImportModel(ctx, "Assets/Model/space_fighter.obj");
@@ -60,37 +51,28 @@ void PlayScene::OnLoad(SceneContext& ctx)
     ctx.world.SetLocalPosition(fighter, { 0.0f, 0.0f, 0.0f });
     m_player = fighter;
 
-
-// Spawn a reference fighter (static) so you can compare motion/attitude.
-{
-    SpawnModelOptions refOpt{};
-    refOpt.name = "Reference";
-    auto spawned_ref = ctx.SpawnModel(res_model_spacefighter.value, refOpt);
-    if (spawned_ref.IsOk())
-    {
-        EntityId ref = spawned_ref.value;
-        ctx.world.AddMaterial(ref, mat_spacefighter);
-        ctx.world.SetLocalPosition(ref, { 0.0f, 0.0f, 50.0f });
-        // No FlightRig on reference (stays still).
-    }
-}
-
-
     // Attach flight rig as a Behaviour (script component)
     {
         auto rig = std::make_unique<FlightRigComponent>();
-        // Optional: tweak defaults here if you want different feel.
         ctx.world.AddScript(m_player, std::move(rig));
+    }
+    // Attach gun
+    {
+        auto gun = std::make_unique<GunComponent>();
+        gun->SetHandles(m_quad, m_bulletTex);
+        ctx.world.AddScript(m_player, std::move(gun));
     }
 
     // Camera
     {
         EntityId cam = ctx.Instantiate("MainCamera");
         ctx.world.AddTransform(cam);
-        ctx.world.AddCamera(cam);
+
+        CameraComponent cc{};
+        ctx.world.AddCamera(cam, cc);
 
         ctx.world.SetLocalPosition(cam, { 0.f, 0.f, -6.f });
-        ctx.world.GetCamera(cam).active = true;
+        cc.active = true;
         m_cam = cam;
 
         // Attach camera rig as a Behaviour so it updates in ScriptSystem order.
@@ -159,10 +141,34 @@ CameraRigComponent* PlayScene::GetCameraRig(SceneContext& ctx)
     return nullptr;
 }
 
+GunComponent* PlayScene::GetGun(SceneContext& ctx)
+{
+    if (!ctx.world.HasScript(m_player)) return nullptr;
+
+    auto& sc = ctx.world.GetScript(m_player);
+
+    // Scripts added this frame live in pendingAdd until World::FlushScripts() (EndFrame).
+    for (auto& p : sc.pendingAdd)
+    {
+        if (!p.ptr || !p.enabled) continue;
+        if (auto* gun = dynamic_cast<GunComponent*>(p.ptr.get()))
+            return gun;
+    }
+
+    for (auto& s : sc.scripts)
+    {
+        if (!s.ptr || !s.enabled) continue;
+        if (auto* gun = dynamic_cast<GunComponent*>(s.ptr.get()))
+            return gun;
+    }
+    return nullptr;
+}
+
 void PlayScene::ExecuteCommand(SceneContext& ctx)
 {
     FlightRigComponent* rig = GetFlightRig(ctx);
     CameraRigComponent* camRig = GetCameraRig(ctx);
+    GunComponent* gun = GetGun(ctx);
 
     FlightInput flightIn{};
     bool hasMove = false;
@@ -180,6 +186,7 @@ void PlayScene::ExecuteCommand(SceneContext& ctx)
             hasMove = true;
             break;
         case ShooterAction::FireGun:
+            gun->Fire(ctx);
             break;
         case ShooterAction::FireMissile:
             break;
