@@ -144,6 +144,7 @@
     <ClInclude Include="ColliderComponent.h" />
     <ClInclude Include="CollisionEvents.h" />
     <ClInclude Include="DWriteFontFace.h" />
+    <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="FlightRigComponent.h" />
     <ClInclude Include="FlightRigSystem.h" />
     <ClInclude Include="FrameLights.h" />
@@ -184,6 +185,7 @@
     <ClCompile Include="CameraRig.cpp" />
     <ClCompile Include="CameraRigComponent.cpp" />
     <ClCompile Include="DWriteFontFace.cpp" />
+    <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="FlightRigComponent.cpp" />
     <ClCompile Include="FlightRigSystem.cpp" />
     <ClCompile Include="GunComponent.cpp" />

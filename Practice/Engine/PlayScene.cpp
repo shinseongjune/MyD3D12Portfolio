@@ -2,13 +2,19 @@
 
 #include <DirectXMath.h>
 #include <memory>
+#include <random>
 #include "World.h"
 #include "SceneContext.h"
 #include "FlightRigComponent.h"
 #include "CameraRigComponent.h"
-#include "BillboardComponent.h"
 #include "GunComponent.h"
 
+static float RandRange(float a, float b)
+{
+    static std::mt19937 rng{ std::random_device{}() };
+    static std::uniform_real_distribution<float> dist(a, b);
+    return dist(rng);
+}
 
 void PlayScene::OnLoad(SceneContext& ctx)
 {
@@ -37,30 +43,48 @@ void PlayScene::OnLoad(SceneContext& ctx)
     MaterialComponent mat_starcruiser  = CreateMaterial(ctx, texh_starcruiser);
 
     // Spawn player
-    SpawnModelOptions spawnOpt{};
-    spawnOpt.name = "Player";
-    auto spawned_spacefighter = ctx.SpawnModel(res_model_spacefighter.value, spawnOpt);
-    if (!spawned_spacefighter.IsOk())
     {
-        LOG_ERROR("Failed to Spawn space_fighter: %s", spawned_spacefighter.error->message.c_str());
-        return;
+        SpawnModelOptions spawnOpt{};
+        spawnOpt.name = "Player";
+        auto spawned_spacefighter = ctx.SpawnModel(res_model_spacefighter.value, spawnOpt);
+#if defined(_DEBUG)
+        if (!spawned_spacefighter.IsOk())
+        {
+            LOG_ERROR("Failed to Spawn space_fighter: %s", spawned_spacefighter.error->message.c_str());
+            return;
+        }
+#endif
+        EntityId fighter = spawned_spacefighter.value;
+        ctx.world.AddMaterial(fighter, mat_spacefighter);
+        ctx.world.SetLocalPosition(fighter, { 0.0f, 0.0f, 0.0f });
+        m_player = fighter;
+
+        // Attach flight rig as a Behaviour (script component)
+        {
+            auto rig = std::make_unique<FlightRigComponent>();
+            ctx.world.AddScript(m_player, std::move(rig));
+        }
+        // Attach gun
+        {
+            auto gun = std::make_unique<GunComponent>();
+            gun->SetHandles(m_quad, m_bulletTex);
+            ctx.world.AddScript(m_player, std::move(gun));
+        }
     }
 
-    EntityId fighter = spawned_spacefighter.value;
-    ctx.world.AddMaterial(fighter, mat_spacefighter);
-    ctx.world.SetLocalPosition(fighter, { 0.0f, 0.0f, 0.0f });
-    m_player = fighter;
-
-    // Attach flight rig as a Behaviour (script component)
+    // test enemies
     {
-        auto rig = std::make_unique<FlightRigComponent>();
-        ctx.world.AddScript(m_player, std::move(rig));
-    }
-    // Attach gun
-    {
-        auto gun = std::make_unique<GunComponent>();
-        gun->SetHandles(m_quad, m_bulletTex);
-        ctx.world.AddScript(m_player, std::move(gun));
+        for (int i = 0; i < 100; i++)
+        {
+            static int enemyNumber = 0;
+            SpawnModelOptions spawnOpt{};
+            spawnOpt.name = "Enemy" + enemyNumber++;
+            auto spawned_cruiser = ctx.SpawnModel(res_model_starcruiser.value, spawnOpt);
+            EntityId cruiser = spawned_cruiser.value;
+            ctx.world.AddMaterial(cruiser, mat_starcruiser);
+            ctx.world.SetLocalPosition(cruiser, { RandRange(-200, 200), RandRange(-100, 100), RandRange(0, 300) });
+            ctx.world.SetLocalRotationEuler(cruiser, { RandRange(0, 360), RandRange(0, 360), RandRange(0, 360) });
+        }
     }
 
     // Camera
@@ -78,7 +102,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
         // Attach camera rig as a Behaviour so it updates in ScriptSystem order.
         auto camRig = std::make_unique<CameraRigComponent>();
         camRig->SetCamera(m_cam);
-        camRig->SetTarget(fighter);
+        camRig->SetTarget(m_player);
         camRig->SetFollowEnabled(true);
         ctx.world.AddScript(m_cam, std::move(camRig));
     }
@@ -86,7 +110,6 @@ void PlayScene::OnLoad(SceneContext& ctx)
 
 void PlayScene::OnUnload(SceneContext& ctx)
 {
-    (void)ctx;
 }
 
 void PlayScene::OnUpdate(SceneContext& ctx)

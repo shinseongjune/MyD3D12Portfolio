@@ -7,8 +7,8 @@
 class GunComponent : public Behaviour
 {
 public:
-	DirectX::XMFLOAT3 muzzleOffset{ 0.0f, 0.0f, 1.0f };
-	float fireInterval = 0.2f;
+	DirectX::XMFLOAT3 muzzleOffset{ 0.0f, 0.0f, 0.5f };
+	float fireInterval = 0.125f;
 	float fireCooldown = 0.0f;
 
 	void Update(SceneContext& ctx) override;

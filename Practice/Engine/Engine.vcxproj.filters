@@ -187,6 +187,12 @@
     <Filter Include="소스 파일\Game\05_Combat">
       <UniqueIdentifier>{af2a39e1-e88d-40eb-a752-3a4840f906a0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\Game\06_Effect">
+      <UniqueIdentifier>{66d0e5c6-021c-48c5-9d79-4ccdcb5d0bff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game\06_Effect">
+      <UniqueIdentifier>{e6f6b762-b9bc-41f7-a4cc-162dd3f559a4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -411,6 +417,9 @@
     <ClInclude Include="BulletComponent.h">
       <Filter>헤더 파일\Game\05_Combat</Filter>
     </ClInclude>
+    <ClInclude Include="EffectComponent.h">
+      <Filter>헤더 파일\Game\06_Effect</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -520,6 +529,9 @@
     </ClCompile>
     <ClCompile Include="GunComponent.cpp">
       <Filter>소스 파일\Game\05_Combat</Filter>
+    </ClCompile>
+    <ClCompile Include="EffectComponent.cpp">
+      <Filter>소스 파일\Game\06_Effect</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
