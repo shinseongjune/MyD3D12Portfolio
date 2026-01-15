@@ -41,7 +41,7 @@ public:
     float airbrakeDragMul = 4.0f;
 
     float turnRatePitch = DirectX::XMConvertToRadians(90.0f);  // rad/s
-    float turnRateRoll  = DirectX::XMConvertToRadians(140.0f);
+    float turnRateRoll  = DirectX::XMConvertToRadians(160.0f);
     // Yaw should be subtle (rudder), most turning comes from roll.
     float turnRateYaw   = DirectX::XMConvertToRadians(8.0f);
 

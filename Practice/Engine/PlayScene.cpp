@@ -1,20 +1,13 @@
 #include "PlayScene.h"
-
 #include <DirectXMath.h>
 #include <memory>
-#include <random>
 #include "World.h"
 #include "SceneContext.h"
 #include "FlightRigComponent.h"
 #include "CameraRigComponent.h"
 #include "GunComponent.h"
-
-static float RandRange(float a, float b)
-{
-    static std::mt19937 rng{ std::random_device{}() };
-    static std::uniform_real_distribution<float> dist(a, b);
-    return dist(rng);
-}
+#include "MyRandom.h"
+#include "StatsComponent.h"
 
 void PlayScene::OnLoad(SceneContext& ctx)
 {
@@ -54,10 +47,9 @@ void PlayScene::OnLoad(SceneContext& ctx)
             return;
         }
 #endif
-        EntityId fighter = spawned_spacefighter.value;
-        ctx.world.AddMaterial(fighter, mat_spacefighter);
-        ctx.world.SetLocalPosition(fighter, { 0.0f, 0.0f, 0.0f });
-        m_player = fighter;
+        m_player = spawned_spacefighter.value;
+        ctx.world.AddMaterial(m_player, mat_spacefighter);
+        ctx.world.SetLocalPosition(m_player, { 0.0f, 0.0f, 0.0f });
 
         // Attach flight rig as a Behaviour (script component)
         {
@@ -70,11 +62,35 @@ void PlayScene::OnLoad(SceneContext& ctx)
             gun->SetHandles(m_quad, m_bulletTex);
             ctx.world.AddScript(m_player, std::move(gun));
         }
+        // Attach collider & rigidbody
+        {
+            ColliderComponent col;
+            col.shapeType = ShapeType::Sphere;
+            col.localCenter = { 0, -1.0f, 0.3f };
+            col.sphere.radius = 2.0f;
+            col.layer = 1;
+            PhysicsMaterial pm;
+            pm.restitution = 0.5f;
+            col.material = pm;
+            ctx.world.AddCollider(m_player, col);
+
+            RigidBodyComponent rb;
+            rb.type = BodyType::Dynamic;
+            rb.useGravity = false;
+            ctx.world.AddRigidBody(m_player, rb);
+        }
+        // Attach Stats
+        {
+            auto stats = std::make_unique<StatsComponent>();
+            stats->SetHp(10000);
+            stats->SetQuadMesh(m_quad);
+            ctx.world.AddScript(m_player, std::move(stats));
+        }
     }
 
     // test enemies
     {
-        for (int i = 0; i < 100; i++)
+        for (int i = 0; i < 50; i++)
         {
             static int enemyNumber = 0;
             SpawnModelOptions spawnOpt{};
@@ -84,6 +100,32 @@ void PlayScene::OnLoad(SceneContext& ctx)
             ctx.world.AddMaterial(cruiser, mat_starcruiser);
             ctx.world.SetLocalPosition(cruiser, { RandRange(-200, 200), RandRange(-100, 100), RandRange(0, 300) });
             ctx.world.SetLocalRotationEuler(cruiser, { RandRange(0, 360), RandRange(0, 360), RandRange(0, 360) });
+
+
+            // Attach collider & rigidbody
+            {
+                ColliderComponent col;
+                col.shapeType = ShapeType::Sphere;
+                col.localCenter = { 0, -1.0f, 0.5f };
+                col.sphere.radius = 10.0f;
+                col.layer = 1 << 1;
+                PhysicsMaterial pm;
+                pm.restitution = 0.5f;
+                col.material = pm;
+                ctx.world.AddCollider(cruiser, col);
+
+                RigidBodyComponent rb;
+                rb.type = BodyType::Dynamic;
+                rb.useGravity = false;
+                ctx.world.AddRigidBody(cruiser, rb);
+            }
+            // Attach Stats
+            {
+                auto stats = std::make_unique<StatsComponent>();
+                stats->SetHp(100);
+                stats->SetQuadMesh(m_quad);
+                ctx.world.AddScript(cruiser, std::move(stats));
+            }
         }
     }
 

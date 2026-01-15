@@ -965,6 +965,10 @@ bool PhysicsSystem::Raycast(const World& world, const DirectX::XMFLOAT3& origin,
     const auto& ents = world.GetColliderEntities();
     for (EntityId e : ents)
     {
+        if (!world.IsAlive(e)) continue;
+        if (!world.HasCollider(e)) continue;
+        if (!world.HasTransform(e)) continue;
+
         const auto& col = world.GetCollider(e);
 
         // layer/mask

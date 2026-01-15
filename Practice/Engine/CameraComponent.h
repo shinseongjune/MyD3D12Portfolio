@@ -5,6 +5,6 @@ struct CameraComponent
     float fovYDegrees = 60.0f;
 	float FovYRadians() const { return fovYDegrees * 3.14159265f / 180.0f; }
     float nearZ = 0.1f;
-    float farZ = 800.0f;
+    float farZ = 500.0f;
     bool  active = true;
 };

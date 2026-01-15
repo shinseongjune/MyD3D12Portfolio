@@ -58,6 +58,16 @@ public:
     void BeginFrame();
     bool TransformsUpdatedThisFrame() const;
 
+    // Get Behaviour Component
+    template<typename T>
+    T* GetScriptAs(EntityId e);
+
+    template<typename T>
+    const T* GetScriptAs(EntityId e) const;
+
+    template<typename T>
+    T* GetOrPendingScriptAs(EntityId e);
+
 private:
     struct Slot
     {
@@ -313,3 +323,68 @@ public:
     void RemoveScriptComponent(EntityId e);
     bool IsPendingDestroy(EntityId e) const;
 };
+
+template<typename T>
+inline T* World::GetScriptAs(EntityId e)
+{
+    if (!IsAlive(e)) return nullptr;
+    if (!HasScript(e)) return nullptr;
+
+    auto& sc = GetScript(e);
+    for (auto& entry : sc.scripts)
+    {
+        if (!entry.ptr) continue;
+        if (!entry.enabled) continue;
+
+        if (auto* casted = dynamic_cast<T*>(entry.ptr.get()))
+            return casted;
+    }
+    return nullptr;
+}
+
+template<typename T>
+inline const T* World::GetScriptAs(EntityId e) const
+{
+    if (!IsAlive(e)) return nullptr;
+    if (!HasScript(e)) return nullptr;
+
+    auto& sc = GetScript(e);
+    for (auto& entry : sc.scripts)
+    {
+        if (!entry.ptr) continue;
+        if (!entry.enabled) continue;
+
+        if (auto* casted = dynamic_cast<const T*>(entry.ptr.get()))
+            return casted;
+    }
+    return nullptr;
+}
+
+template<typename T>
+inline T* World::GetOrPendingScriptAs(EntityId e)
+{
+    if (!IsAlive(e)) return nullptr;
+    if (!HasScript(e)) return nullptr;
+
+    auto& sc = GetScript(e);
+
+    // 1) 이미 편입된 scripts
+    for (auto& entry : sc.scripts)
+    {
+        if (!entry.ptr) continue;
+        if (!entry.enabled) continue;
+        if (auto* casted = dynamic_cast<T*>(entry.ptr.get()))
+            return casted;
+    }
+
+    // 2) 아직 pendingAdd에 있는 것들
+    for (auto& a : sc.pendingAdd)
+    {
+        if (!a.ptr) continue;
+        if (!a.enabled) continue;
+        if (auto* casted = dynamic_cast<T*>(a.ptr.get()))
+            return casted;
+    }
+
+    return nullptr;
+}

@@ -1,6 +1,10 @@
 #include "BulletComponent.h"
 #include "SceneContext.h"
 #include "PhysicsSystem.h"
+#include "StatsComponent.h"
+#if defined(_DEBUG)
+#include <Windows.h>
+#endif
 
 void BulletComponent::Start(SceneContext& ctx)
 {
@@ -48,7 +52,16 @@ void BulletComponent::Step(SceneContext& ctx)
             // 맞은 지점으로 스냅
             tr.position = hit.point;
 
-            // TODO: damage 처리
+            EntityId hitEntity = hit.entity;
+            if (ctx.world.HasScript(hitEntity))
+            {
+                auto* stats = ctx.world.GetScriptAs<StatsComponent>(hitEntity);
+                if (stats != nullptr)
+                {
+                    stats->TakeDamage(20);
+                    OutputDebugStringA("test hit");
+                }
+            }
 
             DestroyBullet(ctx);
             return;

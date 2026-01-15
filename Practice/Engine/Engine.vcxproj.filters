@@ -193,6 +193,9 @@
     <Filter Include="소스 파일\Game\06_Effect">
       <UniqueIdentifier>{e6f6b762-b9bc-41f7-a4cc-162dd3f559a4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\Game\07_Utility">
+      <UniqueIdentifier>{20e2763b-5aeb-486d-9023-44defbba56ad}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -420,6 +423,12 @@
     <ClInclude Include="EffectComponent.h">
       <Filter>헤더 파일\Game\06_Effect</Filter>
     </ClInclude>
+    <ClInclude Include="StatsComponent.h">
+      <Filter>헤더 파일\Game\05_Combat</Filter>
+    </ClInclude>
+    <ClInclude Include="MyRandom.h">
+      <Filter>헤더 파일\Game\07_Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -532,6 +541,9 @@
     </ClCompile>
     <ClCompile Include="EffectComponent.cpp">
       <Filter>소스 파일\Game\06_Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="StatsComponent.cpp">
+      <Filter>소스 파일\Game\05_Combat</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
