@@ -1,6 +1,7 @@
 #include "PlayScene.h"
 #include <DirectXMath.h>
 #include <memory>
+#include <format>
 #include "World.h"
 #include "SceneContext.h"
 #include "FlightRigComponent.h"
@@ -8,6 +9,7 @@
 #include "GunComponent.h"
 #include "MyRandom.h"
 #include "StatsComponent.h"
+#include "PlayerBooster.h"
 
 void PlayScene::OnLoad(SceneContext& ctx)
 {
@@ -30,6 +32,63 @@ void PlayScene::OnLoad(SceneContext& ctx)
 
     TextureHandle texh_starcruiser = LoadTexture(ctx, "Assets/Texture/star_cruiser_diffuse.png");
     if (!texh_starcruiser.IsValid()) return;
+
+    // booster anims
+    {
+        for (int i = 0; i < 11; i++) 
+        {
+            std::string path = std::format("Assets/Texture/Booster/booster-{:02}.png", i);
+
+            m_boosterAnims.push_back(LoadTexture(ctx, path));
+        }
+    }
+
+    // death anims
+    {
+        for (int i = 1; i <= 3; i++)
+        {
+            std::vector<TextureHandle> deathAnims;
+
+            for (int j = 0; j < 12; j++) 
+            {
+                std::string path = std::format("Assets/Texture/Death/death{}-{:02}.png", i, j);
+
+                deathAnims.push_back(LoadTexture(ctx, path));
+            }
+
+            m_deathAnimsContainer.push_back(deathAnims);
+        }
+    }
+
+    // bullet hit anims
+    {
+        for (int i = 0; i < 9; i++) 
+        {
+            std::string path = std::format("Assets/Texture/BulletHit/bullet_hit-{}.png", i);
+
+            m_bulletHitAnims.push_back(LoadTexture(ctx, path));
+        }
+    }
+
+    // missile boom anims
+    {
+        for (int i = 0; i < 6; i++) 
+        {
+            std::string path = std::format("Assets/Texture/MissileBoom/missile_boom-{:02}.png", i);
+
+            m_missleHitAnims.push_back(LoadTexture(ctx, path));
+        }
+    }
+
+    // missile booster anims
+    {
+        for (int i = 0; i < 12; i++)
+        {
+            std::string path = std::format("Assets/Texture/MissileBooster/missile_booster-{:02}.png", i);
+
+            m_missleHitAnims.push_back(LoadTexture(ctx, path));
+        }
+    }
 
     // Materials
     MaterialComponent mat_spacefighter = CreateMaterial(ctx, texh_spacefighter);
@@ -60,6 +119,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
         {
             auto gun = std::make_unique<GunComponent>();
             gun->SetHandles(m_quad, m_bulletTex);
+            gun->SetBulletHitAnims(m_bulletHitAnims);
             ctx.world.AddScript(m_player, std::move(gun));
         }
         // Attach collider & rigidbody
@@ -84,7 +144,15 @@ void PlayScene::OnLoad(SceneContext& ctx)
             auto stats = std::make_unique<StatsComponent>();
             stats->SetHp(10000);
             stats->SetQuadMesh(m_quad);
+            stats->SetDieAnims(m_deathAnimsContainer[0]);
             ctx.world.AddScript(m_player, std::move(stats));
+        }
+        // Attach Booster
+        {
+            auto booster = std::make_unique<PlayerBooster>();
+            booster->SetQuadMesh(m_quad);
+            booster->SetBoosterAnims(m_boosterAnims);
+            ctx.world.AddScript(m_player, std::move(booster));
         }
     }
 
@@ -124,6 +192,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
                 auto stats = std::make_unique<StatsComponent>();
                 stats->SetHp(100);
                 stats->SetQuadMesh(m_quad);
+                stats->SetDieAnims(m_deathAnimsContainer[i % 3]);
                 ctx.world.AddScript(cruiser, std::move(stats));
             }
         }

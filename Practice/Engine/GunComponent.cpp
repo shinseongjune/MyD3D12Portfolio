@@ -6,15 +6,15 @@
 
 void GunComponent::Update(SceneContext& ctx)
 {
-	fireCooldown -= ctx.dt;
-	if (fireCooldown <= 0) fireCooldown = 0;
+	m_fireCooldown -= ctx.dt;
+	if (m_fireCooldown <= 0) m_fireCooldown = 0;
 }
 
 void GunComponent::Fire(SceneContext& ctx)
 {
 	using namespace DirectX;
 
-	if (fireCooldown > 0) 
+	if (m_fireCooldown > 0) 
 	{
 		return;
 	}
@@ -42,11 +42,14 @@ void GunComponent::Fire(SceneContext& ctx)
 	mat.unlit = true;
 	ctx.world.AddMaterial(e, matCom);
 	ctx.world.SetLocalPosition(e, out);
+
 	ctx.world.AddScript(e, std::make_unique<BillboardComponent>(BillboardMode::Spherical));
 
 	auto bullet = std::make_unique<BulletComponent>();
 	bullet->SetOwner(Entity());
+	bullet->SetQuadMesh(m_quad);
+   	bullet->SetBulletHitAnims(m_bulletHitAnims);
 	ctx.world.AddScript(e, std::move(bullet));
 
-	fireCooldown = fireInterval;
+	m_fireCooldown = m_fireInterval;
 }

@@ -51,7 +51,7 @@ void FlightRigComponent::Update(SceneContext& ctx)
         return;
 
     auto& tr = ctx.world.GetTransform(Entity());
-    FlightRigSystem::Step(tr, *this, m_input, ctx.dt);
+    currentSpeed = FlightRigSystem::Step(tr, *this, m_input, ctx.dt);
 
     // Consume input so if the scene stops feeding it, we naturally return to neutral.
     m_input = {};

@@ -1,10 +1,11 @@
 #include "BulletComponent.h"
+#include <memory>
 #include "SceneContext.h"
 #include "PhysicsSystem.h"
 #include "StatsComponent.h"
-#if defined(_DEBUG)
-#include <Windows.h>
-#endif
+#include "MyRandom.h"
+#include "EffectComponent.h"
+#include "BillboardComponent.h"
 
 void BulletComponent::Start(SceneContext& ctx)
 {
@@ -21,8 +22,8 @@ void BulletComponent::Update(SceneContext& ctx)
 {
 	Step(ctx);
 
-	lifeTime -= ctx.dt;
-	if (lifeTime <= 0.0f)
+	m_lifeTime -= ctx.dt;
+	if (m_lifeTime <= 0.0f)
 	{
 		DestroyBullet(ctx);
 	}
@@ -39,7 +40,7 @@ void BulletComponent::Step(SceneContext& ctx)
     XMStoreFloat3(&dirN, dirV);
 
     XMVECTOR posV = XMLoadFloat3(&tr.position);
-    float dist = speed * ctx.dt;
+    float dist = m_speed * ctx.dt;
 
     PhysicsSystem::RaycastHit hit{};
 
@@ -59,9 +60,9 @@ void BulletComponent::Step(SceneContext& ctx)
                 if (stats != nullptr)
                 {
                     stats->TakeDamage(20);
-                    OutputDebugStringA("test hit");
                 }
             }
+            MakeHitEffect(ctx);
 
             DestroyBullet(ctx);
             return;
@@ -76,4 +77,34 @@ void BulletComponent::Step(SceneContext& ctx)
 void BulletComponent::DestroyBullet(SceneContext& ctx)
 {
 	ctx.world.RequestDestroy(Entity());
+}
+
+void BulletComponent::MakeHitEffect(SceneContext& ctx)
+{
+    if (!m_quad.IsValid()) return;
+    if (m_bulletHitAnims.empty()) return;
+
+    EntityId effect = ctx.Instantiate("hitof_" + ctx.world.GetName(Entity()));
+
+    ctx.world.AddTransform(effect);
+    ctx.world.SetLocalPosition(effect, ctx.world.GetLocalPosition(Entity()));
+    float scale = RandRange(1.5f, 4.5f);
+    ctx.world.SetLocalScale(effect, { scale, scale, scale });
+
+    ctx.world.AddMesh(effect, MeshComponent{ m_quad });
+
+    MaterialComponent dieMat;
+    auto& mat = dieMat.Primary();
+    mat.albedo = m_bulletHitAnims[0];
+    mat.transparent = true;
+    mat.unlit = true;
+    ctx.world.AddMaterial(effect, dieMat);
+
+    ctx.world.AddScript(effect, std::make_unique<BillboardComponent>(BillboardMode::Spherical));
+
+    auto dieEffect = std::make_unique<EffectComponent>();
+    dieEffect->SetAnims(m_bulletHitAnims);
+    dieEffect->SetLifeTime(RandRange(0.4f, 0.8f));
+    dieEffect->SetFrameDuration(RandRange(0.05f, 0.18f));
+    ctx.world.AddScript(effect, std::move(dieEffect));
 }

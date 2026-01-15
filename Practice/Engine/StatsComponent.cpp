@@ -4,6 +4,8 @@
 #include "MeshComponent.h"
 #include "MaterialComponent.h"
 #include "EffectComponent.h"
+#include "BillboardComponent.h"
+#include "CameraRigComponent.h"
 
 void StatsComponent::Update(SceneContext& ctx)
 {
@@ -13,6 +15,10 @@ void StatsComponent::Update(SceneContext& ctx)
 	{
 		ctx.world.RequestDestroy(Entity());
 		MakeDeadEffect(ctx);
+
+		auto cam = ctx.world.FindActiveCamera();
+		auto camRig = ctx.world.GetScriptAs<CameraRigComponent>(cam);
+		camRig->Impulse(RandRange(0.25f, 1.2f), 0.03f);
 		m_deadEffectSpawned = true;
 	}
 }
@@ -38,18 +44,23 @@ void StatsComponent::MakeDeadEffect(SceneContext& ctx)
 	
 	ctx.world.AddTransform(effect);
 	ctx.world.SetLocalPosition(effect, ctx.world.GetLocalPosition(Entity()));
-	float scale = RandRange(0.5f, 1.5f);
+	float scale = RandRange(9.2f, 15.3f);
 	ctx.world.SetLocalScale(effect, { scale, scale, scale });
 
 	ctx.world.AddMesh(effect, MeshComponent{ m_quad });
 	
 	MaterialComponent dieMat;
-	dieMat.Primary().albedo = m_anims[0];
+	auto& mat = dieMat.Primary();
+	mat.transparent = true;
+	mat.unlit = true;
+	mat.albedo = m_anims[0];
 	ctx.world.AddMaterial(effect, dieMat);
+
+	ctx.world.AddScript(effect, std::make_unique<BillboardComponent>(BillboardMode::Spherical));
 	
 	auto dieEffect = std::make_unique<EffectComponent>();
 	dieEffect->SetAnims(m_anims);
-	dieEffect->SetLifeTime(RandRange(1, 1.5f));
-	dieEffect->SetFrameDuration(RandRange(0.1f, 0.23f));
+	dieEffect->SetLifeTime(RandRange(0.5f, 1.3f));
+	dieEffect->SetFrameDuration(RandRange(0.05f, 0.18f));
 	ctx.world.AddScript(effect, std::move(dieEffect));
 }

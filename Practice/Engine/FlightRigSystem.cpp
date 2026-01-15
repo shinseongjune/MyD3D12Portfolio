@@ -57,9 +57,9 @@ static XMVECTOR QuaternionFromBasis(FXMVECTOR right, FXMVECTOR up, FXMVECTOR fwd
     return XMQuaternionNormalize(XMQuaternionRotationMatrix(R));
 }
 
-void FlightRigSystem::Step(TransformComponent& tr, FlightRigComponent& rig, const FlightInput& in, float dt)
+float FlightRigSystem::Step(TransformComponent& tr, FlightRigComponent& rig, const FlightInput& in, float dt)
 {
-    if (dt <= 0.0f) return;
+    if (dt <= 0.0f) return 0;
 
     // 0) throttle
     rig.throttle01 = Clamp01(rig.throttle01 + in.throttleDelta * dt);
@@ -204,4 +204,6 @@ void FlightRigSystem::Step(TransformComponent& tr, FlightRigComponent& rig, cons
     XMStoreFloat3(&tr.position, pos);
 
     tr.dirty = true;
+
+    return newSpeed;
 }

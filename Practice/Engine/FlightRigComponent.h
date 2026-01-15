@@ -34,7 +34,7 @@ public:
 
     // Tuning
     float minSpeed = 0.0f;
-    float maxSpeed = 80.0f;
+    float maxSpeed = 35.0f;
 
     float thrustAccel = 25.0f;   // forward accel (m/s^2-ish)
     float drag = 0.02f;          // proportional to speed
@@ -86,6 +86,8 @@ public:
     // Behaviour
     void Start(SceneContext& ctx) override;
     void Update(SceneContext& ctx) override;
+
+    float currentSpeed = 10;
 
 private:
     FlightInput m_input{};

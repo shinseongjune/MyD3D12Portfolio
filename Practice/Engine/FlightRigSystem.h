@@ -6,5 +6,5 @@
 // Stateless helper that advances one FlightRigComponent + Transform by dt.
 struct FlightRigSystem
 {
-    static void Step(TransformComponent& tr, FlightRigComponent& rig, const FlightInput& in, float dt);
+    static float Step(TransformComponent& tr, FlightRigComponent& rig, const FlightInput& in, float dt);
 };

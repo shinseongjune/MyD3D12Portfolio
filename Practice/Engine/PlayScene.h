@@ -95,6 +95,12 @@ private:
     MeshHandle m_quad;
     TextureHandle m_bulletTex;
 
+    std::vector<TextureHandle> m_boosterAnims;
+    std::vector<std::vector<TextureHandle>> m_deathAnimsContainer;
+    std::vector<TextureHandle> m_bulletHitAnims;
+    std::vector<TextureHandle> m_missleHitAnims;
+    std::vector<TextureHandle> m_missleBoosterAnims;
+
 private:
     void SetSkybox(SceneContext& ctx);
     void SetDirectionalLight(SceneContext& ctx);
