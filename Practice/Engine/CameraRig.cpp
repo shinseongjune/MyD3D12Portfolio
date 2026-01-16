@@ -155,8 +155,8 @@ void CameraRig::Update(World& world, float dt)
         if (m_remainingTime <= 0.f)
         {
             m_remainingTime = 0.f;
-            m_orbitYaw = m_orbitYaw + (0 - m_orbitYaw) * 0.5f;
-            m_orbitPitch = m_orbitPitch + (XMConvertToRadians(-20.0f) - m_orbitPitch) * 0.5f;
+            m_orbitYaw = m_orbitYaw + (0 - m_orbitYaw) * m_returnDelay * dt;
+            m_orbitPitch = m_orbitPitch + (XMConvertToRadians(-20.0f) - m_orbitPitch) * m_returnDelay * dt;
         }
     }
     m_hadLookInputThisFrame = false;

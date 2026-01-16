@@ -106,7 +106,7 @@ void PlayerBooster::MakeBoosterFlame(SceneContext& ctx, DirectX::FXMVECTOR baseP
     XMFLOAT3 flamePos;
     XMStoreFloat3(&flamePos, flamePosV);
     ctx.world.SetLocalPosition(effect, flamePos);
-    ctx.world.SetLocalScale(effect, { 0.25f, 0.25f, 0.25f });
+    ctx.world.SetLocalScale(effect, { 0.18f, 0.18f, 0.18f });
 
     ctx.world.AddMesh(effect, MeshComponent{ m_quad });
 

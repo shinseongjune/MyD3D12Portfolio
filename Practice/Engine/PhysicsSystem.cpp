@@ -220,7 +220,7 @@ void PhysicsSystem::Step(World& world, float dt)
 	// 7) Collision Events
     EmitCollisionEvents(world, contacts);
 
-	DebugDrawColliders(world, contacts); // 디버그 드로우
+	//DebugDrawColliders(world, contacts); // 디버그 드로우
 
 	// 8) Sleep 업데이트
     UpdateSleep(world, dt);

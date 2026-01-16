@@ -70,14 +70,14 @@ private:
     float m_orbitPitch = 0.0f;
 
     // yaw/pitch limit
-    float m_orbitYawLimit = DirectX::XMConvertToRadians(180.f);
+    float m_orbitYawLimit = DirectX::XMConvertToRadians(160.f);
     float m_orbitPitchLimit = DirectX::XMConvertToRadians(45.f);
 
     // radius
-    float m_orbitRadius = 4.5f;
+    float m_orbitRadius = 6.0f;
 
-    // Return-to-center: delay 후 즉시 0으로 스냅(스무딩 없음)
-    float m_returnDelay = 0.8f;
+    // Return-to-center: delay 후 0으로 스냅
+    float m_returnDelay = 3.5f;
     float m_remainingTime = 0.0f;
     bool  m_hadLookInputThisFrame = false;
 
