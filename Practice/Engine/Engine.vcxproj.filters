@@ -453,6 +453,12 @@
     <ClInclude Include="ResultScene.h">
       <Filter>헤더 파일\Game\01_Scenes</Filter>
     </ClInclude>
+    <ClInclude Include="MissileComponent.h">
+      <Filter>헤더 파일\Game\05_Combat</Filter>
+    </ClInclude>
+    <ClInclude Include="MissileLauncherComponent.h">
+      <Filter>헤더 파일\Game\05_Combat</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -580,6 +586,12 @@
     </ClCompile>
     <ClCompile Include="ResultScene.cpp">
       <Filter>소스 파일\Game\01_Scenes</Filter>
+    </ClCompile>
+    <ClCompile Include="MissileComponent.cpp">
+      <Filter>소스 파일\Game\05_Combat</Filter>
+    </ClCompile>
+    <ClCompile Include="MissileLauncherComponent.cpp">
+      <Filter>소스 파일\Game\05_Combat</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

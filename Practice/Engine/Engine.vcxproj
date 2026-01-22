@@ -163,6 +163,8 @@
     <ClInclude Include="Input.h" />
     <ClInclude Include="IRenderer.h" />
     <ClInclude Include="LightComponent.h" />
+    <ClInclude Include="MissileComponent.h" />
+    <ClInclude Include="MissileLauncherComponent.h" />
     <ClInclude Include="MyRandom.h" />
     <ClInclude Include="PhysicsSystem.h" />
     <ClInclude Include="PhysicsTestScene.h" />
@@ -195,6 +197,8 @@
     <ClCompile Include="FlightRigComponent.cpp" />
     <ClCompile Include="FlightRigSystem.cpp" />
     <ClCompile Include="GunComponent.cpp" />
+    <ClCompile Include="MissileComponent.cpp" />
+    <ClCompile Include="MissileLauncherComponent.cpp" />
     <ClCompile Include="PlayerBooster.cpp" />
     <ClCompile Include="PlayScene.cpp" />
     <ClCompile Include="ResultScene.cpp" />

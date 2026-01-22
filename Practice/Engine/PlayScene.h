@@ -10,6 +10,7 @@
 class FlightRigComponent;
 class CameraRigComponent;
 class GunComponent;
+class MissileLauncherComponent;
 
 enum class ShooterAction
 {
@@ -96,6 +97,9 @@ private:
     MeshHandle m_quad;
     TextureHandle m_bulletTex;
 
+    ModelAsset m_missile;
+    TextureHandle m_missileTex;
+
     std::vector<TextureHandle> m_boosterAnims;
     std::vector<std::vector<TextureHandle>> m_deathAnimsContainer;
     std::vector<TextureHandle> m_bulletHitAnims;
@@ -123,6 +127,8 @@ private:
 
     // Finds the attached GunComponent
     GunComponent* GetGun(SceneContext& ctx);
+
+    MissileLauncherComponent* GetMissileLauncher(SceneContext& ctx);
 
     int spawnPosNumber = 0;
     std::vector<EntityId> m_spawnPositions;

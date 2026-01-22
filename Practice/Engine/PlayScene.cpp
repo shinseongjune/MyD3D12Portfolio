@@ -12,6 +12,7 @@
 #include "PlayerBooster.h"
 #include "PhysicsSystem.h"
 #include <DirectXMath.h>
+#include "MissileLauncherComponent.h"
 using namespace DirectX;
 
 static XMFLOAT3 Add(const XMFLOAT3& a, const XMFLOAT3& b)
@@ -63,10 +64,15 @@ void PlayScene::OnLoad(SceneContext& ctx)
 
     Result<ModelAsset> res_model_starcruiser = ImportModel(ctx, "Assets/Model/star_cruiser.obj");
 
+    Result<ModelAsset> res_model_missile = ImportModel(ctx, "Assets/Model/missile.obj");
+    m_missile = res_model_missile.value;
+
     // Load textures
     TextureHandle texh_spacefighter = LoadTexture(ctx, "Assets/Texture/space_fighter_diffuse.png");
 
     TextureHandle texh_starcruiser = LoadTexture(ctx, "Assets/Texture/star_cruiser_diffuse.png");
+
+    m_missileTex = LoadTexture(ctx, "Assets/Texture/missile.png");
 
     // booster anims
     {
@@ -121,7 +127,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
         {
             std::string path = std::format("Assets/Texture/MissileBooster/missile_booster-{:02}.png", i);
 
-            m_missleHitAnims.push_back(LoadTexture(ctx, path));
+            m_missleBoosterAnims.push_back(LoadTexture(ctx, path));
         }
     }
 
@@ -188,6 +194,13 @@ void PlayScene::OnLoad(SceneContext& ctx)
             booster->SetQuadMesh(m_quad);
             booster->SetBoosterAnims(m_boosterAnims);
             ctx.world.AddScript(m_player, std::move(booster));
+        }
+        // Attach Missile Launcher
+        {
+            auto missileLauncher = std::make_unique<MissileLauncherComponent>();
+            missileLauncher->SetHandles(m_quad, m_missile, m_missileTex);
+            missileLauncher->SetMissileHitAnims(m_missleHitAnims);
+            ctx.world.AddScript(m_player, std::move(missileLauncher));
         }
     }
 
@@ -324,6 +337,29 @@ GunComponent* PlayScene::GetGun(SceneContext& ctx)
     return nullptr;
 }
 
+MissileLauncherComponent* PlayScene::GetMissileLauncher(SceneContext& ctx)
+{
+    if (!ctx.world.HasScript(m_player)) return nullptr;
+
+    auto& sc = ctx.world.GetScript(m_player);
+
+    // Scripts added this frame live in pendingAdd until World::FlushScripts() (EndFrame).
+    for (auto& p : sc.pendingAdd)
+    {
+        if (!p.ptr || !p.enabled) continue;
+        if (auto* gun = dynamic_cast<MissileLauncherComponent*>(p.ptr.get()))
+            return gun;
+    }
+
+    for (auto& s : sc.scripts)
+    {
+        if (!s.ptr || !s.enabled) continue;
+        if (auto* gun = dynamic_cast<MissileLauncherComponent*>(s.ptr.get()))
+            return gun;
+    }
+    return nullptr;
+}
+
 void PlayScene::SetBoundaryRadius(SceneContext& ctx, float radius)
 {
     auto play = ctx.Instantiate("PlayBoundary");
@@ -346,6 +382,7 @@ void PlayScene::ExecuteCommand(SceneContext& ctx)
     FlightRigComponent* rig = GetFlightRig(ctx);
     CameraRigComponent* camRig = GetCameraRig(ctx);
     GunComponent* gun = GetGun(ctx);
+    MissileLauncherComponent* missile = GetMissileLauncher(ctx);
 
     FlightInput flightIn{};
     bool hasMove = false;
@@ -366,6 +403,7 @@ void PlayScene::ExecuteCommand(SceneContext& ctx)
             gun->Fire(ctx);
             break;
         case ShooterAction::FireMissile:
+            missile->Fire(ctx);
             break;
         case ShooterAction::CameraLook:
             if (camRig) camRig->OnLook(cmd.camX, cmd.camY);
