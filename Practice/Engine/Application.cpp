@@ -14,6 +14,7 @@
 #include "PhysicsTestScene.h"
 #include <crtdbg.h>
 #endif
+#include "TitleScene.h"
 #include "PlayScene.h"
 
 Application::~Application() = default;
@@ -24,7 +25,7 @@ void Application::Initialize(HINSTANCE hInstance)
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF);
 #endif
     // 1) 창 만들기
-    if (!m_window.Create(hInstance, L"Engine", 1280, 720))
+    if (!m_window.Create(hInstance, L"Engine", 900, 600))
         throw std::runtime_error("Failed to create window.");
 	m_window.SetInput(&m_input); // 입력 시스템 연결
 
@@ -48,7 +49,7 @@ void Application::Initialize(HINSTANCE hInstance)
 	// 6) 폰트/텍스트 렌더러 초기화
     
     // 7) 첫 Scene 로드
-    m_sceneManager.Load(std::make_unique<PlayScene>());
+    m_sceneManager.Load(std::make_unique<TitleScene>());
 
 	// 8) 마지막 창 크기 저장
     m_lastW = m_window.GetWidth();
@@ -63,7 +64,7 @@ void Application::Run()
     while (m_running)
     {
         // 메시지 처리 (WM_QUIT면 false)
-        if (!m_window.PumpMessages())
+        if (!m_window.PumpMessages() || m_sceneManager.m_quitting)
         {
             m_running = false;
             break;

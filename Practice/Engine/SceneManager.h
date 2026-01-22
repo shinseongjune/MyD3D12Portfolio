@@ -4,6 +4,8 @@
 #include "Scene.h"
 #include "SceneScope.h"
 #include "UITextDraw.h"
+#include "GameManager.h"
+//#include "ResultScene.h"
 
 class World;
 class AssetPipeline;
@@ -32,6 +34,8 @@ public:
     TextureHandle GetSkybox() const { return m_skybox; }
     void ClearSkybox() { m_skybox = {}; }
 
+    bool m_quitting = false;
+
 private:
     World& m_world;
     AssetPipeline& m_assets;
@@ -48,4 +52,5 @@ private:
     std::unique_ptr<Scene> m_current;
 
     TextureHandle m_skybox{}; // id=0 => none
+
 };

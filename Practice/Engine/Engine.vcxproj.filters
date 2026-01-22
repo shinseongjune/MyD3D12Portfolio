@@ -196,6 +196,15 @@
     <Filter Include="헤더 파일\Game\07_Utility">
       <UniqueIdentifier>{20e2763b-5aeb-486d-9023-44defbba56ad}</UniqueIdentifier>
     </Filter>
+    <Filter Include="헤더 파일\Game\08_System">
+      <UniqueIdentifier>{8136c0f7-62a8-4d6c-a0f0-a4925e9c5efe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game\07_Utility">
+      <UniqueIdentifier>{01e275a4-7f8d-4027-855c-4280a69ef481}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="소스 파일\Game\08_System">
+      <UniqueIdentifier>{a294f9ad-33da-43e0-80d7-56216016d31b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -432,6 +441,18 @@
     <ClInclude Include="PlayerBooster.h">
       <Filter>헤더 파일\Game\06_Effect</Filter>
     </ClInclude>
+    <ClInclude Include="GameManager.h">
+      <Filter>헤더 파일\Game\08_System</Filter>
+    </ClInclude>
+    <ClInclude Include="TitleScene.h">
+      <Filter>헤더 파일\Game\01_Scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="WaveManager.h">
+      <Filter>헤더 파일\Game\08_System</Filter>
+    </ClInclude>
+    <ClInclude Include="ResultScene.h">
+      <Filter>헤더 파일\Game\01_Scenes</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -550,6 +571,15 @@
     </ClCompile>
     <ClCompile Include="PlayerBooster.cpp">
       <Filter>소스 파일\Game\06_Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="TitleScene.cpp">
+      <Filter>소스 파일\Game\01_Scenes</Filter>
+    </ClCompile>
+    <ClCompile Include="WaveManager.cpp">
+      <Filter>소스 파일\Game\08_System</Filter>
+    </ClCompile>
+    <ClCompile Include="ResultScene.cpp">
+      <Filter>소스 파일\Game\01_Scenes</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

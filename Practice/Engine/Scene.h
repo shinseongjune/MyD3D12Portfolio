@@ -13,8 +13,6 @@
 #include "PrimitiveMeshes.h"
 #endif
 
-struct SceneContext;
-
 class Scene
 {
 public:

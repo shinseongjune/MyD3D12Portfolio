@@ -123,6 +123,20 @@ void TextureManager::Destroy(TextureHandle h)
     if (m_onDestroy)
         m_onDestroy(h.id);
 
+    // path 캐시에서 이 id를 가리키는 항목 제거
+    for (auto it = m_pathToId.begin(); it != m_pathToId.end(); )
+    {
+        if (it->second == h.id) it = m_pathToId.erase(it);
+        else ++it;
+    }
+
+    // cubemap 캐시도 제거
+    for (auto it = m_cubePathToId.begin(); it != m_cubePathToId.end(); )
+    {
+        if (it->second == h.id) it = m_cubePathToId.erase(it);
+        else ++it;
+    }
+
     m_textures.erase(h.id);
     m_cubemaps.erase(h.id);
 }

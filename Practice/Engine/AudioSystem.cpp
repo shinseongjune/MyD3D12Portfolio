@@ -27,6 +27,8 @@ struct AudioInstance
     EntityId owner{};     // StopEntity Áö¿ø
     SoundHandle clip{};
     bool active = false;
+
+    std::shared_ptr<std::vector<uint8_t>> pcmHold;
 };
 
 class AudioSystem::Impl
@@ -249,7 +251,7 @@ uint32_t AudioSystem::ExecutePlay(SoundHandle clip, const AudioPlayDesc& desc, E
     if (!sounds.IsValid(clip)) return 0;
 
     const SoundClip& sc = sounds.Get(clip);
-    if (sc.pcm.empty()) return 0;
+    if (!sc.pcm || sc.pcm->empty()) return 0;
 
     IXAudio2SourceVoice* sv = nullptr;
     ThrowIfFailed(m_impl->xaudio->CreateSourceVoice(
@@ -270,8 +272,8 @@ uint32_t AudioSystem::ExecutePlay(SoundHandle clip, const AudioPlayDesc& desc, E
 
     // submit buffer
     XAUDIO2_BUFFER buf{};
-    buf.AudioBytes = (UINT32)sc.pcm.size();
-    buf.pAudioData = (const BYTE*)sc.pcm.data();
+    buf.AudioBytes = (UINT32)sc.pcm->size();
+    buf.pAudioData = (const BYTE*)sc.pcm->data();
     buf.pContext = nullptr;
 
     if (desc.loop)
@@ -290,6 +292,7 @@ uint32_t AudioSystem::ExecutePlay(SoundHandle clip, const AudioPlayDesc& desc, E
     inst.owner = owner;
     inst.clip = clip;
     inst.active = true;
+    inst.pcmHold = sc.pcm;
 
     const size_t idx = m_impl->instances.size();
     m_impl->instances.push_back(inst);

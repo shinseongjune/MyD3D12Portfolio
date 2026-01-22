@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-
+#include <optional>
 #include "World.h"
 #include "AssetPipeline.h"
 #include "MeshManager.h"
@@ -15,6 +15,7 @@
 #include "AudioSystem.h"
 #include "TextureHandle.h"
 #include "UITextDraw.h"
+#include "GameManager.h"
 #include "Behaviour.h"
 
 class PhysicsSystem;
@@ -84,7 +85,7 @@ struct SceneContext
     void StopBGM();
 
     // ---- Text overlay helpers (scene-friendly) ----
-    void DrawText(float x, float y, const std::wstring& str,
+    void DrawWText(float x, float y, const std::wstring& str,
                   float sizePx = 16.0f,
                   const DirectX::XMFLOAT4& color = DirectX::XMFLOAT4(1, 1, 1, 1),
                   const std::wstring& fontFamily = L"Segoe UI");
@@ -96,6 +97,20 @@ struct SceneContext
         T& ref = *p;
         world.AddScript(e, std::move(p));
         return ref;
+    }
+
+    std::optional<SceneId> m_nextScene = std::nullopt;
+
+    void RequestLoadScene(SceneId next)
+    {
+        m_nextScene = next;
+    }
+
+    bool m_quitting = false;
+
+    void RequestExit()
+    {
+        m_quitting = true;
     }
 
 };

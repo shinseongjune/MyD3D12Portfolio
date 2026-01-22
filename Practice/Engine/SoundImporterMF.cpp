@@ -50,6 +50,7 @@ Result<SoundClip> SoundImporterMF::DecodeToPCM(const std::string& path)
     ThrowIfFailed(curType->GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, &bits));
 
     SoundClip clip;
+    clip.pcm = std::make_shared<std::vector<uint8_t>>();
     clip.wfx.wFormatTag = WAVE_FORMAT_PCM;
     clip.wfx.nChannels = (WORD)channels;
     clip.wfx.nSamplesPerSec = sampleRate;
@@ -76,9 +77,9 @@ Result<SoundClip> SoundImporterMF::DecodeToPCM(const std::string& path)
         DWORD maxLen = 0, curLen = 0;
         ThrowIfFailed(buf->Lock(&data, &maxLen, &curLen));
 
-        size_t old = clip.pcm.size();
-        clip.pcm.resize(old + curLen);
-        std::memcpy(clip.pcm.data() + old, data, curLen);
+        size_t old = clip.pcm->size();
+        clip.pcm->resize(old + curLen);
+        std::memcpy(clip.pcm->data() + old, data, curLen);
 
         buf->Unlock();
     }

@@ -5,6 +5,7 @@
 #include "MaterialComponent.h"
 #include "TextureHandle.h"
 #include "ModelAsset.h"
+#include "WaveManager.h"
 
 class FlightRigComponent;
 class CameraRigComponent;
@@ -101,6 +102,8 @@ private:
     std::vector<TextureHandle> m_missleHitAnims;
     std::vector<TextureHandle> m_missleBoosterAnims;
 
+    WaveManager m_waveManager;
+
 private:
     void SetSkybox(SceneContext& ctx);
     void SetDirectionalLight(SceneContext& ctx);
@@ -120,5 +123,10 @@ private:
 
     // Finds the attached GunComponent
     GunComponent* GetGun(SceneContext& ctx);
+
+    int spawnPosNumber = 0;
+    std::vector<EntityId> m_spawnPositions;
+    void SetBoundaryRadius(SceneContext& ctx, float radius);
+    void BuildBoundariesAndSpawnPoints(SceneContext& ctx, float playRadius, int latDiv, int lonDiv, float spawnRadiusRatio);
 
 };

@@ -149,7 +149,7 @@ LRESULT Win32Window::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
     switch (msg)
     {
     case WM_KILLFOCUS:
-        if (m_input) m_input->Clear(); // Ŀ    ʱȭ
+        if (m_input) m_input->Clear();
         return 0;
 
     case WM_KEYDOWN:

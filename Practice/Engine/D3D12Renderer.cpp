@@ -658,28 +658,29 @@ void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
             std::memcpy(m_cbMapped + offset, &cb, sizeof(DrawCB));
         };
 
-    auto ValidateCBAddr = [&](D3D12_GPU_VIRTUAL_ADDRESS addr)
+    auto ValidateFrameCBAddr = [&](D3D12_GPU_VIRTUAL_ADDRESS addr)
         {
 #if defined(_DEBUG)
-            if (!m_cb)
+            if (!m_frameCB)
             {
-                OutputDebugStringA("m_cb is null\n");
+                OutputDebugStringA("m_frameCB is null\n");
                 __debugbreak();
                 return;
             }
 
-            const D3D12_GPU_VIRTUAL_ADDRESS base = m_cb->GetGPUVirtualAddress();
-            const D3D12_GPU_VIRTUAL_ADDRESS end = base + (D3D12_GPU_VIRTUAL_ADDRESS)m_cbSize;
+            const D3D12_GPU_VIRTUAL_ADDRESS base = m_frameCB->GetGPUVirtualAddress();
+            const D3D12_GPU_VIRTUAL_ADDRESS end =
+                base + (D3D12_GPU_VIRTUAL_ADDRESS)(m_frameCBStride * FrameCount);
 
             if ((addr & 255ull) != 0ull)
             {
-                OutputDebugStringA("CBV addr not 256-byte aligned\n");
+                OutputDebugStringA("FrameCB addr not 256-byte aligned\n");
                 __debugbreak();
             }
 
-            if (addr < base || addr + sizeof(DrawCB) > end)
+            if (addr < base || addr + sizeof(FrameCB) > end)
             {
-                OutputDebugStringA("CBV addr out of range\n");
+                OutputDebugStringA("FrameCB addr out of range\n");
                 __debugbreak();
             }
 #endif
@@ -760,7 +761,7 @@ void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
         const D3D12_GPU_VIRTUAL_ADDRESS fcbAddr =
             m_frameCB->GetGPUVirtualAddress() + (UINT64)m_frameIndex * (UINT64)m_frameCBStride;
 
-        ValidateCBAddr(fcbAddr);
+        ValidateFrameCBAddr(fcbAddr);
         m_commandList->SetGraphicsRootConstantBufferView(1, fcbAddr);
     }
 
@@ -775,7 +776,6 @@ void D3D12Renderer::RenderUI(const std::vector<UIDrawItem>& ui)
         const uint32_t uiSlot = frameBase + MaxDraws3D + 2; // Reserved UI slot
         WriteDrawCB(uiSlot, cb);
         const D3D12_GPU_VIRTUAL_ADDRESS cbAddr = m_cb->GetGPUVirtualAddress() + (UINT64)uiSlot * (UINT64)m_cbStride;
-        ValidateCBAddr(cbAddr);
         m_commandList->SetGraphicsRootConstantBufferView(0, cbAddr);
     }
 

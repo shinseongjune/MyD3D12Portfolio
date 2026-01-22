@@ -112,7 +112,7 @@ void SceneContext::StopBGM()
 {
     audio.StopBGM();
 }
-void SceneContext::DrawText(float x, float y, const std::wstring& str, float sizePx, const DirectX::XMFLOAT4& color, const std::wstring& fontFamily)
+void SceneContext::DrawWText(float x, float y, const std::wstring& str, float sizePx, const DirectX::XMFLOAT4& color, const std::wstring& fontFamily)
 {
     UITextDraw t;
     t.x = x;

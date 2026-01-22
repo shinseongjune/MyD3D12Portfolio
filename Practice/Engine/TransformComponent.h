@@ -12,7 +12,7 @@ struct TransformComponent
 
     // Hierarchy
     EntityId parent = EntityId::Invalid();
-    std::vector<EntityId> children;
+    std::vector<EntityId> children{};
 
     // Cached world matrix
     DirectX::XMFLOAT4X4 world{};

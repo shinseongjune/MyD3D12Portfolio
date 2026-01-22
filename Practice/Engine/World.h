@@ -214,7 +214,7 @@ private:
 
 public:
     // --- Transform Public API ---
-    DirectX::XMFLOAT3 GetLocalPosition(EntityId e) const;
+    DirectX::XMFLOAT3 GetLocalPosition(EntityId e);
     void SetLocalPosition(EntityId e, const DirectX::XMFLOAT3& p);
 
     DirectX::XMFLOAT4 GetLocalRotation(EntityId e) const; // quat

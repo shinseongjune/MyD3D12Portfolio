@@ -284,6 +284,6 @@ void PhysicsTestScene::OnUpdate(SceneContext& ctx)
         }
     }
 
-    ctx.DrawText(12.0f, 12.0f, L"한글 테스트", 18.0f);
-    ctx.DrawText(12.0f, 36.0f, L"Hello DWrite", 18.0f, { 1,1,0,1 }, L"Segoe UI");
+    ctx.DrawWText(12.0f, 12.0f, L"한글 테스트", 18.0f);
+    ctx.DrawWText(12.0f, 36.0f, L"Hello DWrite", 18.0f, { 1,1,0,1 }, L"Segoe UI");
 }

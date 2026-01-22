@@ -10,28 +10,63 @@
 #include "MyRandom.h"
 #include "StatsComponent.h"
 #include "PlayerBooster.h"
+#include "PhysicsSystem.h"
+#include <DirectXMath.h>
+using namespace DirectX;
+
+static XMFLOAT3 Add(const XMFLOAT3& a, const XMFLOAT3& b)
+{
+    return { a.x + b.x, a.y + b.y, a.z + b.z };
+}
+
+static XMFLOAT3 Mul(const XMFLOAT3& v, float s)
+{
+    return { v.x * s, v.y * s, v.z * s };
+}
+
+static XMFLOAT3 NormalizeXZ(const XMFLOAT3& v)
+{
+    float x = v.x, z = v.z;
+    float len = std::sqrt(x * x + z * z);
+    if (len < 1e-6f) return { 0,0,1 };
+    return { x / len, 0.0f, z / len };
+}
+
+// yaw: +Y축 기준 회전, (0이면 +Z를 바라본다)
+static float ComputeYawToCenter_XZ(const XMFLOAT3& point, const XMFLOAT3& center)
+{
+    XMFLOAT3 toC{ center.x - point.x, center.y - point.y, center.z - point.z };
+    XMFLOAT3 dir = NormalizeXZ(toC);
+    // +Z 기준 yaw: atan2(x, z)
+    return std::atan2(dir.x, dir.z);
+}
 
 void PlayScene::OnLoad(SceneContext& ctx)
 {
+    GameManager::GetInstance().SetState(GameManager::State::Playing);
+
+    ctx.physics.SetGravityEnabled(false);
     SetSkybox(ctx);
     SetDirectionalLight(ctx);
 	m_quad = CreateQuadMesh(ctx);
 	m_bulletTex = CreateBulletTexture(ctx);
+    BuildBoundariesAndSpawnPoints(ctx, 100, 5, 8, 0.95f);
+
+    // bgm
+    auto bgm = ctx.LoadSoundScoped("Assets/Audio/play_bgm.mp3");
+    if (bgm.IsOk())
+        ctx.PlayBGM(bgm.value, 1.0f);
 
 
     // Import models
     Result<ModelAsset> res_model_spacefighter = ImportModel(ctx, "Assets/Model/space_fighter.obj");
-    if (!res_model_spacefighter.IsOk()) return;
 
     Result<ModelAsset> res_model_starcruiser = ImportModel(ctx, "Assets/Model/star_cruiser.obj");
-    if (!res_model_starcruiser.IsOk()) return;
 
     // Load textures
     TextureHandle texh_spacefighter = LoadTexture(ctx, "Assets/Texture/space_fighter_diffuse.png");
-    if (!texh_spacefighter.IsValid()) return;
 
     TextureHandle texh_starcruiser = LoadTexture(ctx, "Assets/Texture/star_cruiser_diffuse.png");
-    if (!texh_starcruiser.IsValid()) return;
 
     // booster anims
     {
@@ -156,48 +191,6 @@ void PlayScene::OnLoad(SceneContext& ctx)
         }
     }
 
-    // test enemies
-    {
-        for (int i = 0; i < 50; i++)
-        {
-            static int enemyNumber = 0;
-            SpawnModelOptions spawnOpt{};
-            spawnOpt.name = "Enemy" + enemyNumber++;
-            auto spawned_cruiser = ctx.SpawnModel(res_model_starcruiser.value, spawnOpt);
-            EntityId cruiser = spawned_cruiser.value;
-            ctx.world.AddMaterial(cruiser, mat_starcruiser);
-            ctx.world.SetLocalPosition(cruiser, { RandRange(-200, 200), RandRange(-100, 100), RandRange(0, 300) });
-            ctx.world.SetLocalRotationEuler(cruiser, { RandRange(0, 360), RandRange(0, 360), RandRange(0, 360) });
-
-
-            // Attach collider & rigidbody
-            {
-                ColliderComponent col;
-                col.shapeType = ShapeType::Sphere;
-                col.localCenter = { 0, -1.0f, 0.5f };
-                col.sphere.radius = 10.0f;
-                col.layer = 1 << 1;
-                PhysicsMaterial pm;
-                pm.restitution = 0.5f;
-                col.material = pm;
-                ctx.world.AddCollider(cruiser, col);
-
-                RigidBodyComponent rb;
-                rb.type = BodyType::Dynamic;
-                rb.useGravity = false;
-                ctx.world.AddRigidBody(cruiser, rb);
-            }
-            // Attach Stats
-            {
-                auto stats = std::make_unique<StatsComponent>();
-                stats->SetHp(100);
-                stats->SetQuadMesh(m_quad);
-                stats->SetDieAnims(m_deathAnimsContainer[i % 3]);
-                ctx.world.AddScript(cruiser, std::move(stats));
-            }
-        }
-    }
-
     // Camera
     {
         EntityId cam = ctx.Instantiate("MainCamera");
@@ -217,6 +210,31 @@ void PlayScene::OnLoad(SceneContext& ctx)
         camRig->SetFollowEnabled(true);
         ctx.world.AddScript(m_cam, std::move(camRig));
     }
+
+    // wave setting
+    {
+        m_waveManager.model_cruiser = res_model_starcruiser.value;
+        m_waveManager.mat_cruiser = mat_starcruiser;
+        m_waveManager.m_quad = m_quad;
+        m_waveManager.m_deathAnimsContainer = m_deathAnimsContainer;
+        m_waveManager.m_spawns = m_spawnPositions;
+        m_waveManager.Start(m_spawnPositions);
+    }
+
+    // spawn pos test
+    {
+        for (auto e : m_spawnPositions)
+        {
+            static int testInt = 0;
+            std::string name = std::string("test") + std::to_string(testInt++);
+            auto t = ctx.SpawnModel(res_model_spacefighter.value, SpawnModelOptions{ name.c_str()});
+            ctx.world.SetLocalPosition(t.value, ctx.world.GetLocalPosition(e));
+
+            auto& tr = ctx.world.GetPendingTransform(t.value);
+            ctx.world.FlushStructuralChanges();
+            auto& real = ctx.world.GetTransform(t.value);
+        }
+    }
 }
 
 void PlayScene::OnUnload(SceneContext& ctx)
@@ -225,6 +243,14 @@ void PlayScene::OnUnload(SceneContext& ctx)
 
 void PlayScene::OnUpdate(SceneContext& ctx)
 {
+    if (GameManager::GetInstance().CurrentState() == GameManager::State::Win || GameManager::GetInstance().CurrentState() == GameManager::State::Lose)
+    {
+        ctx.RequestLoadScene(SceneId::Result);
+        return;
+    }
+
+    m_waveManager.Update(ctx, ctx.dt);
+
     BuildShooterCommands(ctx.input, m_cmds);
 
     ExecuteCommand(ctx);
@@ -296,6 +322,23 @@ GunComponent* PlayScene::GetGun(SceneContext& ctx)
             return gun;
     }
     return nullptr;
+}
+
+void PlayScene::SetBoundaryRadius(SceneContext& ctx, float radius)
+{
+    auto play = ctx.Instantiate("PlayBoundary");
+    ColliderComponent playCol;
+    playCol.shapeType = ShapeType::Sphere;
+    playCol.isTrigger = true;
+    playCol.sphere.radius = radius;
+    ctx.world.AddCollider(play, playCol);
+
+    auto limit = ctx.Instantiate("LimitBoundary");
+    ColliderComponent limitCol;
+    limitCol.shapeType = ShapeType::Sphere;
+    limitCol.isTrigger = true;
+    limitCol.sphere.radius = radius * 1.2f;
+    ctx.world.AddCollider(limit, limitCol);
 }
 
 void PlayScene::ExecuteCommand(SceneContext& ctx)
@@ -410,19 +453,8 @@ Result<ModelAsset> PlayScene::ImportModel(SceneContext& ctx, const std::string& 
 
 TextureHandle PlayScene::LoadTexture(SceneContext& ctx, const std::string& path)
 {
-    auto tex_res = LoadTextureRGBA8_WIC(path, ImageColorSpace::SRGB, /*flipY=*/false);
-    TextureHandle tex{};
-    if (tex_res.IsOk())
-    {
-        tex = ctx.textures.Create(std::move(tex_res.value));
-    }
-    else
-    {
-#if defined(_DEBUG)
-        LOG_ERROR("Failed to load texture: %s", tex_res.error->message.c_str());
-#endif
-    }
-    return tex;
+    auto tex = ctx.LoadTextureScoped(path);
+    return tex.value;
 }
 
 MaterialComponent PlayScene::CreateMaterial(SceneContext& ctx, const TextureHandle& tex)
@@ -451,4 +483,64 @@ TextureHandle PlayScene::CreateBulletTexture(SceneContext& ctx)
     auto texR = ctx.LoadTextureScoped("assets/texture/bullet.png");
     TextureHandle bulletTex = texR.IsOk() ? texR.value : TextureHandle{ 0 };
 	return bulletTex;
+}
+
+void PlayScene::BuildBoundariesAndSpawnPoints(
+    SceneContext& ctx,
+    float playRadius,
+    int latDiv,     // θ 분할 개수(극쪽 포함 여부는 아래 코드 참고)
+    int lonDiv,     // φ 분할 개수
+    float spawnRadiusRatio // 예: 0.95f ~ 1.05f (playRadius 근처 링/쉘)
+)
+{
+    // 1) Boundary spheres
+    SetBoundaryRadius(ctx, playRadius);
+
+    // 2) 중심점
+    XMFLOAT3 center{ 0.f, 0.f, 0.f };
+
+    float R = playRadius * spawnRadiusRatio;
+
+    m_spawnPositions.clear();
+    m_spawnPositions.reserve(latDiv * lonDiv);
+
+    // 위도/경도 분할:
+    // θ: (0..π). 0/π는 극점이라 lon을 돌려도 같은 점이므로,
+    // 극을 피하려면 0과 π를 제외하고 (1..latDiv-1)만 쓰는 게 실용적.
+    // 아래는 "극점 제외" 버전.
+    for (int i = 1; i < latDiv; ++i)
+    {
+        float t = (float)i / (float)latDiv; // (0,1)
+        float theta = t * XM_PI;            // (0, π)
+
+        float sinT = std::sin(theta);
+        float cosT = std::cos(theta);
+
+        for (int j = 0; j < lonDiv; ++j)
+        {
+            float u = (float)j / (float)lonDiv; // [0,1)
+            float phi = u * XM_2PI;
+
+            float x = R * sinT * std::cos(phi);
+            float y = R * cosT;
+            float z = R * sinT * std::sin(phi);
+
+            XMFLOAT3 pos = Add(center, { x, y, z });
+
+            std::string name = std::string("SpawnPoint") + std::to_string(spawnPosNumber++);
+            EntityId sp = ctx.Instantiate(name.c_str());
+            ctx.world.AddTransform(sp);
+
+            ctx.world.SetLocalPosition(sp, pos);
+
+            // "중앙을 향하도록" (y rotation만)
+            float yaw = ComputeYawToCenter_XZ(pos, center);
+
+            ctx.world.SetLocalRotationEuler(sp, { 0.f, yaw, 0.f });
+
+            auto test = ctx.world.GetPendingTransform(sp);
+
+            m_spawnPositions.push_back(sp);
+        }
+    }
 }

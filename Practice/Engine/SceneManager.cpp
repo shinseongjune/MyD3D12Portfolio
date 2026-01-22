@@ -1,7 +1,9 @@
 #include "SceneManager.h"
-
 #include "SceneContext.h"
 #include "ScriptSystem.h"
+#include "TitleScene.h"
+#include "PlayScene.h"
+#include "ResultScene.h"
 
 void SceneManager::Load(std::unique_ptr<Scene> scene)
 {
@@ -37,6 +39,30 @@ void SceneManager::Update(float dt)
     SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, dt, &m_skybox };
     m_current->OnUpdate(ctx);
     m_scripts.Update(ctx);
+
+    if (ctx.m_quitting)
+    {
+        m_quitting = true;
+        return;
+    }
+
+    if (ctx.m_nextScene.has_value())
+    {
+        switch (ctx.m_nextScene.value())
+        {
+        case SceneId::Title:
+            Load(std::make_unique<TitleScene>());
+            break;
+        case SceneId::Play:
+            Load(std::make_unique<PlayScene>());
+            break;
+        case SceneId::Result:
+            Load(std::make_unique<ResultScene>());
+            break;
+        default:
+            Load(std::make_unique<TitleScene>());
+        }
+    }
 }
 
 void SceneManager::FixedUpdate(float fixedDt)
@@ -45,4 +71,28 @@ void SceneManager::FixedUpdate(float fixedDt)
     SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, fixedDt, &m_skybox };
     m_current->OnFixedUpdate(ctx);
     m_scripts.FixedUpdate(ctx);
+
+    if (ctx.m_quitting)
+    {
+        m_quitting = true;
+        return;
+    }
+
+    if (ctx.m_nextScene.has_value())
+    {
+        switch (ctx.m_nextScene.value())
+        {
+        case SceneId::Title:
+            Load(std::make_unique<TitleScene>());
+            break;
+        case SceneId::Play:
+            Load(std::make_unique<PlayScene>());
+            break;
+        case SceneId::Result:
+            Load(std::make_unique<ResultScene>());
+            break;
+        default:
+            Load(std::make_unique<TitleScene>());
+        }
+    }
 }

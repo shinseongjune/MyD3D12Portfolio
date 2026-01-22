@@ -42,6 +42,11 @@ EntityId World::CreateEntity(const std::string& name)
     EnsureMaterialSparseSize(index);
     EnsureCameraSparseSize(index);
     EnsureLightSparseSize(index);
+    EnsureRigidBodySparseSize(index);
+    EnsureColliderSparseSize(index);
+    EnsureUIElementSparseSize(index);
+    EnsureAudioSourceSparseSize(index);
+    EnsureScriptSparseSize(index);
 
     if (!name.empty())
         m_nameToEntity[name] = e;
@@ -57,13 +62,10 @@ bool World::IsPendingDestroy(EntityId e) const
 
 void World::DestroyEntity(EntityId e)
 {
-    if (!IsAlive(e))
-        return;
+    if (!IsAlive(e)) return;
 
     if (HasScript(e))
     {
-        auto& sc = GetScript(e);
-
         RemoveScriptComponent(e);
     }
 
@@ -72,10 +74,11 @@ void World::DestroyEntity(EntityId e)
     RemoveMesh(e);
     RemoveMaterial(e);
     RemoveCamera(e);
-	RemoveCollider(e);
-	RemoveRigidBody(e);
-    RemoveAudioSource(e);
-    RemoveLight(e);
+    if (HasUIElement(e))   RemoveUIElement_Immediate(e);
+    if (HasCollider(e))    RemoveCollider_Immediate(e);
+    if (HasRigidBody(e))   RemoveRigidBody_Immediate(e);
+    if (HasAudioSource(e)) RemoveAudioSource_Immediate(e);
+    if (HasLight(e))       RemoveLight_Immediate(e);
 
     Slot& s = m_slots[e.index];
     s.alive = false;
@@ -151,6 +154,38 @@ void World::AddMesh(EntityId e, const MeshComponent& comp)
     if (!IsAlive(e)) return;
     m_pendingAddMesh.push_back({ e, comp });
 }
+
+void World::AddMesh_Immediate(EntityId e, const MeshComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureMeshSparseSize(e.index);
+
+    uint32_t di = m_meshSparse[e.index];
+
+    if (di != InvalidDenseIndex)
+    {
+        if (di >= m_meshDenseEntities.size())
+        {
+            m_meshSparse[e.index] = InvalidDenseIndex; // 깨진 sparse 복구 후 새로 추가로 진행
+        }
+        else
+        {
+            // stale/정상 모두 소유자 갱신
+            m_meshDenseEntities[di] = e;
+
+            // 기존 정책 유지: draws append
+            auto& dst = m_meshes[di].draws;
+            dst.insert(dst.end(), comp.draws.begin(), comp.draws.end());
+            return;
+        }
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_meshes.size();
+    m_meshSparse[e.index] = denseIndex;
+    m_meshDenseEntities.push_back(e);
+    m_meshes.push_back(comp);
+}
+
 
 bool World::HasMesh(EntityId e) const
 {
@@ -426,6 +461,20 @@ void World::FlushStructuralChanges()
 void World::AddTransform(EntityId e, const TransformComponent& init)
 {
     if (!IsAlive(e)) return;
+
+    // 이미 실제 Transform이 있으면 아무것도 안 함
+    if (HasTransform(e)) return;
+
+    // 이미 pending이면 "덮어쓰기" 또는 무시
+    for (auto& [pe, tc] : m_pendingAddTransform)
+    {
+        if (pe == e)
+        {
+            tc = init;      // upsert
+            return;
+        }
+    }
+
     m_pendingAddTransform.push_back({ e, init });
 }
 
@@ -728,8 +777,27 @@ void World::AddTransform_Immediate(EntityId e, const TransformComponent& comp)
     if (!IsAlive(e)) return;
     EnsureTransformSparseSize(e.index);
 
-    if (m_transformSparse[e.index] != InvalidDenseIndex)
-        return; // already has
+    uint32_t di = m_transformSparse[e.index];
+    if (di != InvalidDenseIndex)
+    {
+        if (di >= m_transformDenseEntities.size())
+        {
+            // 깨진 sparse 복구 후 새로 추가로 진행
+            m_transformSparse[e.index] = InvalidDenseIndex;
+        }
+        else
+        {
+            // 기존 슬롯 갱신 (Transform은 보통 덮어쓰기)
+            m_transformDenseEntities[di] = e;
+            m_transforms[di] = comp;
+
+            // world를 identity로 초기화 + dirty
+            auto& t = m_transforms[di];
+            XMStoreFloat4x4(&t.world, XMMatrixIdentity());
+            t.dirty = true;
+            return;
+        }
+    }
 
     const uint32_t denseIndex = (uint32_t)m_transforms.size();
     m_transformSparse[e.index] = denseIndex;
@@ -737,32 +805,9 @@ void World::AddTransform_Immediate(EntityId e, const TransformComponent& comp)
     m_transformDenseEntities.push_back(e);
     m_transforms.push_back(comp);
 
-    // world를 identity로 초기화
     auto& t = m_transforms.back();
-    t.world = DirectX::XMFLOAT4X4{};
-    DirectX::XMStoreFloat4x4(&t.world, DirectX::XMMatrixIdentity());
-
+    XMStoreFloat4x4(&t.world, XMMatrixIdentity());
     t.dirty = true;
-}
-
-void World::AddMesh_Immediate(EntityId e, const MeshComponent& comp)
-{
-    if (!IsAlive(e)) return;
-    EnsureMeshSparseSize(e.index);
-
-    // 이미 MeshComponent가 있으면 append
-    if (m_meshSparse[e.index] != InvalidDenseIndex)
-    {
-        const uint32_t di = m_meshSparse[e.index];
-        auto& dst = m_meshes[di].draws;
-        dst.insert(dst.end(), comp.draws.begin(), comp.draws.end());
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_meshes.size();
-    m_meshSparse[e.index] = denseIndex;
-    m_meshDenseEntities.push_back(e);
-    m_meshes.push_back(comp);
 }
 
 void World::AddMaterial_Immediate(EntityId e, const MaterialComponent& comp)
@@ -770,10 +815,19 @@ void World::AddMaterial_Immediate(EntityId e, const MaterialComponent& comp)
     if (!IsAlive(e)) return;
     EnsureMaterialSparseSize(e.index);
 
-    if (m_materialSparse[e.index] != InvalidDenseIndex)
+    uint32_t di = m_materialSparse[e.index];
+    if (di != InvalidDenseIndex)
     {
-        m_materials[m_materialSparse[e.index]] = comp;
-        return;
+        if (di >= m_materialDenseEntities.size())
+        {
+            m_materialSparse[e.index] = InvalidDenseIndex;
+        }
+        else
+        {
+            m_materialDenseEntities[di] = e;
+            m_materials[di] = comp;
+            return;
+        }
     }
 
     const uint32_t denseIndex = (uint32_t)m_materials.size();
@@ -786,8 +840,21 @@ void World::AddCamera_Immediate(EntityId e, const CameraComponent& c)
 {
     if (!IsAlive(e)) return;
     EnsureCameraSparseSize(e.index);
-    if (m_cameraSparse[e.index] != InvalidDenseIndex)
-        return;
+
+    uint32_t di = m_cameraSparse[e.index];
+    if (di != InvalidDenseIndex)
+    {
+        if (di >= m_cameraDenseEntities.size())
+        {
+            m_cameraSparse[e.index] = InvalidDenseIndex;
+        }
+        else
+        {
+            m_cameraDenseEntities[di] = e;
+            m_cameras[di] = c;
+            return;
+        }
+    }
 
     const uint32_t denseIndex = (uint32_t)m_cameras.size();
     m_cameraSparse[e.index] = denseIndex;
@@ -800,12 +867,21 @@ void World::AddRigidBody_Immediate(EntityId e, const RigidBodyComponent& comp)
     if (!IsAlive(e)) return;
     EnsureRigidBodySparseSize(e.index);
 
-    // 이미 있으면 갱신(덮어쓰기)
-    if (m_rigidBodySparse[e.index] != InvalidDenseIndex)
+    uint32_t di = m_rigidBodySparse[e.index];
+
+    if (di != InvalidDenseIndex)
     {
-        const uint32_t di = m_rigidBodySparse[e.index];
-        m_rigidBodies[di] = comp;
-        return;
+        if (di >= m_rigidBodyDenseEntities.size())
+        {
+            m_rigidBodySparse[e.index] = InvalidDenseIndex;
+        }
+        else
+        {
+            // stale이든 정상이든: 소유자 갱신 + 덮어쓰기
+            m_rigidBodyDenseEntities[di] = e;
+            m_rigidBodies[di] = comp;
+            return;
+        }
     }
 
     const uint32_t denseIndex = (uint32_t)m_rigidBodies.size();
@@ -814,23 +890,31 @@ void World::AddRigidBody_Immediate(EntityId e, const RigidBodyComponent& comp)
     m_rigidBodies.push_back(comp);
 }
 
-void World::AddCollider_Immediate(EntityId e, const ColliderComponent& comp)
+void World::AddUIElement_Immediate(EntityId e, const UIElementComponent& c)
 {
     if (!IsAlive(e)) return;
-    EnsureColliderSparseSize(e.index);
+    EnsureUIElementSparseSize(e.index);
 
-    // 이미 있으면 갱신(덮어쓰기)
-    if (m_colliderSparse[e.index] != InvalidDenseIndex)
+    uint32_t di = m_uiElementSparse[e.index];
+
+    if (di != InvalidDenseIndex)
     {
-        const uint32_t di = m_colliderSparse[e.index];
-        m_colliders[di] = comp;
-        return;
+        if (di >= m_uiElementDenseEntities.size())
+        {
+            m_uiElementSparse[e.index] = InvalidDenseIndex;
+        }
+        else
+        {
+            m_uiElementDenseEntities[di] = e;
+            m_uiElements[di] = c;
+            return;
+        }
     }
 
-    const uint32_t denseIndex = (uint32_t)m_colliders.size();
-    m_colliderSparse[e.index] = denseIndex;
-    m_colliderDenseEntities.push_back(e);
-    m_colliders.push_back(comp);
+    const uint32_t denseIndex = (uint32_t)m_uiElements.size();
+    m_uiElementSparse[e.index] = denseIndex;
+    m_uiElementDenseEntities.push_back(e);
+    m_uiElements.push_back(c);
 }
 
 void World::AddAudioSource_Immediate(EntityId e, const AudioSourceComponent& c)
@@ -838,12 +922,20 @@ void World::AddAudioSource_Immediate(EntityId e, const AudioSourceComponent& c)
     if (!IsAlive(e)) return;
     EnsureAudioSourceSparseSize(e.index);
 
-    // 이미 있으면 갱신(덮어쓰기)
-    if (m_audioSourceSparse[e.index] != InvalidDenseIndex)
+    uint32_t di = m_audioSourceSparse[e.index];
+
+    if (di != InvalidDenseIndex)
     {
-        const uint32_t di = m_audioSourceSparse[e.index];
-        m_audioSources[di] = c;
-        return;
+        if (di >= m_audioSourceDenseEntities.size())
+        {
+            m_audioSourceSparse[e.index] = InvalidDenseIndex;
+        }
+        else
+        {
+            m_audioSourceDenseEntities[di] = e;
+            m_audioSources[di] = c;
+            return;
+        }
     }
 
     const uint32_t denseIndex = (uint32_t)m_audioSources.size();
@@ -857,35 +949,26 @@ void World::AddLight_Immediate(EntityId e, const LightComponent& c)
     if (!IsAlive(e)) return;
     EnsureLightSparseSize(e.index);
 
-    if (HasLight(e))
+    uint32_t di = m_lightSparse[e.index];
+
+    if (di != InvalidDenseIndex)
     {
-        m_lights[m_lightSparse[e.index]] = c;
-        return;
+        if (di >= m_lightDenseEntities.size())
+        {
+            m_lightSparse[e.index] = InvalidDenseIndex;
+        }
+        else
+        {
+            m_lightDenseEntities[di] = e;
+            m_lights[di] = c;
+            return;
+        }
     }
 
     const uint32_t denseIndex = (uint32_t)m_lights.size();
-    m_lights.push_back(c);
-    m_lightDenseEntities.push_back(e);
     m_lightSparse[e.index] = denseIndex;
-}
-
-void World::AddUIElement_Immediate(EntityId e, const UIElementComponent& c)
-{
-    if (!IsAlive(e)) return;
-    EnsureUIElementSparseSize(e.index);
-
-    // 이미 있으면 갱신(덮어쓰기)
-    if (m_uiElementSparse[e.index] != InvalidDenseIndex)
-    {
-        const uint32_t di = m_uiElementSparse[e.index];
-        m_uiElements[di] = c;
-        return;
-    }
-
-    const uint32_t denseIndex = (uint32_t)m_uiElements.size();
-    m_uiElementSparse[e.index] = denseIndex;
-    m_uiElementDenseEntities.push_back(e);
-    m_uiElements.push_back(c);
+    m_lightDenseEntities.push_back(e);
+    m_lights.push_back(c);
 }
 
 void World::RemoveAudioSource_Immediate(EntityId e)
@@ -1034,9 +1117,16 @@ void World::RemoveScriptComponent(EntityId e)
     m_scriptSparse[e.index] = InvalidDenseIndex;
 }
 
-XMFLOAT3 World::GetLocalPosition(EntityId e) const
+XMFLOAT3 World::GetLocalPosition(EntityId e)
 {
-    if (!HasTransform(e)) return XMFLOAT3{ 0,0,0 };
+    if (!HasOrPendingTransform(e)) return XMFLOAT3{ 0,0,0 };
+
+    if (!HasTransform(e))
+    {
+        auto& pend = GetPendingTransform(e);
+        return pend.position;
+    }
+
     const TransformComponent& t = GetTransform(e);
     return t.position;
 }
@@ -1049,6 +1139,7 @@ void World::SetLocalPosition(EntityId e, const XMFLOAT3& p)
     {
         auto& pend = GetPendingTransform(e);
         pend.position = p;
+        MarkDirtyRecursive(e);
         return;
     }
 
@@ -1090,6 +1181,7 @@ void World::SetLocalRotation(EntityId e, const XMFLOAT4& q)
     {
         TransformComponent& t = GetPendingTransform(e);
         t.rotation = out;
+        MarkDirtyRecursive(e);
     }
 }
 
@@ -1148,6 +1240,7 @@ void World::SetLocalRotationEuler(EntityId e, const DirectX::XMFLOAT3& eulerRad)
     {
         TransformComponent& t = GetPendingTransform(e);
         t.rotation = out;
+        MarkDirtyRecursive(e);
     }
 }
 
@@ -1172,6 +1265,7 @@ void World::SetLocalScale(EntityId e, const XMFLOAT3& s)
     {
         TransformComponent& t = GetPendingTransform(e);
         t.scale = s;
+        MarkDirtyRecursive(e);
     }
 }
 
@@ -1193,6 +1287,8 @@ void World::TranslateLocal(EntityId e, const XMFLOAT3& delta)
         t.position.x += delta.x;
         t.position.y += delta.y;
         t.position.z += delta.z;
+
+        MarkDirtyRecursive(e);
     }
 }
 
@@ -1290,6 +1386,35 @@ void World::AddCollider(EntityId e, const ColliderComponent& comp)
     if (!IsAlive(e)) return;
     m_pendingAddCollider.push_back({ e, comp });
 }
+
+void World::AddCollider_Immediate(EntityId e, const ColliderComponent& comp)
+{
+    if (!IsAlive(e)) return;
+    EnsureColliderSparseSize(e.index);
+
+    uint32_t di = m_colliderSparse[e.index];
+
+    if (di != InvalidDenseIndex)
+    {
+        if (di >= m_colliderDenseEntities.size())
+        {
+            m_colliderSparse[e.index] = InvalidDenseIndex;
+        }
+        else
+        {
+            // denseEntities도 갱신해야 HasCollider/레이캐스트가 정상
+            m_colliderDenseEntities[di] = e;
+            m_colliders[di] = comp;
+            return;
+        }
+    }
+
+    const uint32_t denseIndex = (uint32_t)m_colliders.size();
+    m_colliderSparse[e.index] = denseIndex;
+    m_colliderDenseEntities.push_back(e);
+    m_colliders.push_back(comp);
+}
+
 
 bool World::HasCollider(EntityId e) const
 {
@@ -1510,6 +1635,7 @@ void World::AddLight(EntityId e, const LightComponent& c)
 
 bool World::HasLight(EntityId e) const
 {
+    if (!IsAlive(e)) return false;
     if (e.index >= m_lightSparse.size()) return false;
     const uint32_t denseIndex = m_lightSparse[e.index];
     if (denseIndex == InvalidDenseIndex) return false;
