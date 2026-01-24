@@ -67,12 +67,16 @@ void PlayScene::OnLoad(SceneContext& ctx)
     Result<ModelAsset> res_model_missile = ImportModel(ctx, "Assets/Model/missile.obj");
     m_missile = res_model_missile.value;
 
+    Result<ModelAsset> res_model_map = ImportModel(ctx, "Assets/Model/map.obj");
+
     // Load textures
     TextureHandle texh_spacefighter = LoadTexture(ctx, "Assets/Texture/space_fighter_diffuse.png");
 
     TextureHandle texh_starcruiser = LoadTexture(ctx, "Assets/Texture/star_cruiser_diffuse.png");
 
     m_missileTex = LoadTexture(ctx, "Assets/Texture/missile.png");
+
+    TextureHandle texh_map = LoadTexture(ctx, "Assets/Texture/map.png");
 
     // booster anims
     {
@@ -134,6 +138,16 @@ void PlayScene::OnLoad(SceneContext& ctx)
     // Materials
     MaterialComponent mat_spacefighter = CreateMaterial(ctx, texh_spacefighter);
     MaterialComponent mat_starcruiser  = CreateMaterial(ctx, texh_starcruiser);
+
+    MaterialComponent mat_map = CreateMaterial(ctx, texh_map);
+
+    // Spawn map
+    {
+        auto spawned_map = ctx.SpawnModel(res_model_map.value, SpawnModelOptions{ "Map" });
+        auto map = spawned_map.value;
+        ctx.world.AddMaterial(map, mat_map);
+        ctx.world.SetLocalPosition(map, { 0.0f, -m_playBoundary * 1.5f, 0.0f });
+    }
 
     // Spawn player
     {
@@ -262,6 +276,15 @@ void PlayScene::OnUpdate(SceneContext& ctx)
         return;
     }
 
+    DetectBoundary(ctx);
+
+    // 경계를 벗어난 경우
+    if (m_outOfPlay)
+    {
+        //TODO: 경고음
+        //TODO: 경고 ui
+    }
+
     m_waveManager.Update(ctx, ctx.dt);
 
     BuildShooterCommands(ctx.input, m_cmds);
@@ -362,19 +385,7 @@ MissileLauncherComponent* PlayScene::GetMissileLauncher(SceneContext& ctx)
 
 void PlayScene::SetBoundaryRadius(SceneContext& ctx, float radius)
 {
-    auto play = ctx.Instantiate("PlayBoundary");
-    ColliderComponent playCol;
-    playCol.shapeType = ShapeType::Sphere;
-    playCol.isTrigger = true;
-    playCol.sphere.radius = radius;
-    ctx.world.AddCollider(play, playCol);
-
-    auto limit = ctx.Instantiate("LimitBoundary");
-    ColliderComponent limitCol;
-    limitCol.shapeType = ShapeType::Sphere;
-    limitCol.isTrigger = true;
-    limitCol.sphere.radius = radius * 1.2f;
-    ctx.world.AddCollider(limit, limitCol);
+    m_playBoundary = radius;
 }
 
 void PlayScene::ExecuteCommand(SceneContext& ctx)
@@ -581,4 +592,29 @@ void PlayScene::BuildBoundariesAndSpawnPoints(
             m_spawnPositions.push_back(sp);
         }
     }
+}
+
+void PlayScene::DetectBoundary(SceneContext& ctx)
+{
+    // 플레이어가 죽었거나 없으면 스킵
+    if (!ctx.world.IsAlive(m_player) || !ctx.world.HasTransform(m_player))
+        return;
+
+    const XMFLOAT3 p = ctx.world.GetLocalPosition(m_player);
+    const float playR = m_playBoundary;
+    const float limitR = playR * 1.2f;
+
+    const float d2 = p.x * p.x + p.y * p.y + p.z * p.z;
+    const float playR2 = playR * playR;
+    const float limitR2 = limitR * limitR;
+
+    // 완전히 벗어나면 Lose 처리
+    if (d2 > limitR2)
+    {
+        GameManager::GetInstance().SetState(GameManager::State::Lose);
+        return;
+    }
+
+    // 플레이 경계 밖
+    m_outOfPlay = (d2 > playR2);
 }
