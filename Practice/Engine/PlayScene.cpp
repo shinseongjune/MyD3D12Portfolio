@@ -54,10 +54,59 @@ void PlayScene::OnLoad(SceneContext& ctx)
     BuildBoundariesAndSpawnPoints(ctx, 100, 5, 8, 0.95f);
 
     // bgm
-    auto bgm = ctx.LoadSoundScoped("Assets/Audio/play_bgm.mp3");
-    if (bgm.IsOk())
-        ctx.PlayBGM(bgm.value, 1.0f);
+    {
+        auto bgm = ctx.LoadSoundScoped("Assets/Audio/play_bgm.mp3");
+        if (bgm.IsOk())
+            ctx.PlayBGM(bgm.value, 1.0f);
+    }
 
+    // sfx
+    {
+        auto gunFire1 = ctx.LoadSoundScoped("Assets/Audio/gun1.mp3");
+        auto gunFire2 = ctx.LoadSoundScoped("Assets/Audio/gun2.mp3");
+        if (gunFire1.IsOk())
+            m_gunFireSounds.push_back(gunFire1.value);
+        if (gunFire2.IsOk())
+            m_gunFireSounds.push_back(gunFire2.value);
+    }
+
+    {
+        for (int i = 0; i < 3; i++) {
+            auto bulletHit = ctx.LoadSoundScoped(std::format("Assets/Audio/bulletHit{}.mp3", i + 1));
+            if (bulletHit.IsOk())
+                m_bulletHitSounds.push_back(bulletHit.value);
+        }
+    }
+
+    {
+        auto missileFire = ctx.LoadSoundScoped("Assets/Audio/missile_launch.mp3");
+        if (missileFire.IsOk())
+            m_missileLaunchSound = missileFire.value;
+    }
+
+    {
+        auto missileBoom = ctx.LoadSoundScoped("Assets/Audio/missile_boom.mp3");
+        if (missileBoom.IsOk())
+            m_missileBoomSound = missileBoom.value;
+    }
+
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            auto death = ctx.LoadSoundScoped(std::format("Assets/Audio/death{}.mp3", i + 1));
+            if (death.IsOk())
+                m_deathSounds.push_back(death.value);
+        }
+    }
+
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            auto wind = ctx.LoadSoundScoped(std::format("Assets/Audio/wind{}.mp3", i + 1));
+            if (wind.IsOk())
+                m_windSounds.push_back(wind.value);
+        }
+    }
 
     // Import models
     Result<ModelAsset> res_model_spacefighter = ImportModel(ctx, "Assets/Model/space_fighter.obj");
@@ -175,6 +224,8 @@ void PlayScene::OnLoad(SceneContext& ctx)
             auto gun = std::make_unique<GunComponent>();
             gun->SetHandles(m_quad, m_bulletTex);
             gun->SetBulletHitAnims(m_bulletHitAnims);
+            gun->SetGunFireSounds(m_gunFireSounds);
+            gun->SetBulletHitSounds(m_bulletHitSounds);
             ctx.world.AddScript(m_player, std::move(gun));
         }
         // Attach collider & rigidbody
@@ -200,6 +251,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
             stats->SetHp(10000);
             stats->SetQuadMesh(m_quad);
             stats->SetDieAnims(m_deathAnimsContainer[0]);
+            stats->SetDieSounds(m_deathSounds);
             ctx.world.AddScript(m_player, std::move(stats));
         }
         // Attach Booster
@@ -214,7 +266,13 @@ void PlayScene::OnLoad(SceneContext& ctx)
             auto missileLauncher = std::make_unique<MissileLauncherComponent>();
             missileLauncher->SetHandles(m_quad, m_missile, m_missileTex);
             missileLauncher->SetMissileHitAnims(m_missleHitAnims);
+            missileLauncher->SetLaunchSound(m_missileLaunchSound);
+            missileLauncher->SetBoomSound(m_missileBoomSound);
             ctx.world.AddScript(m_player, std::move(missileLauncher));
+        }
+        // audio source
+        {
+            ctx.world.AddAudioSource(m_player, AudioSourceComponent{});
         }
     }
 
@@ -245,6 +303,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
         m_waveManager.m_quad = m_quad;
         m_waveManager.m_deathAnimsContainer = m_deathAnimsContainer;
         m_waveManager.m_spawns = m_spawnPositions;
+        m_waveManager.SetDieSounds(m_deathSounds);
         m_waveManager.Start(m_spawnPositions);
     }
 
@@ -284,6 +343,8 @@ void PlayScene::OnUpdate(SceneContext& ctx)
         //TODO: 경고음
         //TODO: 경고 ui
     }
+
+    PlayerWindUpdate(ctx, m_player, m_windSounds);
 
     m_waveManager.Update(ctx, ctx.dt);
 
@@ -617,4 +678,29 @@ void PlayScene::DetectBoundary(SceneContext& ctx)
 
     // 플레이 경계 밖
     m_outOfPlay = (d2 > playR2);
+}
+
+void PlayScene::PlayerWindUpdate(SceneContext& ctx, EntityId player, const std::vector<SoundHandle>& windClips)
+{
+    if (!ctx.world.HasAudioSource(player)) return;
+
+    AudioSourceComponent& src = ctx.world.GetAudioSource(player);
+
+    src.bus = AudioBus::SFX;
+    src.loop = false;
+
+    // 아직 재생중이면 아무것도 안 함
+    if (src.playingInstanceId != 0 && ctx.audio.IsInstanceAlive(src.playingInstanceId))
+        return;
+
+    // 재생 끝났거나 아직 시작 안 했음 → 다음 클립 랜덤 선택
+    src.playingInstanceId = 0;
+
+    if (windClips.empty()) return;
+
+    const int n = (int)windClips.size();
+    const int idx = RandRangeInt(0, n - 1);
+    src.clip = windClips[idx];
+
+    ctx.audio.PlayFromEntity(player);
 }

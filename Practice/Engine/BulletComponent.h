@@ -4,6 +4,7 @@
 #include <vector>
 #include "TextureHandle.h"
 #include "MeshHandle.h"
+#include "SoundHandle.h"
 
 class BulletComponent : public Behaviour
 {
@@ -14,6 +15,7 @@ public:
 	void SetOwner(const EntityId& ownerId) { owner = ownerId; }
 	void SetQuadMesh(MeshHandle quad) { m_quad = quad; }
 	void SetBulletHitAnims(std::vector<TextureHandle> anims) { m_bulletHitAnims = anims; }
+	void SetBulletHitSounds(std::vector<SoundHandle> sounds) { m_bulletHitSounds = sounds; }
 
 private:
 	float m_lifeTime = 5.0f; // sec
@@ -23,6 +25,7 @@ private:
 
 	MeshHandle m_quad;
 	std::vector<TextureHandle> m_bulletHitAnims;
+	std::vector<SoundHandle> m_bulletHitSounds;
 
 	void Step(SceneContext& ctx);
 

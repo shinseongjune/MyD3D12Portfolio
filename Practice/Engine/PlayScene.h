@@ -97,14 +97,24 @@ private:
     MeshHandle m_quad;
     TextureHandle m_bulletTex;
 
+    std::vector<SoundHandle> m_gunFireSounds;
+    std::vector<SoundHandle> m_bulletHitSounds;
+
     ModelAsset m_missile;
     TextureHandle m_missileTex;
+
+    SoundHandle m_missileLaunchSound;
+    SoundHandle m_missileBoomSound;
 
     std::vector<TextureHandle> m_boosterAnims;
     std::vector<std::vector<TextureHandle>> m_deathAnimsContainer;
     std::vector<TextureHandle> m_bulletHitAnims;
     std::vector<TextureHandle> m_missleHitAnims;
     std::vector<TextureHandle> m_missleBoosterAnims;
+
+    std::vector<SoundHandle> m_deathSounds;
+
+    std::vector<SoundHandle> m_windSounds;
 
     WaveManager m_waveManager;
 
@@ -139,5 +149,7 @@ private:
     
     bool m_outOfPlay = false;
     void DetectBoundary(SceneContext& ctx);
+
+    void PlayerWindUpdate(SceneContext& ctx, EntityId player, const std::vector<SoundHandle>& windClips);
 
 };

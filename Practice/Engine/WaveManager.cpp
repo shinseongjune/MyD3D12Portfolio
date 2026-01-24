@@ -132,6 +132,7 @@ void WaveManager::CreateCruiser(SceneContext& ctx, EntityId spawnPos)
         stats->SetHp(100);
         stats->SetQuadMesh(m_quad);
         stats->SetDieAnims(m_deathAnimsContainer[RandRangeInt(0, 2)]);
+        stats->SetDieSounds(m_deathSounds);
         ctx.world.AddScript(e, std::move(stats));
     }
 

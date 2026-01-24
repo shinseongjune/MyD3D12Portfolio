@@ -212,6 +212,12 @@ void AudioSystem::StopEntity(EntityId e)
     m_impl->pending.push_back(cmd);
 }
 
+bool AudioSystem::IsInstanceAlive(uint32_t id) const
+{
+    if (id == 0) return false;
+    return m_impl->FindInstance(id) != nullptr;
+}
+
 void AudioSystem::PlayBGM(SoundHandle clip, float volume)
 {
     AudioPlayDesc d{};
@@ -342,12 +348,15 @@ void AudioSystem::Update(World& world, SoundManager& sounds)
             if (!world.HasAudioSource(cmd.entity))
                 break;
 
-            const AudioSourceComponent& src = world.GetAudioSource(cmd.entity);
+            AudioSourceComponent src = world.GetAudioSource(cmd.entity);
             if (!src.clip.IsValid())
                 break;
 
             const AudioPlayDesc d = MakeDescFromComponent(src);
-            ExecutePlay(src.clip, d, cmd.entity, sounds);
+            const uint32_t instId = ExecutePlay(src.clip, d, cmd.entity, sounds);
+
+            src.playingInstanceId = instId;
+            world.AddAudioSource(cmd.entity, src);
         } break;
 
         case AudioCommandType::StopInstance:

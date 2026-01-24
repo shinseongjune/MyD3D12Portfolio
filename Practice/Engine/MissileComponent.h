@@ -4,6 +4,7 @@
 #include <vector>
 #include "TextureHandle.h"
 #include "MeshHandle.h"
+#include "SoundHandle.h"
 
 class MissileComponent : public Behaviour
 {
@@ -14,6 +15,7 @@ public:
 	void SetOwner(const EntityId& ownerId) { owner = ownerId; }
 	void SetQuadMesh(MeshHandle quad) { m_quad = quad; }
 	void SetBoomAnims(std::vector<TextureHandle> anims) { m_boomAnims = anims; }
+	void SetBoomSound(SoundHandle sound) { m_boomSound = sound; }
 
 private:
 	float m_lifeTime = 10.0f; // sec
@@ -23,6 +25,7 @@ private:
 
 	MeshHandle m_quad;
 	std::vector<TextureHandle> m_boomAnims;
+	SoundHandle m_boomSound;
 
 	float m_seekRadius = 800.0f;     // 탐지 반경
 	float m_seekHalfFovDeg = 60.0f;   // 전방 120도 = 반각 60도

@@ -54,6 +54,7 @@ void MissileComponent::Update(SceneContext& ctx)
 	if (m_lifeTime <= 0.0f)
 	{
         MakeBoomEffect(ctx);
+        ctx.PlaySFX(m_boomSound);
 		DestroyMissile(ctx);
 	}
 }
@@ -159,6 +160,7 @@ void MissileComponent::Step(SceneContext& ctx)
             }
 
             MakeBoomEffect(ctx);
+            ctx.PlaySFX(m_boomSound);
             DestroyMissile(ctx);
             return;
         }

@@ -3,6 +3,7 @@
 #include "SceneContext.h"
 #include "BillboardComponent.h"
 #include "BulletComponent.h"
+#include "MyRandom.h"
 
 void GunComponent::Update(SceneContext& ctx)
 {
@@ -49,7 +50,11 @@ void GunComponent::Fire(SceneContext& ctx)
 	bullet->SetOwner(Entity());
 	bullet->SetQuadMesh(m_quad);
    	bullet->SetBulletHitAnims(m_bulletHitAnims);
+	bullet->SetBulletHitSounds(m_bulletHitSounds);
 	ctx.world.AddScript(e, std::move(bullet));
 
 	m_fireCooldown = m_fireInterval;
+
+	auto fireSound = m_gunFireSounds[RandRangeInt(0, m_gunFireSounds.size() - 1)];
+	ctx.PlaySFX(fireSound);
 }

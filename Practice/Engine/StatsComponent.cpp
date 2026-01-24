@@ -14,6 +14,7 @@ void StatsComponent::Update(SceneContext& ctx)
 	if (m_dead)
 	{
 		ctx.world.RequestDestroy(Entity());
+		ctx.PlaySFX(m_deathSounds[RandRangeInt(0, m_deathSounds.size() - 1)]);
 		MakeDeadEffect(ctx);
 
 		auto cam = ctx.world.FindActiveCamera();

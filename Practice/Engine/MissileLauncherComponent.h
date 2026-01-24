@@ -5,6 +5,7 @@
 #include "MeshHandle.h"
 #include "TextureHandle.h"
 #include "ModelAsset.h"
+#include "SoundHandle.h"
 
 class MissileLauncherComponent : public Behaviour
 {
@@ -21,11 +22,15 @@ public:
 
 	void SetHandles(const MeshHandle quad, const ModelAsset missileMesh, const TextureHandle missileTex) { m_quad = quad, m_missileMesh = missileMesh; m_missileTex = missileTex; }
 	void SetMissileHitAnims(std::vector<TextureHandle> anims) { m_boomAnims = anims; }
+	void SetLaunchSound(SoundHandle sound) { m_missileLaunchSound = sound; }
+	void SetBoomSound(SoundHandle sound) { m_missileBoomSound = sound; }
 
 private:
 	MeshHandle m_quad;
 	ModelAsset m_missileMesh;
 	TextureHandle m_missileTex;
 	std::vector<TextureHandle> m_boomAnims;
+	SoundHandle m_missileLaunchSound;
+	SoundHandle m_missileBoomSound;
 
 };

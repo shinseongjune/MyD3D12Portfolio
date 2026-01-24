@@ -37,11 +37,14 @@ void MissileLauncherComponent::Fire(SceneContext& ctx)
 	ctx.world.SetLocalPosition(e, out);
 	ctx.world.SetLocalRotation(e, ctx.world.GetLocalRotation(Entity()));
 
-	auto bullet = std::make_unique<MissileComponent>();
-	bullet->SetOwner(Entity());
-	bullet->SetQuadMesh(m_quad);
-	bullet->SetBoomAnims(m_boomAnims);
-	ctx.world.AddScript(e, std::move(bullet));
+	auto missile = std::make_unique<MissileComponent>();
+	missile->SetOwner(Entity());
+	missile->SetQuadMesh(m_quad);
+	missile->SetBoomAnims(m_boomAnims);
+	missile->SetBoomSound(m_missileBoomSound);
+	ctx.world.AddScript(e, std::move(missile));
+
+	ctx.PlaySFX(m_missileLaunchSound);
 
 	m_fireCooldown = m_fireInterval;
 	m_missileCount--;

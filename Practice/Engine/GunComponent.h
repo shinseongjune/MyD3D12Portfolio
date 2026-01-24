@@ -4,6 +4,7 @@
 #include "Behaviour.h"
 #include "MeshHandle.h"
 #include "TextureHandle.h"
+#include "SoundHandle.h"
 
 class GunComponent : public Behaviour
 {
@@ -18,10 +19,14 @@ public:
 
 	void SetHandles(const MeshHandle quad, const TextureHandle bulletTex) { m_quad = quad; m_bulletTex = bulletTex; }
 	void SetBulletHitAnims(std::vector<TextureHandle> anims) { m_bulletHitAnims = anims; }
+	void SetGunFireSounds(std::vector<SoundHandle> sounds) { m_gunFireSounds = sounds; }
+	void SetBulletHitSounds(std::vector<SoundHandle> sounds) { m_bulletHitSounds = sounds; }
 
 private:
 	MeshHandle m_quad;
 	TextureHandle m_bulletTex;
 	std::vector<TextureHandle> m_bulletHitAnims;
+	std::vector<SoundHandle> m_gunFireSounds;
+	std::vector<SoundHandle> m_bulletHitSounds;
 
 };

@@ -5,6 +5,7 @@
 #include "EntityId.h"
 #include "MeshHandle.h"
 #include "TextureHandle.h"
+#include "SoundHandle.h"
 
 struct SceneContext;
 
@@ -38,6 +39,7 @@ public:
     void Update(SceneContext& ctx, float dt);
 
     void CreateCruiser(SceneContext& ctx, EntityId spawnPos);
+    void SetDieSounds(std::vector<SoundHandle> sounds) { m_deathSounds = sounds; }
 
 private:
     EntityId PickSpawn(SceneContext& ctx) const;
@@ -47,5 +49,6 @@ private:
     std::vector<WaveSpec> m_waves;          // 웨이브 테이블
     WaveRuntime m_rt;
     std::vector<EntityId> m_currentEnemies; // 현재 살아있는 적(추적용)
+    std::vector<SoundHandle> m_deathSounds;
 
 };

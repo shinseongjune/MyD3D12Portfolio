@@ -64,6 +64,9 @@ void BulletComponent::Step(SceneContext& ctx)
             }
             MakeHitEffect(ctx);
 
+            auto hitSound = m_bulletHitSounds[RandRangeInt(0, (int)m_bulletHitSounds.size() - 1)];
+            ctx.PlaySFX(hitSound);
+
             DestroyBullet(ctx);
             return;
         }
