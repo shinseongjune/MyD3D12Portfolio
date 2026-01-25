@@ -19,7 +19,7 @@ public:
 
 private:
 	float m_lifeTime = 10.0f; // sec
-	float m_speed = 45.0f;    // m/s
+	float m_speed = 110.0f;    // m/s
 	DirectX::XMFLOAT3 direction = { 0.0f, 0.0f, 1.0f };
 	EntityId owner = EntityId::Invalid();
 

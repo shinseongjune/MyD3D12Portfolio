@@ -34,13 +34,13 @@ public:
 
     // Tuning
     float minSpeed = 0.0f;
-    float maxSpeed = 35.0f;
+    float maxSpeed = 60.0f;
 
     float thrustAccel = 25.0f;   // forward accel (m/s^2-ish)
     float drag = 0.02f;          // proportional to speed
     float airbrakeDragMul = 4.0f;
 
-    float turnRatePitch = DirectX::XMConvertToRadians(90.0f);  // rad/s
+    float turnRatePitch = DirectX::XMConvertToRadians(110.0f);  // rad/s
     float turnRateRoll  = DirectX::XMConvertToRadians(160.0f);
     // Yaw should be subtle (rudder), most turning comes from roll.
     float turnRateYaw   = DirectX::XMConvertToRadians(8.0f);

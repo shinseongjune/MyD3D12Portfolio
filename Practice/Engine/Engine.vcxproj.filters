@@ -459,6 +459,9 @@
     <ClInclude Include="MissileLauncherComponent.h">
       <Filter>헤더 파일\Game\05_Combat</Filter>
     </ClInclude>
+    <ClInclude Include="EnemyAIComponent.h">
+      <Filter>헤더 파일\Game\05_Combat</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Engine.cpp">
@@ -591,6 +594,9 @@
       <Filter>소스 파일\Game\05_Combat</Filter>
     </ClCompile>
     <ClCompile Include="MissileLauncherComponent.cpp">
+      <Filter>소스 파일\Game\05_Combat</Filter>
+    </ClCompile>
+    <ClCompile Include="EnemyAIComponent.cpp">
       <Filter>소스 파일\Game\05_Combat</Filter>
     </ClCompile>
   </ItemGroup>

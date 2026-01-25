@@ -51,7 +51,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
     SetDirectionalLight(ctx);
 	m_quad = CreateQuadMesh(ctx);
 	m_bulletTex = CreateBulletTexture(ctx);
-    BuildBoundariesAndSpawnPoints(ctx, 100, 5, 8, 0.95f);
+    BuildBoundariesAndSpawnPoints(ctx, 500, 5, 8, 0.95f, m_groundBoundary);
 
     // bgm
     {
@@ -195,7 +195,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
         auto spawned_map = ctx.SpawnModel(res_model_map.value, SpawnModelOptions{ "Map" });
         auto map = spawned_map.value;
         ctx.world.AddMaterial(map, mat_map);
-        ctx.world.SetLocalPosition(map, { 0.0f, -m_playBoundary * 1.5f, 0.0f });
+        ctx.world.SetLocalPosition(map, { 0.0f, m_groundBoundary, 0.0f });
     }
 
     // Spawn player
@@ -304,6 +304,9 @@ void PlayScene::OnLoad(SceneContext& ctx)
         m_waveManager.m_deathAnimsContainer = m_deathAnimsContainer;
         m_waveManager.m_spawns = m_spawnPositions;
         m_waveManager.SetDieSounds(m_deathSounds);
+        m_waveManager.SetGunAssets(m_bulletTex, m_bulletHitAnims, m_gunFireSounds, m_bulletHitSounds);
+        m_waveManager.SetMissileAssets(m_missile, m_missileTex, m_missleHitAnims, m_missileLaunchSound, m_missileBoomSound);
+        m_waveManager.SetAIData(m_player, m_playBoundary, m_groundBoundary + 150);
         m_waveManager.Start(m_spawnPositions);
     }
 
@@ -600,7 +603,8 @@ void PlayScene::BuildBoundariesAndSpawnPoints(
     float playRadius,
     int latDiv,     // θ 분할 개수(극쪽 포함 여부는 아래 코드 참고)
     int lonDiv,     // φ 분할 개수
-    float spawnRadiusRatio // 예: 0.95f ~ 1.05f (playRadius 근처 링/쉘)
+    float spawnRadiusRatio, // 예: 0.95f ~ 1.05f (playRadius 근처 링/쉘)
+    float groundY
 )
 {
     // 1) Boundary spheres
@@ -614,14 +618,29 @@ void PlayScene::BuildBoundariesAndSpawnPoints(
     m_spawnPositions.clear();
     m_spawnPositions.reserve(latDiv * lonDiv);
 
+    // 스폰 y 범위
+    float minY = groundY + 150.0f;
+
+    // 천정 제외 (여유값)
+    float ceilingMargin = 50.0f;
+    float maxY = R - ceilingMargin;
+
+    // 안전 클램프
+    minY = std::max(minY, -R + 1.0f);
+    maxY = std::min(maxY, R - 1.0f);
+
+    // y -> theta 변환
+    float thetaMin = std::acos(maxY / R); // y가 클수록 theta는 작아짐
+    float thetaMax = std::acos(minY / R);
+
     // 위도/경도 분할:
     // θ: (0..π). 0/π는 극점이라 lon을 돌려도 같은 점이므로,
     // 극을 피하려면 0과 π를 제외하고 (1..latDiv-1)만 쓰는 게 실용적.
     // 아래는 "극점 제외" 버전.
     for (int i = 1; i < latDiv; ++i)
     {
-        float t = (float)i / (float)latDiv; // (0,1)
-        float theta = t * XM_PI;            // (0, π)
+        float t = (float)i / (float)(latDiv - 1); // [0,1]
+        float theta = thetaMin + t * (thetaMax - thetaMin);
 
         float sinT = std::sin(theta);
         float cosT = std::cos(theta);
@@ -657,11 +676,18 @@ void PlayScene::BuildBoundariesAndSpawnPoints(
 
 void PlayScene::DetectBoundary(SceneContext& ctx)
 {
-    // 플레이어가 죽었거나 없으면 스킵
     if (!ctx.world.IsAlive(m_player) || !ctx.world.HasTransform(m_player))
         return;
 
     const XMFLOAT3 p = ctx.world.GetLocalPosition(m_player);
+
+    // 0) Ground boundary: below ground => Lose
+    if (p.y < m_groundBoundary)
+    {
+        GameManager::GetInstance().SetState(GameManager::State::Lose);
+        return;
+    }
+
     const float playR = m_playBoundary;
     const float limitR = playR * 1.2f;
 
@@ -669,16 +695,15 @@ void PlayScene::DetectBoundary(SceneContext& ctx)
     const float playR2 = playR * playR;
     const float limitR2 = limitR * limitR;
 
-    // 완전히 벗어나면 Lose 처리
     if (d2 > limitR2)
     {
         GameManager::GetInstance().SetState(GameManager::State::Lose);
         return;
     }
 
-    // 플레이 경계 밖
-    m_outOfPlay = (d2 > playR2);
+    m_outOfPlay = (d2 > playR2) || p.y < m_groundBoundary + 150;
 }
+
 
 void PlayScene::PlayerWindUpdate(SceneContext& ctx, EntityId player, const std::vector<SoundHandle>& windClips)
 {

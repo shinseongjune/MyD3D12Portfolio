@@ -156,7 +156,7 @@ void MissileComponent::Step(SceneContext& ctx)
             if (ctx.world.HasScript(hitEntity))
             {
                 auto* stats = ctx.world.GetScriptAs<StatsComponent>(hitEntity);
-                if (stats) stats->TakeDamage(100);
+                if (stats) stats->TakeDamage(80);
             }
 
             MakeBoomEffect(ctx);

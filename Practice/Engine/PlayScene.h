@@ -141,11 +141,12 @@ private:
     MissileLauncherComponent* GetMissileLauncher(SceneContext& ctx);
 
     float m_playBoundary = 0;
+    float m_groundBoundary = -150.0f;
 
     int spawnPosNumber = 0;
     std::vector<EntityId> m_spawnPositions;
     void SetBoundaryRadius(SceneContext& ctx, float radius);
-    void BuildBoundariesAndSpawnPoints(SceneContext& ctx, float playRadius, int latDiv, int lonDiv, float spawnRadiusRatio);
+    void BuildBoundariesAndSpawnPoints(SceneContext& ctx, float playRadius, int latDiv, int lonDiv, float spawnRadiusRatio, float groundY);
     
     bool m_outOfPlay = false;
     void DetectBoundary(SceneContext& ctx);

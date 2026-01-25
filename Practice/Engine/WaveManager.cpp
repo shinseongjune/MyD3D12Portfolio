@@ -3,6 +3,10 @@
 #include "SceneContext.h"
 #include "MyRandom.h"
 #include "StatsComponent.h"
+#include "EnemyAIComponent.h"
+#include "GunComponent.h"
+#include "MissileLauncherComponent.h"
+#include "FlightRigComponent.h"
 
 void WaveManager::Start(const std::vector<EntityId>& spawnPositions)
 {
@@ -10,7 +14,7 @@ void WaveManager::Start(const std::vector<EntityId>& spawnPositions)
 
     // 웨이브 테이블
     m_waves.clear();
-    m_waves.push_back({ 1, 1, 1.5f });
+    m_waves.push_back({ 10, 10, 1.5f });
     m_waves.push_back({ 2, 2, 1.2f });
     m_waves.push_back({ 3, 3, 1.0f });
 
@@ -134,6 +138,41 @@ void WaveManager::CreateCruiser(SceneContext& ctx, EntityId spawnPos)
         stats->SetDieAnims(m_deathAnimsContainer[RandRangeInt(0, 2)]);
         stats->SetDieSounds(m_deathSounds);
         ctx.world.AddScript(e, std::move(stats));
+    }
+    // Attach Gun
+    {
+        auto gun = std::make_unique<GunComponent>();
+        gun->SetHandles(m_quad, m_bulletTex);
+        gun->SetBulletHitAnims(m_bulletHitAnims);
+        gun->SetGunFireSounds(m_gunFireSounds);
+        gun->SetBulletHitSounds(m_bulletHitSounds);
+        ctx.world.AddScript(e, std::move(gun));
+    }
+    // Attach Missile
+    {
+        auto missileLauncher = std::make_unique<MissileLauncherComponent>();
+        missileLauncher->SetHandles(m_quad, m_missile, m_missileTex);
+        missileLauncher->SetMissileHitAnims(m_missleHitAnims);
+        missileLauncher->SetLaunchSound(m_missileLaunchSound);
+        missileLauncher->SetBoomSound(m_missileBoomSound);
+        ctx.world.AddScript(e, std::move(missileLauncher));
+    }
+    // Attach Flight
+    {
+        auto rig = std::make_unique<FlightRigComponent>();
+        rig->maxSpeed = 25.0f;
+        rig->turnRatePitch = DirectX::XMConvertToRadians(70.0f);
+        rig->turnRateRoll = DirectX::XMConvertToRadians(100.0f);
+        ctx.world.AddScript(e, std::move(rig));
+    }
+    // Attach AI
+    {
+        auto ai = std::make_unique<EnemyAIComponent>();
+        ai->target = m_player;
+        ai->mapCenter = { 0,0,0 };
+        ai->mapRadius = m_playBoundary;
+        ai->groundY = m_groundBoundary;
+        ctx.world.AddScript(e, std::move(ai));
     }
 
     m_currentEnemies.push_back(e);

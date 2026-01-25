@@ -40,6 +40,29 @@ public:
 
     void CreateCruiser(SceneContext& ctx, EntityId spawnPos);
     void SetDieSounds(std::vector<SoundHandle> sounds) { m_deathSounds = sounds; }
+    void SetGunAssets(TextureHandle tex, std::vector<TextureHandle> hitAnims, std::vector<SoundHandle> fireSounds, std::vector<SoundHandle> hitSounds)
+    {
+        m_bulletTex = tex;
+        m_bulletHitAnims = hitAnims;
+        m_gunFireSounds = fireSounds;
+        m_bulletHitSounds = hitSounds;
+    }
+
+    void SetMissileAssets(ModelAsset model, TextureHandle tex, std::vector<TextureHandle> hitAnims, SoundHandle launchSound, SoundHandle boomSound)
+    {
+        m_missile = model;
+        m_missileTex = tex;
+        m_missleHitAnims = hitAnims;
+        m_missileLaunchSound = launchSound;
+        m_missileBoomSound = boomSound;
+    }
+
+    void SetAIData(EntityId player, float radius, float groundBoundary)
+    {
+        m_player = player;
+        m_playBoundary = radius;
+        m_groundBoundary = groundBoundary;
+    }
 
 private:
     EntityId PickSpawn(SceneContext& ctx) const;
@@ -50,5 +73,23 @@ private:
     WaveRuntime m_rt;
     std::vector<EntityId> m_currentEnemies; // 현재 살아있는 적(추적용)
     std::vector<SoundHandle> m_deathSounds;
+
+    // gun
+    TextureHandle m_bulletTex;
+    std::vector<TextureHandle> m_bulletHitAnims;
+    std::vector<SoundHandle> m_gunFireSounds;
+    std::vector<SoundHandle> m_bulletHitSounds;
+
+    // missile
+    ModelAsset m_missile;
+    TextureHandle m_missileTex;
+    std::vector<TextureHandle> m_missleHitAnims;
+    SoundHandle m_missileLaunchSound;
+    SoundHandle m_missileBoomSound;
+
+    // player & map
+    EntityId m_player;
+    float m_playBoundary;
+    float m_groundBoundary;
 
 };
