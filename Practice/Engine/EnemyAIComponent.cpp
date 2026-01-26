@@ -153,6 +153,8 @@ void EnemyAIComponent::Update(SceneContext& ctx)
     if (m_state == State::Attack) m_attackTime += ctx.dt;
     if (m_disengageTimeLeft > 0.0f) m_disengageTimeLeft -= ctx.dt;
     if (m_missileAiCooldown > 0.0f) m_missileAiCooldown -= ctx.dt;
+    if (m_reengageCooldown > 0.0f) m_reengageCooldown -= ctx.dt;
+    if (m_attackGateTime > 0.0f && m_state != State::Chase) m_attackGateTime = 0.0f;
 
     // Distances
     XMFLOAT3 toTargetV = Sub(tgPos, myPos);
@@ -193,8 +195,19 @@ void EnemyAIComponent::Update(SceneContext& ctx)
         {
             if (!outsideSoft)
             {
-                if (dTarget < attackEnterDist && dotFT > 0.0f) // roughly in front hemisphere
+                // 1) "진입 조건"을 조금 더 엄격하게 + 일정 시간 유지되면 Attack으로
+                bool gateOk =
+                    (m_reengageCooldown <= 0.0f) &&
+                    (dTarget < attackEnterDist) &&
+                    (dotFT > attackEnterDot);
+
+                if (gateOk) m_attackGateTime += ctx.dt;
+                else        m_attackGateTime = std::max(0.0f, m_attackGateTime - ctx.dt * 2.0f);
+
+                if (m_attackGateTime >= attackGateRequiredTime)
                 {
+                    m_attackGateTime = 0.0f;
+
                     m_state = State::Attack;
                     m_stateTime = 0.0f;
                     m_attackTime = 0.0f;
@@ -216,6 +229,8 @@ void EnemyAIComponent::Update(SceneContext& ctx)
 
                 m_returnPoint = PickRandomReturnPoint(myPos);
                 m_hasReturnPoint = true;
+
+                m_reengageCooldown = reengageCooldownTime;
             }
         } break;
 

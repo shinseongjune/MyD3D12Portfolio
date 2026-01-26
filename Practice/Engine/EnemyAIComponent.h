@@ -104,6 +104,12 @@ public:
     float returnRadiusRatioMax = 0.55f; // mapRadius * 0.55
     bool  keepReturnAltitude = false;    // y 고정할지
 
+    float m_reengageCooldown = 0;
+    float m_attackGateTime = 0.0f;
+    float reengageCooldownTime = 3.0f;
+    float attackGateRequiredTime = 0.8f;
+    float attackEnterDot = 0.25f;
+
 private:
     // Helpers
     FlightInput ComputeSteeringToPoint(

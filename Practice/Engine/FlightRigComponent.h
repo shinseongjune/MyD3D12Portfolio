@@ -40,10 +40,10 @@ public:
     float drag = 0.02f;          // proportional to speed
     float airbrakeDragMul = 4.0f;
 
-    float turnRatePitch = DirectX::XMConvertToRadians(110.0f);  // rad/s
+    float turnRatePitch = DirectX::XMConvertToRadians(140.0f);  // rad/s
     float turnRateRoll  = DirectX::XMConvertToRadians(160.0f);
     // Yaw should be subtle (rudder), most turning comes from roll.
-    float turnRateYaw   = DirectX::XMConvertToRadians(8.0f);
+    float turnRateYaw   = DirectX::XMConvertToRadians(32.0f);
 
     float autoYawFromRoll = 0.65f; // roll -> yaw coupling (banked turn feel)
 
