@@ -6,6 +6,7 @@
 #include "TextureHandle.h"
 #include "ModelAsset.h"
 #include "WaveManager.h"
+#include "EnemyIndicatorHUD.h"
 
 class FlightRigComponent;
 class CameraRigComponent;
@@ -117,6 +118,7 @@ private:
     std::vector<SoundHandle> m_windSounds;
 
     WaveManager m_waveManager;
+    EnemyIndicatorHUD m_enemyHud;
 
 private:
     void SetSkybox(SceneContext& ctx);

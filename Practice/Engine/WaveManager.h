@@ -64,6 +64,8 @@ public:
         m_groundBoundary = groundBoundary;
     }
 
+    const std::vector<EntityId>& GetCurrentEnemies() const { return m_currentEnemies; }
+
 private:
     EntityId PickSpawn(SceneContext& ctx) const;
     void CleanupDead(SceneContext& ctx);

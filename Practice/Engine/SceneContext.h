@@ -40,6 +40,9 @@ struct SceneContext
 	// ---- Skybox 관리용 포인터 (SceneManager가 소유) ----
     TextureHandle* skybox = nullptr;
 
+    uint32_t screenW = 1;
+    uint32_t screenH = 1;
+
 	// ---- Skybox helpers ----
     void SetSkybox(TextureHandle h)
     {

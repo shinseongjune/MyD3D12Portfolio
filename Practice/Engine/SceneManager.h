@@ -36,6 +36,8 @@ public:
 
     bool m_quitting = false;
 
+    void SetScreenSize(uint32_t w, uint32_t h) { screenW = w; screenH = h; }
+
 private:
     World& m_world;
     AssetPipeline& m_assets;
@@ -52,5 +54,8 @@ private:
     std::unique_ptr<Scene> m_current;
 
     TextureHandle m_skybox{}; // id=0 => none
+
+    uint32_t screenW = 1;
+    uint32_t screenH = 1;
 
 };

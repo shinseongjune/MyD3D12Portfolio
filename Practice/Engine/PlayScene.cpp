@@ -52,6 +52,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
 	m_quad = CreateQuadMesh(ctx);
 	m_bulletTex = CreateBulletTexture(ctx);
     BuildBoundariesAndSpawnPoints(ctx, 500, 5, 8, 0.95f, m_groundBoundary);
+    m_enemyHud.Initialize(ctx, 64);
 
     // bgm
     {
@@ -332,6 +333,7 @@ void PlayScene::OnUnload(SceneContext& ctx)
 
 void PlayScene::OnUpdate(SceneContext& ctx)
 {
+    m_enemyHud.SetEnabled(GameManager::GetInstance().CurrentState() == GameManager::State::Playing);
     if (GameManager::GetInstance().CurrentState() == GameManager::State::Win || GameManager::GetInstance().CurrentState() == GameManager::State::Lose)
     {
         ctx.RequestLoadScene(SceneId::Result);
@@ -346,6 +348,8 @@ void PlayScene::OnUpdate(SceneContext& ctx)
         //TODO: 경고음
         //TODO: 경고 ui
     }
+
+    m_enemyHud.Update(ctx, m_cam, m_player, m_waveManager.GetCurrentEnemies());
 
     PlayerWindUpdate(ctx, m_player, m_windSounds);
 

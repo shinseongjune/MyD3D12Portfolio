@@ -9,7 +9,7 @@ void SceneManager::Load(std::unique_ptr<Scene> scene)
 {
     if (m_current)
     {
-        SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, 0.0f, &m_skybox };
+        SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, 0.0f, &m_skybox, screenW, screenH };
         m_current->OnUnload(ctx);
 
         m_scope.Cleanup(m_world, m_meshes, m_textures, m_sounds);
@@ -25,7 +25,7 @@ void SceneManager::Load(std::unique_ptr<Scene> scene)
 
     if (m_current)
     {
-        SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, 0.0f, &m_skybox };
+        SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, 0.0f, &m_skybox, screenW, screenH };
         m_current->OnLoad(ctx);
 
         m_world.FlushStructuralChanges();
@@ -36,7 +36,7 @@ void SceneManager::Load(std::unique_ptr<Scene> scene)
 void SceneManager::Update(float dt)
 {
     if (!m_current) return;
-    SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, dt, &m_skybox };
+    SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, dt, &m_skybox, screenW, screenH };
     m_current->OnUpdate(ctx);
     m_scripts.Update(ctx);
 
@@ -68,7 +68,7 @@ void SceneManager::Update(float dt)
 void SceneManager::FixedUpdate(float fixedDt)
 {
     if (!m_current) return;
-    SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, fixedDt, &m_skybox };
+    SceneContext ctx{ m_world, m_assets, m_meshes, m_textures, m_scope, m_input, m_physics, m_sounds, m_audio, m_textItems, fixedDt, &m_skybox, screenW, screenH };
     m_current->OnFixedUpdate(ctx);
     m_scripts.FixedUpdate(ctx);
 

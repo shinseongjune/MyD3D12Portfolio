@@ -46,16 +46,14 @@ void Application::Initialize(HINSTANCE hInstance)
 	// 5) Importer 등록
     m_registry.Register(std::make_unique<ObjImporter_Minimal>());
 
-	// 6) 폰트/텍스트 렌더러 초기화
-    
-    // 7) 첫 Scene 로드
+    // 6) 첫 Scene 로드
     m_sceneManager.Load(std::make_unique<TitleScene>());
 
-	// 8) 마지막 창 크기 저장
+	// 7) 마지막 창 크기 저장
     m_lastW = m_window.GetWidth();
     m_lastH = m_window.GetHeight();
 
-	// 9) 실행 상태로 설정
+	// 8) 실행 상태로 설정
     m_running = true;
 }
 
@@ -79,6 +77,7 @@ void Application::Run()
 #endif
         Resize();
         BeginFrame();
+        m_sceneManager.SetScreenSize(m_window.GetWidth(), m_window.GetHeight());
         UpdateScene(m_dt);
 		TickFixed(m_dt);
         UpdateTransforms();

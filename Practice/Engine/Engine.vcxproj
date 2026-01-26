@@ -146,6 +146,7 @@
     <ClInclude Include="DWriteFontFace.h" />
     <ClInclude Include="EffectComponent.h" />
     <ClInclude Include="EnemyAIComponent.h" />
+    <ClInclude Include="EnemyIndicatorHUD.h" />
     <ClInclude Include="FlightRigComponent.h" />
     <ClInclude Include="FlightRigSystem.h" />
     <ClInclude Include="FrameLights.h" />
@@ -196,6 +197,7 @@
     <ClCompile Include="DWriteFontFace.cpp" />
     <ClCompile Include="EffectComponent.cpp" />
     <ClCompile Include="EnemyAIComponent.cpp" />
+    <ClCompile Include="EnemyIndicatorHUD.cpp" />
     <ClCompile Include="FlightRigComponent.cpp" />
     <ClCompile Include="FlightRigSystem.cpp" />
     <ClCompile Include="GunComponent.cpp" />
