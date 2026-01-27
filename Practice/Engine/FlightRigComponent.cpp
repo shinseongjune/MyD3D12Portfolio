@@ -1,4 +1,5 @@
 #include "FlightRigComponent.h"
+#define NOMINMAX
 #include "FlightRigSystem.h"
 #include "SceneContext.h"
 #include "World.h"

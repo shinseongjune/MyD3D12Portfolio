@@ -1,4 +1,5 @@
 #include "EnemyAIComponent.h"
+#define NOMINMAX
 #include <cmath>
 #include "SceneContext.h"
 #include "World.h"

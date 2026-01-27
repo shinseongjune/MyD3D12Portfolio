@@ -1,4 +1,5 @@
 #include "PlayerBooster.h"
+#define NOMINMAX
 #include <string>
 #include <format>
 #include <memory>

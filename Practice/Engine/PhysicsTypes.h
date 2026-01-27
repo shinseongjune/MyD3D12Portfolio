@@ -22,9 +22,9 @@ struct AABB
 struct Contact
 {
     // A를 normal 방향으로 밀면 분리되는 규약
-    XMFLOAT3 normal;
-    float    penetration;
-    XMFLOAT3 point;
+    XMFLOAT3 normal{};
+    float    penetration = 0;
+    XMFLOAT3 point{};
 
     // --- Sequential Impulses용(누적 임펄스) ---
     float normalImpulseSum = 0.0f;   // λn 누적 (>=0)

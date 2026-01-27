@@ -13,6 +13,7 @@
 #include "PhysicsSystem.h"
 #include <DirectXMath.h>
 #include "MissileLauncherComponent.h"
+#include "PrimitiveMeshes.h"
 using namespace DirectX;
 
 static XMFLOAT3 Add(const XMFLOAT3& a, const XMFLOAT3& b)
@@ -311,6 +312,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
         m_waveManager.Start(m_spawnPositions);
     }
 
+#if defined(_DEBUG)
     // spawn pos test
     {
         for (auto e : m_spawnPositions)
@@ -325,6 +327,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
             auto& real = ctx.world.GetTransform(t.value);
         }
     }
+#endif
 }
 
 void PlayScene::OnUnload(SceneContext& ctx)

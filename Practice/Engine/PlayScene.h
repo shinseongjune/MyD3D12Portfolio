@@ -1,4 +1,5 @@
 #pragma once
+#define NOMINMAX
 #include "Scene.h"
 #include <vector>
 #include <string>

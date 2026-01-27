@@ -1,4 +1,5 @@
 #pragma once
+#define NOMINMAX
 #include <vector>
 #include <DirectXMath.h>
 #include "World.h"

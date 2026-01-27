@@ -1,4 +1,5 @@
 #include "PhysicsSystem.h"
+#define NOMINMAX
 #include "DebugDraw.h"
 #include "CollisionEvents.h"
 #include <algorithm>
