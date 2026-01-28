@@ -68,11 +68,6 @@ public:
     void  ForceState(State s) { m_state = s; m_stateTime = 0.0f; }
 
 private:
-    // Cached references (optional)
-    FlightRigComponent* m_rig = nullptr;
-    GunComponent* m_gun = nullptr;
-    MissileLauncherComponent* m_missile = nullptr;
-
     State m_state = State::Chase;
     float m_stateTime = 0.0f;
     float m_attackTime = 0.0f;
@@ -106,7 +101,7 @@ public:
 
     float m_reengageCooldown = 0;
     float m_attackGateTime = 0.0f;
-    float reengageCooldownTime = 3.0f;
+    float reengageCooldownTime = 5.0f;
     float attackGateRequiredTime = 0.8f;
     float attackEnterDot = 0.25f;
 

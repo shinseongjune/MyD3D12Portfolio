@@ -110,6 +110,12 @@ void PlayScene::OnLoad(SceneContext& ctx)
         }
     }
 
+    {
+        auto boundaryWarning = ctx.LoadSoundScoped("Assets/Audio/boundaryWarning.mp3");
+        if (boundaryWarning.IsOk())
+            m_boundaryWarningSound = boundaryWarning.value;
+    }
+
     // Import models
     Result<ModelAsset> res_model_spacefighter = ImportModel(ctx, "Assets/Model/space_fighter.obj");
 
@@ -128,6 +134,9 @@ void PlayScene::OnLoad(SceneContext& ctx)
     m_missileTex = LoadTexture(ctx, "Assets/Texture/missile.png");
 
     TextureHandle texh_map = LoadTexture(ctx, "Assets/Texture/map.png");
+
+    m_minimapTex = LoadTexture(ctx, "Assets/Texture/minimap.png");
+    m_minimap_enemymarkerTex = LoadTexture(ctx, "Assets/Texture/minimap_enemyMarker.png");
 
     // booster anims
     {
@@ -236,7 +245,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
             col.shapeType = ShapeType::Sphere;
             col.localCenter = { 0, -1.0f, 0.3f };
             col.sphere.radius = 2.0f;
-            col.layer = 1;
+            col.layer = 1 << 0;
             PhysicsMaterial pm;
             pm.restitution = 0.5f;
             col.material = pm;
@@ -250,7 +259,7 @@ void PlayScene::OnLoad(SceneContext& ctx)
         // Attach Stats
         {
             auto stats = std::make_unique<StatsComponent>();
-            stats->SetHp(10000);
+            stats->SetHp(5000);
             stats->SetQuadMesh(m_quad);
             stats->SetDieAnims(m_deathAnimsContainer[0]);
             stats->SetDieSounds(m_deathSounds);
@@ -275,6 +284,15 @@ void PlayScene::OnLoad(SceneContext& ctx)
         // audio source
         {
             ctx.world.AddAudioSource(m_player, AudioSourceComponent{});
+        }
+
+        // warning audio entity (player child 역할)
+        {
+            m_warningAudio = ctx.Instantiate("WarningAudio");
+            ctx.world.AddTransform(m_warningAudio);
+            ctx.world.AddAudioSource(m_warningAudio, AudioSourceComponent{});
+
+            ctx.world.SetParent(m_warningAudio, m_player);
         }
     }
 
@@ -328,6 +346,47 @@ void PlayScene::OnLoad(SceneContext& ctx)
         }
     }
 #endif
+
+    // minimap
+    {
+        // background
+        {
+            m_minimapBg = ctx.Instantiate("MinimapBG");
+            UIElementComponent bg;
+            bg.texture = m_minimapTex;
+            bg.sizePx = { 256,256 };
+            bg.anchor = { 1.0f, 1.0f };          // 화면 우하단 기준
+            bg.pivot = { 1.0f, 1.0f };          // 자기 우하단을 anchor에 붙임
+            bg.anchoredPosPx = { -20, -20 };     // 화면 끝에서 살짝 띄움
+            bg.z = 100;                          // HUD 위로
+            bg.color = { 1,1,1,1 };
+            ctx.world.AddUIElement(m_minimapBg, bg);
+        }
+
+        // enemy pool
+        {
+            const int K = 64;
+            m_minimapEnemyMarkers.clear();
+            m_minimapEnemyMarkers.reserve(K);
+
+            for (int i = 0; i < K; i++)
+            {
+                EntityId m = ctx.Instantiate(std::format("MinimapEnemyMarker{}", i).c_str());
+                UIElementComponent ui;
+                ui.uiParent = m_minimapBg;                 // BG의 자식
+                ui.texture = m_minimap_enemymarkerTex;
+                ui.sizePx = { 12,12 };                     // 빨간 점 크기
+                ui.anchor = { 0.5f, 0.5f };                // 부모(미니맵) 중앙
+                ui.pivot = { 0.5f, 0.5f };                // 점의 중앙 정렬
+                ui.anchoredPosPx = { 0,0 };
+                ui.z = 101;                                // BG 위
+                ui.enabled = false;
+                ctx.world.AddUIElement(m, ui);
+
+                m_minimapEnemyMarkers.push_back(m);
+            }
+        }
+    }
 }
 
 void PlayScene::OnUnload(SceneContext& ctx)
@@ -336,20 +395,37 @@ void PlayScene::OnUnload(SceneContext& ctx)
 
 void PlayScene::OnUpdate(SceneContext& ctx)
 {
+    // 플레이어가 이미 죽었거나 삭제 예정이면 바로 Lose 처리
+    if (!m_player.IsValid() || !ctx.world.IsAlive(m_player) || !ctx.world.HasTransform(m_player))
+    {
+        GameManager::GetInstance().SetState(GameManager::State::Lose);
+    }
+
     m_enemyHud.SetEnabled(GameManager::GetInstance().CurrentState() == GameManager::State::Playing);
     if (GameManager::GetInstance().CurrentState() == GameManager::State::Win || GameManager::GetInstance().CurrentState() == GameManager::State::Lose)
     {
+        ctx.audio.StopEntity(m_warningAudio);
         ctx.RequestLoadScene(SceneId::Result);
         return;
     }
 
+    DisplayDefaultHUD(ctx);
+
     DetectBoundary(ctx);
+
+    // 전투 지역 이탈 경고음
+    UpdateBoundaryWarningAudio(ctx);
 
     // 경계를 벗어난 경우
     if (m_outOfPlay)
     {
-        //TODO: 경고음
-        //TODO: 경고 ui
+        ctx.DrawWText(300, 350, L"전투 지역을 이탈하고 있습니다!", 18, { 1, 0, 0, 1 });
+    }
+
+    // 땅이 가까운 경우
+    if (m_groundWarning)
+    {
+        ctx.DrawWText(300, 380, L"지면이 너무 가깝습니다!", 18, { 1, 0, 0 ,1 });
     }
 
     m_enemyHud.Update(ctx, m_cam, m_player, m_waveManager.GetCurrentEnemies());
@@ -357,6 +433,7 @@ void PlayScene::OnUpdate(SceneContext& ctx)
     PlayerWindUpdate(ctx, m_player, m_windSounds);
 
     m_waveManager.Update(ctx, ctx.dt);
+    UpdateMinimap(ctx);
 
     BuildShooterCommands(ctx.input, m_cmds);
 
@@ -708,7 +785,8 @@ void PlayScene::DetectBoundary(SceneContext& ctx)
         return;
     }
 
-    m_outOfPlay = (d2 > playR2) || p.y < m_groundBoundary + 150;
+    m_outOfPlay = (d2 > playR2);
+    m_groundWarning = p.y < m_groundBoundary + 30;
 }
 
 
@@ -735,4 +813,159 @@ void PlayScene::PlayerWindUpdate(SceneContext& ctx, EntityId player, const std::
     src.clip = windClips[idx];
 
     ctx.audio.PlayFromEntity(player);
+}
+
+void PlayScene::DisplayDefaultHUD(SceneContext& ctx)
+{
+    if (!m_player.IsValid()) return;
+    if (!ctx.world.IsAlive(m_player)) return;
+
+    auto stats = ctx.world.GetScriptAs<StatsComponent>(m_player);
+    if (!stats) return;
+
+    auto buf = std::format(L"HP : {}", stats->CurrentHp());
+    ctx.DrawWText(40, 440, buf, 24, {0.2f, 1, 0.35f, 1});
+
+    auto missileLauncher = ctx.world.GetScriptAs<MissileLauncherComponent>(m_player);
+    buf = std::format(L"missile : {}", missileLauncher->m_missileCount);
+    ctx.DrawWText(40, 480, buf, 24, {0.2f, 1, 0.35f, 1});
+
+    buf = std::format(L"웨이브 {}", m_waveManager.GetCurrentWaveIndex() + 1);
+    ctx.DrawWText(40, 40, buf, 24, { 1, 1, 1, 1 });
+
+    buf = std::format(L"남은 적 수 : {} / {}", m_waveManager.GetCurrentEnemiesCount(), m_waveManager.GetCurrentWaveEnemiesCound());
+    ctx.DrawWText(40, 80, buf, 24, { 1, 1, 1, 1 });
+}
+
+void PlayScene::UpdateBoundaryWarningAudio(SceneContext& ctx)
+{
+    if (!ctx.world.IsAlive(m_warningAudio) || !ctx.world.HasAudioSource(m_warningAudio))
+        return;
+
+    const bool warningNow = (m_outOfPlay || m_groundWarning);
+
+    auto& src = ctx.world.GetAudioSource(m_warningAudio);
+    src.bus = AudioBus::SFX;
+    src.loop = false;
+
+    if (!warningNow)
+    {
+        if (m_prevWarning)
+        {
+            ctx.audio.StopEntity(m_warningAudio);
+        }
+        m_prevWarning = false;
+        return;
+    }
+
+    // ON 상태
+    src.clip = m_boundaryWarningSound;
+
+    // 아직 재생 중이면 겹치지 않게 리턴
+    if (ctx.audio.IsEntityPlaying(m_warningAudio))
+    {
+        m_prevWarning = true;
+        return;
+    }
+
+    // 재생 중이 아니면 1회 재생 요청
+    ctx.audio.PlayFromEntity(m_warningAudio);
+    m_prevWarning = true;
+}
+
+void PlayScene::UpdateMinimap(SceneContext& ctx)
+{
+    if (!ctx.world.IsAlive(m_player) || !ctx.world.HasTransform(m_player))
+        return;
+
+    // 미니맵 크기/반지름(픽셀)
+    const float mmW = ctx.world.GetUIElement(m_minimapBg).sizePx.x;
+    const float mmH = ctx.world.GetUIElement(m_minimapBg).sizePx.y;
+    const float R = 0.5f * std::min(mmW, mmH);
+
+    const float marginPx = 10.0f;
+    const float clampR = R - marginPx;
+
+    // 미니맵이 커버하는 월드 반경
+    const float rangeWorld = m_playBoundary;
+
+    XMFLOAT3 ppos = ctx.world.GetLocalPosition(m_player);
+
+    float playerYaw = 0.0f;
+    if (ctx.world.HasTransform(m_player))
+    {
+        playerYaw = ctx.world.GetLocalRotationEuler(m_player).y;
+    }
+
+    const float c = cosf(playerYaw);
+    const float s = sinf(playerYaw);
+
+    // 1) 살아있는 적 목록 수집
+    std::vector<EntityId> alive;
+    alive.reserve(128);
+
+    for (EntityId e : m_waveManager.GetCurrentEnemies())
+    {
+        if (!ctx.world.IsAlive(e) || !ctx.world.HasTransform(e))
+            continue;
+
+        if (auto* st = ctx.world.GetScriptAs<StatsComponent>(e))
+        {
+            if (st->CurrentHp() <= 0) continue;
+        }
+        alive.push_back(e);
+    }
+
+    // 가까운 순 정렬
+    std::sort(alive.begin(), alive.end(),
+        [&](EntityId a, EntityId b)
+        {
+            XMFLOAT3 A = ctx.world.GetLocalPosition(a);
+            XMFLOAT3 B = ctx.world.GetLocalPosition(b);
+            float dax = A.x - ppos.x, daz = A.z - ppos.z;
+            float dbx = B.x - ppos.x, dbz = B.z - ppos.z;
+            return (dax * dax + daz * daz) < (dbx * dbx + dbz * dbz);
+        });
+
+    const int K = (int)m_minimapEnemyMarkers.size();
+    const int count = std::min((int)alive.size(), K);
+
+    // 2) 보이는 슬롯 갱신
+    for (int i = 0; i < count; i++)
+    {
+        EntityId marker = m_minimapEnemyMarkers[i];
+        auto& ui = ctx.world.GetUIElement(marker);
+
+        XMFLOAT3 epos = ctx.world.GetLocalPosition(alive[i]);
+
+        float dx = epos.x - ppos.x;
+        float dz = epos.z - ppos.z;
+
+        // 로컬(플레이어 기준 회전)
+        float lx = dx * c - dz * s;
+        float lz = dx * s + dz * c;
+
+        // 월드->픽셀
+        float px = (lx / rangeWorld) * clampR;
+        float py = (lz / rangeWorld) * clampR;
+
+        // 원형 클램프
+        float len = std::sqrt(px * px + py * py);
+        if (len > clampR && len > 1e-5f)
+        {
+            px = px / len * clampR;
+            py = py / len * clampR;
+        }
+
+        ui.anchoredPosPx = { px, -py };
+
+        ui.enabled = true;
+    }
+
+    // 3) 남은 슬롯 숨김
+    for (int i = count; i < K; i++)
+    {
+        auto& ui = ctx.world.GetUIElement(m_minimapEnemyMarkers[i]);
+        ui.enabled = false;
+    }
 }

@@ -14,9 +14,9 @@ void WaveManager::Start(const std::vector<EntityId>& spawnPositions)
 
     // 웨이브 테이블
     m_waves.clear();
-    m_waves.push_back({ 10, 10, 1.5f });
-    m_waves.push_back({ 2, 2, 1.2f });
-    m_waves.push_back({ 3, 3, 1.0f });
+    m_waves.push_back({ 4, 3, 1.5f });
+    m_waves.push_back({ 8, 4, 1.2f });
+    m_waves.push_back({ 10, 10, 1.0f });
 
     StartWave(0);
 }
@@ -160,9 +160,9 @@ void WaveManager::CreateCruiser(SceneContext& ctx, EntityId spawnPos)
     // Attach Flight
     {
         auto rig = std::make_unique<FlightRigComponent>();
-        rig->maxSpeed = 25.0f;
-        rig->turnRatePitch = DirectX::XMConvertToRadians(70.0f);
-        rig->turnRateRoll = DirectX::XMConvertToRadians(100.0f);
+        rig->maxSpeed = 23.0f;
+        rig->turnRatePitch = DirectX::XMConvertToRadians(60.0f);
+        rig->turnRateRoll = DirectX::XMConvertToRadians(80.0f);
         ctx.world.AddScript(e, std::move(rig));
     }
     // Attach AI

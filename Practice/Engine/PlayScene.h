@@ -95,6 +95,7 @@ private:
     // Camera follow lives as a Behaviour on the camera entity (CameraRigComponent).
     EntityId m_cam;
     EntityId m_player;
+    EntityId m_warningAudio;
 
     MeshHandle m_quad;
     TextureHandle m_bulletTex;
@@ -120,6 +121,11 @@ private:
 
     WaveManager m_waveManager;
     EnemyIndicatorHUD m_enemyHud;
+
+    SoundHandle m_boundaryWarningSound;
+
+    TextureHandle m_minimapTex;
+    TextureHandle m_minimap_enemymarkerTex;
 
 private:
     void SetSkybox(SceneContext& ctx);
@@ -152,8 +158,19 @@ private:
     void BuildBoundariesAndSpawnPoints(SceneContext& ctx, float playRadius, int latDiv, int lonDiv, float spawnRadiusRatio, float groundY);
     
     bool m_outOfPlay = false;
+    bool m_groundWarning = false;
     void DetectBoundary(SceneContext& ctx);
 
     void PlayerWindUpdate(SceneContext& ctx, EntityId player, const std::vector<SoundHandle>& windClips);
+
+    void DisplayDefaultHUD(SceneContext& ctx);
+
+    uint32_t m_warningInstId = 0;
+    bool m_prevWarning = false;
+    void UpdateBoundaryWarningAudio(SceneContext& ctx);
+
+    EntityId m_minimapBg;
+    std::vector<EntityId> m_minimapEnemyMarkers;
+    void UpdateMinimap(SceneContext& ctx);
 
 };

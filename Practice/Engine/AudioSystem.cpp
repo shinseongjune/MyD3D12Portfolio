@@ -13,6 +13,8 @@
 #include <unordered_map>
 #include <vector>
 #include <cstdint>
+#include <memory>
+
 #include "Utilities.h"
 
 #pragma comment(lib, "xaudio2.lib")
@@ -28,7 +30,7 @@ struct AudioInstance
     SoundHandle clip{};
     bool active = false;
 
-    std::shared_ptr<std::vector<uint8_t>> pcmHold;
+    std::shared_ptr<std::vector<uint8_t>> pcmHold; // PCM 수명 유지
 };
 
 class AudioSystem::Impl
@@ -38,7 +40,7 @@ public:
     ComPtr<IXAudio2> xaudio;
     IXAudio2MasteringVoice* master = nullptr;
 
-    // command queue (B안)
+    // command queue
     std::vector<AudioCommand> pending;
     std::vector<AudioCommand> processing;
 
@@ -47,7 +49,7 @@ public:
     std::vector<AudioInstance> instances;
     std::unordered_map<uint32_t, size_t> idToIndex;
 
-    // entity -> instance (최소 정책: 엔티티당 1개만 추적)
+    // entity -> instance (엔티티당 1개만 추적)
     std::unordered_map<uint32_t, uint32_t> entityToInstance;
 
     // bgm slot
@@ -58,7 +60,10 @@ public:
     {
         auto it = idToIndex.find(id);
         if (it == idToIndex.end()) return nullptr;
-        return &instances[it->second];
+        const size_t idx = it->second;
+        if (idx >= instances.size()) return nullptr; // 방어
+        if (instances[idx].id != id) return nullptr;  // 방어(정합성)
+        return &instances[idx];
     }
 
     void RebuildIndexFor(size_t idx)
@@ -80,18 +85,20 @@ public:
         instances.pop_back();
     }
 
+    // voice만 파괴 + 매핑 정리(컨테이너 제거는 호출자가 함)
     void StopAndDestroyVoice(AudioInstance& inst)
     {
-        if (!inst.voice) return;
-
-        inst.voice->Stop(0);
-        inst.voice->FlushSourceBuffers();
-        inst.voice->DestroyVoice();
-        inst.voice = nullptr;
+        if (inst.voice)
+        {
+            inst.voice->Stop(0);
+            inst.voice->FlushSourceBuffers();
+            inst.voice->DestroyVoice();
+            inst.voice = nullptr;
+        }
 
         inst.active = false;
 
-        // entity mapping cleanup
+        // entity mapping cleanup (해당 인스턴스가 매핑된 경우만)
         if (inst.owner.index != 0)
         {
             auto eit = entityToInstance.find(inst.owner.index);
@@ -104,15 +111,30 @@ public:
             bgmInstanceId = 0;
     }
 
-    // 폴링으로 끝난 voice 회수
+    // 핵심: Stop은 "파괴 + 컨테이너 제거"까지 한 번에
+    bool StopAndRemoveInstanceById(uint32_t id)
+    {
+        auto it = idToIndex.find(id);
+        if (it == idToIndex.end()) return false;
+
+        const size_t idx = it->second;
+        if (idx >= instances.size()) { idToIndex.erase(it); return false; } // 방어
+
+        StopAndDestroyVoice(instances[idx]);
+        RemoveInstanceAt(idx);
+        return true;
+    }
+
+    // 폴링으로 "자연 종료된(non-loop)" voice 회수
     void CollectFinishedVoices()
     {
-        for (size_t i = 0; i < instances.size();)
+        for (size_t i = 0; i < instances.size(); )
         {
             AudioInstance& inst = instances[i];
 
             if (!inst.voice)
             {
+                // Stop에서 제거하는 구조라 여기로 올 일은 거의 없지만 방어차원 유지
                 RemoveInstanceAt(i);
                 continue;
             }
@@ -158,11 +180,13 @@ void AudioSystem::Shutdown()
 {
     if (!m_impl) return;
 
-    // stop all voices
-    for (auto& inst : m_impl->instances)
-        m_impl->StopAndDestroyVoice(inst);
+    // stop all voices safely
+    while (!m_impl->instances.empty())
+    {
+        const uint32_t id = m_impl->instances.back().id;
+        m_impl->StopAndRemoveInstanceById(id);
+    }
 
-    m_impl->instances.clear();
     m_impl->idToIndex.clear();
     m_impl->entityToInstance.clear();
     m_impl->bgmInstanceId = 0;
@@ -259,6 +283,18 @@ uint32_t AudioSystem::ExecutePlay(SoundHandle clip, const AudioPlayDesc& desc, E
     const SoundClip& sc = sounds.Get(clip);
     if (!sc.pcm || sc.pcm->empty()) return 0;
 
+    // --- 엔티티당 1개 정책: 기존 거 있으면 "제거까지"
+    if (owner.index != 0)
+    {
+        auto it = m_impl->entityToInstance.find(owner.index);
+        if (it != m_impl->entityToInstance.end())
+        {
+            const uint32_t prevId = it->second;
+            // StopAndRemove가 entityToInstance도 지우지만, 아래에서 다시 설정할 거라 상관없음
+            m_impl->StopAndRemoveInstanceById(prevId);
+        }
+    }
+
     IXAudio2SourceVoice* sv = nullptr;
     ThrowIfFailed(m_impl->xaudio->CreateSourceVoice(
         &sv,
@@ -304,17 +340,8 @@ uint32_t AudioSystem::ExecutePlay(SoundHandle clip, const AudioPlayDesc& desc, E
     m_impl->instances.push_back(inst);
     m_impl->idToIndex[inst.id] = idx;
 
-    // entity -> instance (최소 정책: 엔티티당 1개만)
     if (owner.index != 0)
     {
-        auto it = m_impl->entityToInstance.find(owner.index);
-        if (it != m_impl->entityToInstance.end())
-        {
-            // 기존 재생이 있으면 stop하고 교체
-            const uint32_t prev = it->second;
-            if (auto* prevInst = m_impl->FindInstance(prev))
-                m_impl->StopAndDestroyVoice(*prevInst);
-        }
         m_impl->entityToInstance[owner.index] = inst.id;
     }
 
@@ -326,10 +353,10 @@ void AudioSystem::Update(World& world, SoundManager& sounds)
     if (!m_impl->xaudio)
         return;
 
-    // 1) finished voice 정리
+    // 1) 자연 종료된 것 정리
     m_impl->CollectFinishedVoices();
 
-    // 2) 커맨드 스왑(B안 핵심)
+    // 2) 커맨드 스왑
     m_impl->processing.clear();
     m_impl->processing.swap(m_impl->pending);
 
@@ -356,39 +383,40 @@ void AudioSystem::Update(World& world, SoundManager& sounds)
             const uint32_t instId = ExecutePlay(src.clip, d, cmd.entity, sounds);
 
             src.playingInstanceId = instId;
+
+            // ※ world.AddAudioSource가 "Set"처럼 덮어쓰는 API라면 OK.
+            //   만약 "추가"라서 중복이 나는 구조면, SetAudioSource 같은 API로 바꾸는 게 안전.
             world.AddAudioSource(cmd.entity, src);
         } break;
 
         case AudioCommandType::StopInstance:
         {
-            if (auto* inst = m_impl->FindInstance(cmd.instanceId))
-                m_impl->StopAndDestroyVoice(*inst);
+            m_impl->StopAndRemoveInstanceById(cmd.instanceId);
         } break;
 
         case AudioCommandType::StopEntity:
         {
-            const uint32_t eid = cmd.entity.index;                                                                                                                                                      
+            const uint32_t eid = cmd.entity.index;
             auto it = m_impl->entityToInstance.find(eid);
             if (it != m_impl->entityToInstance.end())
             {
                 const uint32_t instId = it->second;
-                if (auto* inst = m_impl->FindInstance(instId))
-                    m_impl->StopAndDestroyVoice(*inst);
-                m_impl->entityToInstance.erase(it);
+                m_impl->StopAndRemoveInstanceById(instId);
+
+                // StopAndDestroyVoice에서도 지웠을 수 있으니, idempotent하게 한 번 더
+                m_impl->entityToInstance.erase(eid);
             }
         } break;
 
         case AudioCommandType::PlayBGM:
         {
-            // 기존 BGM 끄기
+            // 기존 BGM 제거까지
             if (m_impl->bgmInstanceId != 0)
             {
-                if (auto* inst = m_impl->FindInstance(m_impl->bgmInstanceId))
-                    m_impl->StopAndDestroyVoice(*inst);
+                m_impl->StopAndRemoveInstanceById(m_impl->bgmInstanceId);
                 m_impl->bgmInstanceId = 0;
             }
 
-            // BGM은 loop=true로 들어오는 걸 전제로 함
             const uint32_t instId = ExecutePlay(cmd.clip, cmd.desc, EntityId{}, sounds);
             m_impl->bgmInstanceId = instId;
         } break;
@@ -397,8 +425,7 @@ void AudioSystem::Update(World& world, SoundManager& sounds)
         {
             if (m_impl->bgmInstanceId != 0)
             {
-                if (auto* inst = m_impl->FindInstance(m_impl->bgmInstanceId))
-                    m_impl->StopAndDestroyVoice(*inst);
+                m_impl->StopAndRemoveInstanceById(m_impl->bgmInstanceId);
                 m_impl->bgmInstanceId = 0;
             }
         } break;
@@ -408,6 +435,14 @@ void AudioSystem::Update(World& world, SoundManager& sounds)
         }
     }
 
-    // 4) stop 처리 후 한 번 더 정리
+    // 4) stop 처리 후 자연 종료된 것 정리(필요하면)
     m_impl->CollectFinishedVoices();
+}
+
+bool AudioSystem::IsEntityPlaying(EntityId e) const
+{
+    if (e.index == 0) return false;
+    auto it = m_impl->entityToInstance.find(e.index);
+    if (it == m_impl->entityToInstance.end()) return false;
+    return m_impl->FindInstance(it->second) != nullptr;
 }

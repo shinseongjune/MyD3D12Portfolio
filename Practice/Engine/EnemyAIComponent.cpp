@@ -36,12 +36,6 @@ XMFLOAT3 EnemyAIComponent::Normalize3(const XMFLOAT3& v, const XMFLOAT3& fallbac
 
 void EnemyAIComponent::Start(SceneContext& ctx)
 {
-    // Cache script pointers if your World supports it.
-    // If you don't have GetScriptAs, just resolve every frame in Update() (still fine).
-    m_rig = ctx.world.GetScriptAs<FlightRigComponent>(Entity());
-    m_gun = ctx.world.GetScriptAs<GunComponent>(Entity());
-    m_missile = ctx.world.GetScriptAs<MissileLauncherComponent>(Entity());
-
     m_state = State::Chase;
     m_stateTime = 0.0f;
     m_attackTime = 0.0f;
@@ -134,20 +128,16 @@ void EnemyAIComponent::Update(SceneContext& ctx)
     if (!ctx.world.HasTransform(Entity())) return;
     if (!ctx.world.HasTransform(target)) return;
 
-    // Resolve pointers if caching isn't reliable (optional safety)
-    if (!m_rig)     m_rig = ctx.world.GetScriptAs<FlightRigComponent>(Entity());
-    if (!m_gun)     m_gun = ctx.world.GetScriptAs<GunComponent>(Entity());
-    if (!m_missile) m_missile = ctx.world.GetScriptAs<MissileLauncherComponent>(Entity());
-    if (!m_rig) return;
-
     auto& myTr = ctx.world.GetTransform(Entity());
     auto& tgTr = ctx.world.GetTransform(target);
 
     const XMFLOAT3 myPos = myTr.position;
     const XMFLOAT3 tgPos = tgTr.position;
 
-    const XMFLOAT3 myFwd = m_rig->forwardDir;
-    const XMFLOAT3 myUp = m_rig->upDir;
+    auto* rig = ctx.world.GetScriptAs<FlightRigComponent>(Entity());
+
+    const XMFLOAT3 myFwd = rig->forwardDir;
+    const XMFLOAT3 myUp = rig->upDir;
 
     // Timers
     m_stateTime += ctx.dt;
@@ -304,7 +294,7 @@ void EnemyAIComponent::Update(SceneContext& ctx)
 
     // 3) Decide throttleDelta based on current rig throttle01
     // Output in [-1..+1], FlightRigSystem integrates: rig.throttle01 += throttleDelta * dt
-    float th = m_rig->throttle01;
+    float th = rig->throttle01;
     float thErr = throttleTarget01 - th;
     desired.throttleDelta = Clamp(thErr * 2.0f, -1.0f, +1.0f); // proportional control
 
@@ -338,7 +328,7 @@ void EnemyAIComponent::Update(SceneContext& ctx)
             liftedDesired.roll *= 0.6f;
             liftedDesired.yaw *= 0.4f;
             // 스로틀은 유지/증가(회복 우선)
-            liftedDesired.throttleDelta = Clamp((disengageThrottleTarget01 - m_rig->throttle01) * 2.5f, -1.0f, +1.0f);
+            liftedDesired.throttleDelta = Clamp((disengageThrottleTarget01 - rig->throttle01) * 2.5f, -1.0f, +1.0f);
         }
 
         desired = liftedDesired;
@@ -361,13 +351,14 @@ void EnemyAIComponent::Update(SceneContext& ctx)
     m_smoothed.airbrake = desired.airbrake; // bool은 즉시 반영
 
     // 5) Feed rig input
-    m_rig->SetInput(m_smoothed);
+    rig->SetInput(m_smoothed);
 
     // 6) Fire weapons in Attack state when aimed
     if (m_state == State::Attack)
     {
         // Gun
-        bool gunOk = (m_gun != nullptr)
+        auto* gun = ctx.world.GetScriptAs<GunComponent>(Entity());
+        bool gunOk = (gun != nullptr)
             && (dTarget <= gunRange)
             && (aimAngle <= aimConeGun)
             && (dotFT > 0.0f);
@@ -375,11 +366,12 @@ void EnemyAIComponent::Update(SceneContext& ctx)
         if (gunOk)
         {
             // GunComponent has internal cooldown; calling each frame is ok if Fire() checks it.
-            m_gun->Fire(ctx);
+            gun->Fire(ctx);
         }
 
         // Missile (optional)
-        bool missileOk = (m_missile != nullptr)
+        auto* missile = ctx.world.GetScriptAs<MissileLauncherComponent>(Entity());
+        bool missileOk = (missile != nullptr)
             && (dTarget <= missileRange)
             && (aimAngle <= aimConeMissile)
             && (dotFT > 0.0f)
@@ -389,7 +381,7 @@ void EnemyAIComponent::Update(SceneContext& ctx)
         {
             // MissileLauncherComponent also has cooldown & count;
             // We additionally gate with AI-side cooldown to prevent spamming.
-            m_missile->Fire(ctx);
+            missile->Fire(ctx);
             m_missileAiCooldown = missileMinTimeBetweenShots;
         }
     }

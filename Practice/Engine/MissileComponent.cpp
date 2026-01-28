@@ -67,6 +67,10 @@ void MissileComponent::Step(SceneContext& ctx)
     // 1) 현재 dir 정규화
     XMVECTOR dirV = XMVector3Normalize(XMLoadFloat3(&direction));
 
+    uint32_t ownerLayer = 0;
+    if (owner.IsValid() && ctx.world.IsAlive(owner) && ctx.world.HasCollider(owner))
+        ownerLayer = ctx.world.GetCollider(owner).layer;
+
     // 2) 타겟 탐색 + direction을 "조금씩" 조향
     {
         const float radius = m_seekRadius;
@@ -78,6 +82,7 @@ void MissileComponent::Step(SceneContext& ctx)
         XMVECTOR selfPosV = XMLoadFloat3(&tr.position);
 
         const auto& candidates = ctx.world.GetColliderEntities();
+
         for (EntityId e : candidates)
         {
             if (!ctx.world.IsAlive(e)) continue;
@@ -89,6 +94,9 @@ void MissileComponent::Step(SceneContext& ctx)
             if (!stats) continue;
 
             if (!ctx.world.HasTransform(e)) continue;
+
+            auto& candidateCol = ctx.world.GetCollider(e);
+            if ((candidateCol.layer & ownerLayer) != 0) continue;
 
             XMVECTOR targetPosV = XMLoadFloat3(&ctx.world.GetTransform(e).position);
             XMVECTOR toV = XMVectorSubtract(targetPosV, selfPosV);
@@ -145,25 +153,23 @@ void MissileComponent::Step(SceneContext& ctx)
 
     PhysicsSystem::RaycastHit hit{};
     uint32_t mask = 0xFFFFFFFFu;
+    mask &= ~ownerLayer;
 
     if (ctx.physics.Raycast(ctx.world, tr.position, dirN, dist, hit, mask, false))
     {
-        if (!owner.IsValid() || hit.entity != owner)
+        ctx.world.SetLocalPosition(Entity(), hit.point); // ★ setter 사용
+
+        EntityId hitEntity = hit.entity;
+        if (ctx.world.HasScript(hitEntity))
         {
-            ctx.world.SetLocalPosition(Entity(), hit.point); // ★ setter 사용
-
-            EntityId hitEntity = hit.entity;
-            if (ctx.world.HasScript(hitEntity))
-            {
-                auto* stats = ctx.world.GetScriptAs<StatsComponent>(hitEntity);
-                if (stats) stats->TakeDamage(80);
-            }
-
-            MakeBoomEffect(ctx);
-            ctx.PlaySFX(m_boomSound);
-            DestroyMissile(ctx);
-            return;
+            auto* stats = ctx.world.GetScriptAs<StatsComponent>(hitEntity);
+            if (stats) stats->TakeDamage(80);
         }
+
+        MakeBoomEffect(ctx);
+        ctx.PlaySFX(m_boomSound);
+        DestroyMissile(ctx);
+        return;
     }
 
     // 이동

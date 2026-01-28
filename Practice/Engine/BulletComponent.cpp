@@ -45,31 +45,30 @@ void BulletComponent::Step(SceneContext& ctx)
     PhysicsSystem::RaycastHit hit{};
 
     uint32_t mask = 0xFFFFFFFFu;
+    auto& ownerCol = ctx.world.GetCollider(owner);
+    mask &= ~ownerCol.layer;
 
     if (ctx.physics.Raycast(ctx.world, tr.position, dirN, dist, hit, mask, false))
     {
-        if (!owner.IsValid() || hit.entity != owner)
+        // 맞은 지점으로 스냅
+        tr.position = hit.point;
+
+        EntityId hitEntity = hit.entity;
+        if (ctx.world.HasScript(hitEntity))
         {
-            // 맞은 지점으로 스냅
-            tr.position = hit.point;
-
-            EntityId hitEntity = hit.entity;
-            if (ctx.world.HasScript(hitEntity))
+            auto* stats = ctx.world.GetScriptAs<StatsComponent>(hitEntity);
+            if (stats != nullptr)
             {
-                auto* stats = ctx.world.GetScriptAs<StatsComponent>(hitEntity);
-                if (stats != nullptr)
-                {
-                    stats->TakeDamage(20);
-                }
+                stats->TakeDamage(20);
             }
-            MakeHitEffect(ctx);
-
-            auto hitSound = m_bulletHitSounds[RandRangeInt(0, (int)m_bulletHitSounds.size() - 1)];
-            ctx.PlaySFX(hitSound);
-
-            DestroyBullet(ctx);
-            return;
         }
+        MakeHitEffect(ctx);
+
+        auto hitSound = m_bulletHitSounds[RandRangeInt(0, (int)m_bulletHitSounds.size() - 1)];
+        ctx.PlaySFX(hitSound);
+
+        DestroyBullet(ctx);
+        return;
     }
 
     // 이동

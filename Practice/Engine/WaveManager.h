@@ -65,6 +65,9 @@ public:
     }
 
     const std::vector<EntityId>& GetCurrentEnemies() const { return m_currentEnemies; }
+    int GetCurrentEnemiesCount() const { return (int)m_currentEnemies.size(); }
+    int GetCurrentWaveIndex() const { return m_rt.waveIndex; }
+    int GetCurrentWaveEnemiesCound() const { return m_waves[m_rt.waveIndex].totalCount; }
 
 private:
     EntityId PickSpawn(SceneContext& ctx) const;

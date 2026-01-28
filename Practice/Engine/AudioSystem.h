@@ -30,6 +30,8 @@ public:
     // --- Execute ---
     void Update(World& world, SoundManager& sounds);
 
+    bool IsEntityPlaying(EntityId e) const;
+
 private:
     uint32_t ExecutePlay(SoundHandle clip, const AudioPlayDesc& desc, EntityId owner, SoundManager& sounds);
 
