@@ -63,9 +63,9 @@ public:
     // We keep an independent velocity vector and only steer its DIRECTION toward the nose
     // at a limited angular rate. This produces the "nice arc" feel even with aggressive
     // pitch/roll inputs, and avoids singularities caused by world-up yaw hacks.
-    float velTurnRate = DirectX::XMConvertToRadians(140.0f); // rad/s (how fast velocity direction can bend)
-    float velTurnRateMin = DirectX::XMConvertToRadians(45.0f); // rad/s at very low speeds
-    float velTurnRateByBank = DirectX::XMConvertToRadians(80.0f); // extra rad/s when banked (more "bank-to-turn" feel)
+    float velTurnRate = DirectX::XMConvertToRadians(120.0f); // rad/s (how fast velocity direction can bend)
+    float velTurnRateMin = DirectX::XMConvertToRadians(40.0f); // rad/s at very low speeds
+    float velTurnRateByBank = DirectX::XMConvertToRadians(70.0f); // extra rad/s when banked (more "bank-to-turn" feel)
 
     // Optional: damp sideways component relative to nose (0 = off). 0.0~6.0 is typical.
     float sideslipDampRate = 0.0f;
