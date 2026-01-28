@@ -5,6 +5,46 @@
 
 using namespace DirectX;
 
+static float SmoothDamp1(float current, float target, float& currentVelocity, float smoothTime, float maxSpeed, float dt)
+{
+    smoothTime = (smoothTime < 1e-4f) ? 1e-4f : smoothTime;
+
+    float omega = 2.0f / smoothTime;
+    float x = omega * dt;
+    float exp = 1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x);
+
+    float change = current - target;
+    float originalTo = target;
+
+    // clamp max speed
+    float maxChange = maxSpeed * smoothTime;
+    change = (change > maxChange) ? maxChange : (change < -maxChange ? -maxChange : change);
+    target = current - change;
+
+    float temp = (currentVelocity + omega * change) * dt;
+    currentVelocity = (currentVelocity - omega * temp) * exp;
+
+    float output = target + (change + temp) * exp;
+
+    // prevent overshoot
+    if ((originalTo - current > 0.0f) == (output > originalTo))
+    {
+        output = originalTo;
+        currentVelocity = (output - originalTo) / dt;
+    }
+    return output;
+}
+
+static DirectX::XMFLOAT3 SmoothDamp3(DirectX::XMFLOAT3 cur, DirectX::XMFLOAT3 tgt,
+    DirectX::XMFLOAT3& vel, float smoothTime, float maxSpeed, float dt)
+{
+    DirectX::XMFLOAT3 out;
+    out.x = SmoothDamp1(cur.x, tgt.x, vel.x, smoothTime, maxSpeed, dt);
+    out.y = SmoothDamp1(cur.y, tgt.y, vel.y, smoothTime, maxSpeed, dt);
+    out.z = SmoothDamp1(cur.z, tgt.z, vel.z, smoothTime, maxSpeed, dt);
+    return out;
+}
+
 void CameraRig::SetTarget(EntityId target)
 {
     m_target = target;
@@ -270,6 +310,23 @@ void CameraRig::Update(World& world, float dt)
     lookAtV = XMVectorAdd(lookAtV, XMVectorScale(aircraftRight, m_lookAtOffset.x));
     lookAtV = XMVectorAdd(lookAtV, XMVectorScale(aircraftUp, m_lookAtOffset.y));
     lookAtV = XMVectorAdd(lookAtV, XMVectorScale(aircraftFwd, m_lookAtOffset.z));
+
+    // 6.5) smooth focus point (lookAt)
+    XMFLOAT3 lookAtF;
+    XMStoreFloat3(&lookAtF, lookAtV);
+
+    if (!m_hasFocus)
+    {
+        m_focusPos = lookAtF;
+        m_focusVel = { 0,0,0 };
+        m_hasFocus = true;
+    }
+    else
+    {
+        m_focusPos = SmoothDamp3(m_focusPos, lookAtF, m_focusVel, m_focusSmoothTime, m_focusMaxSpeed, dt);
+    }
+
+    XMVECTOR focusV = XMLoadFloat3(&m_focusPos);
 
     // 7) rotation: stable look-at
     XMVECTOR qLook = BuildLookAtQuaternionStable(camPosV, lookAtV, orbitUp, camRight);

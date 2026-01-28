@@ -106,4 +106,17 @@ private:
     // qTarget continuity (avoid q/-q flip)
     DirectX::XMFLOAT4 m_prevTargetQ{ 0,0,0,1 };
     bool m_hasPrevTargetQ = false;
+
+    // smoothed focus point
+    DirectX::XMFLOAT3 m_focusPos{ 0,0,0 };
+    DirectX::XMFLOAT3 m_focusVel{ 0,0,0 };
+    bool m_hasFocus = false;
+
+    // tuning (seconds)
+    float m_focusSmoothTime = 0.18f;   // 0.12~0.25 추천
+    float m_focusMaxSpeed = 4000.f;  // 너무 낮으면 뒤처짐/난조, 충분히 크게
+
+    DirectX::XMFLOAT4 m_smoothedCamQ{ 0,0,0,1 };
+    bool m_hasSmoothedQ = false;
+    float m_rotFollowRate = 16.0f; // 클수록 빨리 따라감(=덜 부드러움)
 };

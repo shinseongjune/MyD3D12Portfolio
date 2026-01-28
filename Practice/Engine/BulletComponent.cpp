@@ -15,6 +15,16 @@ void BulletComponent::Start(SceneContext& ctx)
 		XMVECTOR q = XMLoadFloat4(&ownerTr.rotation);
 		XMVECTOR f = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), q);
 		XMStoreFloat3(&direction, XMVector3Normalize(f));
+
+        if (ctx.world.IsAlive(owner) && ctx.world.HasCollider(owner))
+        {
+            const auto& oc = ctx.world.GetCollider(owner);
+            m_ownerLayerMask = oc.layer;
+        }
+        else
+        {
+            m_ownerLayerMask = 0;
+        }
 	}
 }
 
@@ -45,8 +55,7 @@ void BulletComponent::Step(SceneContext& ctx)
     PhysicsSystem::RaycastHit hit{};
 
     uint32_t mask = 0xFFFFFFFFu;
-    auto& ownerCol = ctx.world.GetCollider(owner);
-    mask &= ~ownerCol.layer;
+    mask &= ~m_ownerLayerMask;
 
     if (ctx.physics.Raycast(ctx.world, tr.position, dirN, dist, hit, mask, false))
     {

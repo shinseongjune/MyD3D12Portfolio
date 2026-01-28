@@ -22,6 +22,7 @@ private:
 	float m_speed = 110.0f;    // m/s
 	DirectX::XMFLOAT3 direction = { 0.0f, 0.0f, 1.0f };
 	EntityId owner = EntityId::Invalid();
+	uint32_t m_ownerLayerMask = 0;
 
 	MeshHandle m_quad;
 	std::vector<TextureHandle> m_boomAnims;

@@ -43,6 +43,16 @@ void MissileComponent::Start(SceneContext& ctx)
 		XMVECTOR q = XMLoadFloat4(&ownerTr.rotation);
 		XMVECTOR f = XMVector3Rotate(XMVectorSet(0, 0, 1, 0), q);
 		XMStoreFloat3(&direction, XMVector3Normalize(f));
+
+        if (ctx.world.IsAlive(owner) && ctx.world.HasCollider(owner))
+        {
+            const auto& oc = ctx.world.GetCollider(owner);
+            m_ownerLayerMask = oc.layer;
+        }
+        else
+        {
+            m_ownerLayerMask = 0;
+        }
 	}
 }
 
@@ -66,10 +76,6 @@ void MissileComponent::Step(SceneContext& ctx)
 
     // 1) 현재 dir 정규화
     XMVECTOR dirV = XMVector3Normalize(XMLoadFloat3(&direction));
-
-    uint32_t ownerLayer = 0;
-    if (owner.IsValid() && ctx.world.IsAlive(owner) && ctx.world.HasCollider(owner))
-        ownerLayer = ctx.world.GetCollider(owner).layer;
 
     // 2) 타겟 탐색 + direction을 "조금씩" 조향
     {
@@ -96,7 +102,7 @@ void MissileComponent::Step(SceneContext& ctx)
             if (!ctx.world.HasTransform(e)) continue;
 
             auto& candidateCol = ctx.world.GetCollider(e);
-            if ((candidateCol.layer & ownerLayer) != 0) continue;
+            if ((candidateCol.layer & m_ownerLayerMask) != 0) continue;
 
             XMVECTOR targetPosV = XMLoadFloat3(&ctx.world.GetTransform(e).position);
             XMVECTOR toV = XMVectorSubtract(targetPosV, selfPosV);
@@ -153,7 +159,7 @@ void MissileComponent::Step(SceneContext& ctx)
 
     PhysicsSystem::RaycastHit hit{};
     uint32_t mask = 0xFFFFFFFFu;
-    mask &= ~ownerLayer;
+    mask &= ~m_ownerLayerMask;
 
     if (ctx.physics.Raycast(ctx.world, tr.position, dirN, dist, hit, mask, false))
     {

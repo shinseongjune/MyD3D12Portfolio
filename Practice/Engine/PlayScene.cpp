@@ -16,6 +16,20 @@
 #include "PrimitiveMeshes.h"
 using namespace DirectX;
 
+static float MoveToward(float cur, float target, float maxDelta)
+{
+    float d = target - cur;
+    if (d > maxDelta) return cur + maxDelta;
+    if (d < -maxDelta) return cur - maxDelta;
+    return target;
+}
+
+static float ApplyRate(float cur, float target, float riseRate, float fallRate, float dt)
+{
+    float rate = (std::abs(target) > std::abs(cur)) ? riseRate : fallRate;
+    return MoveToward(cur, target, rate * dt);
+}
+
 static XMFLOAT3 Add(const XMFLOAT3& a, const XMFLOAT3& b)
 {
     return { a.x + b.x, a.y + b.y, a.z + b.z };
@@ -543,40 +557,57 @@ void PlayScene::ExecuteCommand(SceneContext& ctx)
     GunComponent* gun = GetGun(ctx);
     MissileLauncherComponent* missile = GetMissileLauncher(ctx);
 
-    FlightInput flightIn{};
-    bool hasMove = false;
+    if (!rig) return;
 
+    // (A) 이번 프레임 목표값(디지털)
+    FlightInput target{}; // 기본 0 (Move 없으면 자연스럽게 중립으로 복귀)
+
+    for (auto& c : m_cmds)
+    {
+        if (c.action == ShooterAction::Move)
+        {
+            target.pitch = c.pitch;
+            target.roll = c.roll;
+            target.yaw = c.yaw;
+            target.throttleDelta = c.throttle; // W/S: 레버 업/다운(Delta)
+            target.airbrake = c.airbrake;
+            break;
+        }
+    }
+
+    // (B) 스무딩 (레이트 제한)
+    m_playerSmoothed.pitch = ApplyRate(m_playerSmoothed.pitch, target.pitch, m_inputRiseRate, m_inputFallRate, ctx.dt);
+    m_playerSmoothed.roll = ApplyRate(m_playerSmoothed.roll, target.roll, m_inputRiseRate, m_inputFallRate, ctx.dt);
+    m_playerSmoothed.yaw = ApplyRate(m_playerSmoothed.yaw, target.yaw, m_inputRiseRate, m_inputFallRate, ctx.dt);
+
+    m_playerSmoothed.throttleDelta =
+        ApplyRate(m_playerSmoothed.throttleDelta, target.throttleDelta, m_throttleRiseRate, m_throttleFallRate, ctx.dt);
+
+    m_playerSmoothed.airbrake = target.airbrake;
+
+    // (C) rig에 공급
+    rig->SetInput(m_playerSmoothed);
+
+    // (D) 나머지 명령 실행
     for (const auto& cmd : m_cmds)
     {
         switch (cmd.action)
         {
         case ShooterAction::Move:
-            // Aggregate move input for this frame.
-            flightIn.throttleDelta += cmd.throttle;
-            flightIn.yaw += cmd.yaw;
-            flightIn.roll += cmd.roll;
-            flightIn.pitch += cmd.pitch;
-            hasMove = true;
             break;
+
         case ShooterAction::FireGun:
-            gun->Fire(ctx);
+            if (gun) gun->Fire(ctx);
             break;
+
         case ShooterAction::FireMissile:
-            missile->Fire(ctx);
+            if (missile) missile->Fire(ctx);
             break;
+
         case ShooterAction::CameraLook:
             if (camRig) camRig->OnLook(cmd.camX, cmd.camY);
             break;
         }
-    }
-
-    // Feed input to the rig only through ExecuteCommand (no direct Input usage in rig/system)
-    if (rig)
-    {
-        if (hasMove)
-            rig->SetInput(flightIn);
-        else
-            rig->ClearInput();
     }
 }
 
