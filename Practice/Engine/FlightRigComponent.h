@@ -45,7 +45,7 @@ public:
     // Yaw should be subtle (rudder), most turning comes from roll.
     float turnRateYaw   = DirectX::XMConvertToRadians(32.0f);
 
-    float autoYawFromRoll = 0.65f; // roll -> yaw coupling (banked turn feel)
+    float autoYawFromRoll = 0.55f; // roll -> yaw coupling (banked turn feel)
 
     float sideslipDamp = 0.0f; // reduces velocity component not aligned with nose
 
@@ -68,7 +68,7 @@ public:
     float velTurnRateByBank = DirectX::XMConvertToRadians(70.0f); // extra rad/s when banked (more "bank-to-turn" feel)
 
     // Optional: damp sideways component relative to nose (0 = off). 0.0~6.0 is typical.
-    float sideslipDampRate = 0.0f;
+    float sideslipDampRate = 2.0f;
 
     // Camera shake options (kept here for future camera-rig usage)
     bool  enableCameraShake = true;

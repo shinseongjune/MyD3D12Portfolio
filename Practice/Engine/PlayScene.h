@@ -92,9 +92,9 @@ public:
 private:
     // smooth input
     FlightInput m_playerSmoothed{};   // rig에 넣을 최종 입력(누적 상태)
-    float m_inputRiseRate = 2.0f;     // 0->1 올라가는 속도(초당)
-    float m_inputFallRate = 5.0f;     // 1->0 내려가는 속도(초당)
-    float m_throttleRiseRate = 1.0f;  // throttleDelta는 좀 느리게
+    float m_inputRiseRate = 0.8f;     // 0->1 올라가는 속도(초당)
+    float m_inputFallRate = 3.0f;     // 1->0 내려가는 속도(초당)
+    float m_throttleRiseRate = 0.5f;  // throttleDelta는 좀 느리게
     float m_throttleFallRate = 2.0f;
 
     std::vector<ShooterCommand> m_cmds;

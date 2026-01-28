@@ -15,8 +15,8 @@ void WaveManager::Start(const std::vector<EntityId>& spawnPositions)
     // 웨이브 테이블
     m_waves.clear();
     m_waves.push_back({ 4, 3, 1.5f });
-    m_waves.push_back({ 8, 4, 1.2f });
-    m_waves.push_back({ 10, 10, 1.0f });
+    m_waves.push_back({ 5, 4, 1.2f });
+    m_waves.push_back({ 8, 8, 1.0f });
 
     StartWave(0);
 }
