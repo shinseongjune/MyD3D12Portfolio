@@ -38,6 +38,9 @@ void RenderSystem::Build(const World& world, std::vector<RenderItem>& outItem) c
                 it.albedo = slot.albedo;
                 it.transparent = slot.transparent;
 				it.unlit = slot.unlit;
+                it.metallic = slot.metallic;
+                it.roughness = slot.roughness;
+                it.emissive = slot.emissive;
             }
             else
             {

@@ -519,7 +519,12 @@ void D3D12Renderer::Render(const std::vector<RenderItem>& items, const RenderCam
                 DirectX::XMStoreFloat4x4(&cb.mvp, MVP);
                 DirectX::XMStoreFloat4x4(&cb.world, W);
                 cb.color = it.color;
-                cb.material = DirectX::XMFLOAT4(it.unlit ? 1.0f : 0.0f, 0, 0, 0);
+                cb.material = DirectX::XMFLOAT4(
+                    it.unlit ? 1.0f : 0.0f,
+                    it.roughness,
+                    it.metallic,
+                    it.emissive
+                );
 
                 const uint32_t slot = slotBase + k;
                 if (slot >= frameBase + MaxDraws3D) { OutputDebugStringA("3D CB slot overflow\n"); __debugbreak(); break; }
@@ -1045,7 +1050,7 @@ void D3D12Renderer::CreatePipeline()
         row_major float4x4 mvp;
         row_major float4x4 world;
         float4 color;       // rgb=틴트, a=알파
-        float4 material;    // x=unlit(0/1), y,z,w unused
+        float4 material;    // x=unlit(0/1), y=roughness, z=metallic, w=emissive
     };
 
     cbuffer FrameCB : register(b1)
@@ -1068,17 +1073,70 @@ void D3D12Renderer::CreatePipeline()
         float2 uv        : TEXCOORD0;
         float3 worldPos  : TEXCOORD1;
         float3 worldNrm  : TEXCOORD2;
+        float3 viewDirWS : TEXCOORD3;
     };
+
+    // --- 컴파일 안전: 3x3 역행렬 직접 구현 ---
+    float3x3 Inverse3x3(float3x3 m)
+    {
+        float a00 = m[0][0], a01 = m[0][1], a02 = m[0][2];
+        float a10 = m[1][0], a11 = m[1][1], a12 = m[1][2];
+        float a20 = m[2][0], a21 = m[2][1], a22 = m[2][2];
+
+        float b01 =  a22 * a11 - a12 * a21;
+        float b11 = -a22 * a10 + a12 * a20;
+        float b21 =  a21 * a10 - a11 * a20;
+
+        float det = a00 * b01 + a01 * b11 + a02 * b21;
+
+        // det가 0에 가까우면 안전하게 단위행렬로 대체
+        if (abs(det) < 1e-8)
+            return float3x3(1,0,0, 0,1,0, 0,0,1);
+
+        float invDet = 1.0 / det;
+
+        float3x3 inv;
+        inv[0][0] = b01 * invDet;
+        inv[0][1] = (-a22 * a01 + a02 * a21) * invDet;
+        inv[0][2] = ( a12 * a01 - a02 * a11) * invDet;
+
+        inv[1][0] = b11 * invDet;
+        inv[1][1] = ( a22 * a00 - a02 * a20) * invDet;
+        inv[1][2] = (-a12 * a00 + a02 * a10) * invDet;
+
+        inv[2][0] = b21 * invDet;
+        inv[2][1] = (-a21 * a00 + a01 * a20) * invDet;
+        inv[2][2] = ( a11 * a00 - a01 * a10) * invDet;
+
+        return inv;
+    }
+
+    float3x3 InverseTranspose3x3(float3x3 m)
+    {
+        return transpose(Inverse3x3(m));
+    }
 
     VSOut main(VSIn i)
     {
         VSOut o;
+
+        // World position
         float4 wp = mul(float4(i.pos, 1.0), world);
         o.worldPos = wp.xyz;
-        // normal: use upper-left 3x3 of world, good enough for now
-        o.worldNrm = normalize(mul(i.nrm, (float3x3)world));
+
+        // Normal: inverse-transpose (비균일 스케일/회전 안전)
+        float3x3 W3 = (float3x3)world;
+        float3x3 NrmM = InverseTranspose3x3(W3);
+        o.worldNrm = normalize(mul(i.nrm, NrmM));
+
+        // View direction
+        float3 camPos = cameraPos_numLights.xyz;
+        o.viewDirWS = normalize(camPos - o.worldPos);
+
+        // Clip position
         o.pos = mul(float4(i.pos, 1.0), mvp);
         o.uv = i.uv;
+
         return o;
     }
     )";
@@ -1089,7 +1147,7 @@ void D3D12Renderer::CreatePipeline()
         row_major float4x4 mvp;
         row_major float4x4 world;
         float4 color;       // rgb=틴트, a=알파
-        float4 material;    // x=unlit(0/1), y,z,w unused
+        float4 material;    // x=unlit, y=roughness, z=metallic, w=emissive
     };
 
     struct Light
@@ -1123,65 +1181,111 @@ void D3D12Renderer::CreatePipeline()
         float2 uv        : TEXCOORD0;
         float3 worldPos  : TEXCOORD1;
         float3 worldNrm  : TEXCOORD2;
+        float3 viewDirWS : TEXCOORD3;
     };
 
-    float3 EvalLight(uint idx, float3 P, float3 N)
+    float3 EvalLight_Dir(uint idx, float3 N, out float3 Ldir)
     {
         Light L = lights[idx];
-        float3 result = 0;
-
-        if (L.type == 0)
-        {
-            float3 dir = normalize(-L.directionWS); // direction light points *toward* surface
-            float ndl = saturate(dot(N, dir));
-            result = L.color * (L.intensity * ndl);
-        }
-        else
-        {
-            float3 toL = L.positionWS - P;
-            float dist = length(toL);
-            if (dist <= 1e-4) return 0;
-            float3 dir = toL / dist;
-            float atten = saturate(1.0 - dist / max(L.range, 1e-3));
-            atten *= atten;
-
-            if (L.type == 2)
-            {
-                float cosA = dot(dir, normalize(-L.directionWS));
-                float spot = saturate((cosA - L.outerCos) / max(L.innerCos - L.outerCos, 1e-3));
-                atten *= spot;
-            }
-
-            float ndl = saturate(dot(N, dir));
-            result = L.color * (L.intensity * ndl * atten);
-        }
-
-        return result;
+        Ldir = normalize(-L.directionWS);
+        float ndl = saturate(dot(N, Ldir));
+        return L.color * (L.intensity * ndl);
     }
+
+    float3 EvalLight_PointSpot(uint idx, float3 P, float3 N, out float3 Ldir, out float atten)
+    {
+        Light L = lights[idx];
+        float3 toL = L.positionWS - P;
+        float dist = length(toL);
+        if (dist <= 1e-4) { atten = 0; Ldir = 0; return 0; }
+        Ldir = toL / dist;
+
+        atten = saturate(1.0 - dist / max(L.range, 1e-3));
+        atten *= atten;
+
+        if (L.type == 2) // spot
+        {
+            float cosA = dot(Ldir, normalize(-L.directionWS));
+            float spot = saturate((cosA - L.outerCos) / max(L.innerCos - L.outerCos, 1e-3));
+            atten *= spot;
+        }
+
+        float ndl = saturate(dot(N, Ldir));
+        return L.color * (L.intensity * ndl * atten);
+    }
+
+    float3 Tonemap_Reinhard(float3 x) { return x / (1.0 + x); }
 
     float4 main(PSIn i) : SV_TARGET
     {
-        float4 albedo = gTex.Sample(gSamp, i.uv) * color;
+        float4 tex = gTex.Sample(gSamp, i.uv);
+        float4 albedo = tex * color;
 
+        // Unlit
         if (material.x > 0.5)
-        {
-            // unlit
             return albedo;
-        }
 
         float3 N = normalize(i.worldNrm);
+        float3 V = normalize(i.viewDirWS);
         float3 P = i.worldPos;
 
-        float ambient = 0.12; // simple constant ambient
-        float3 lit = albedo.rgb * ambient;
+        float rough = saturate(material.y);     // 0=매끈, 1=거침
+        float metal = saturate(material.z);     // 0=비금속, 1=금속
+        float emiss = max(material.w, 0.0);
 
-        uint n = (uint)cameraPos_numLights.w;
-        n = min(n, 32u);
+        // “희뿌연 spec” 방지: roughness->specPow 매핑을 더 공격적으로
+        // rough=0 => 매우 날카로움, rough=1 => 둔탁
+        float specPow = lerp(256.0, 16.0, rough);
+        float specStr = lerp(0.04, 1.0, metal);
+
+        // 헤미스피어 앰비언트
+        float up = saturate(N.y * 0.5 + 0.5);
+        float3 ambientSky = float3(0.17, 0.12, 0.15);
+        float3 ambientGnd = float3(0.08, 0.05, 0.02);
+        float3 ambient = lerp(ambientGnd, ambientSky, up);
+
+        float3 diffAcc = albedo.rgb * ambient;
+        float3 specAcc = 0;
+
+        uint n = min((uint)cameraPos_numLights.w, 32u);
+
         [loop]
         for (uint li = 0; li < n; ++li)
         {
-            lit += albedo.rgb * EvalLight(li, P, N);
+            float3 Ldir = 0;
+            float atten = 1;
+
+            float3 diff = 0;
+            if (lights[li].type == 0)
+                diff = EvalLight_Dir(li, N, Ldir);
+            else
+                diff = EvalLight_PointSpot(li, P, N, Ldir, atten);
+
+            float3 H = normalize(Ldir + V);
+            float ndh = saturate(dot(N, H));
+            float spec = pow(ndh, specPow) * specStr;
+
+            diffAcc += albedo.rgb * diff;
+            specAcc += lights[li].color * (lights[li].intensity * spec * atten);
         }
+
+        // Rim light (원하면 0으로 꺼도 됨)
+        float rim = pow(1.0 - saturate(dot(N, V)), 3.0);
+        float3 rimCol = float3(0.25, 0.35, 0.55) * rim;
+
+        float3 lit = diffAcc + specAcc + rimCol + albedo.rgb * emiss;
+
+        // Fog (석양용)
+        float dist = length(cameraPos_numLights.xyz - P);
+        float fogStart = 250.0;
+        float fogEnd   = 2000.0;
+        float fogT = saturate((dist - fogStart) / max(fogEnd - fogStart, 1e-3));
+        float tHeight = saturate(P.y * 0.002 + 0.5);
+        float3 fogCol = lerp(float3(0.85,0.45,0.22), float3(0.22,0.28,0.40), tHeight);
+        lit = lerp(lit, fogCol, fogT);
+
+        // 톤매핑만 (감마는 일단 꺼둔 상태 유지)
+        lit = Tonemap_Reinhard(lit);
 
         return float4(lit, albedo.a);
     }

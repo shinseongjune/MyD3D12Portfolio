@@ -12,6 +12,11 @@ struct MaterialSlot
     bool transparent = false;
     bool unlit = false;
 	uint8_t _pad0[2]{};            // ÆÐµù
+
+    float roughness = 0.45f;
+    float metallic = 0.0f;
+    float emissive = 0.0f;
+    float _pad1 = 0.0f;
 };
 
 struct MaterialComponent

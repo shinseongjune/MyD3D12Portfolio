@@ -211,9 +211,27 @@ void PlayScene::OnLoad(SceneContext& ctx)
 
     // Materials
     MaterialComponent mat_spacefighter = CreateMaterial(ctx, texh_spacefighter);
+    {
+        auto& s = mat_spacefighter.Primary();
+        s.metallic = 0.9f;
+        s.roughness = 0.3f;
+        s.emissive = 0.0f;
+    }
     MaterialComponent mat_starcruiser  = CreateMaterial(ctx, texh_starcruiser);
+    {
+        auto& s = mat_starcruiser.Primary();
+        s.metallic = 0.95f;
+        s.roughness = 0.35f;
+        s.emissive = 0.0f;
+    }
 
     MaterialComponent mat_map = CreateMaterial(ctx, texh_map);
+    {
+        auto& s = mat_map.Primary();
+        s.metallic = 0.0f;
+        s.roughness = 0.85f;
+        s.emissive = 0.0f;
+    }
 
     // Spawn map
     {
@@ -636,31 +654,31 @@ void PlayScene::SetDirectionalLight(SceneContext& ctx)
 
     LightComponent s{};
     s.type = LightType::Directional;
-    s.color = { 1, 0.87f, 0.87f };
+    s.color = { 1, 0.95f, 0.95f };
     s.intensity = 8.0f;
     ctx.world.AddLight(light, s);
 
     ctx.world.SetLocalRotationEuler(light, {
-        DirectX::XMConvertToRadians(10.0f),
+        DirectX::XMConvertToRadians(3.0f),
         DirectX::XMConvertToRadians(-90.0f),
         0.0f
     });
 
     // Fill light
-    EntityId light2 = ctx.Instantiate("SubDirectionalLight");
-    ctx.world.AddTransform(light2);
-
-    LightComponent s2{};
-    s2.type = LightType::Directional;
-    s2.color = { 0.8f, 0.5f, 0.6f };
-    s2.intensity = 3.5f;
-    ctx.world.AddLight(light2, s2);
-
-    ctx.world.SetLocalRotationEuler(light2, {
-        DirectX::XMConvertToRadians(0.0f),
-        DirectX::XMConvertToRadians(90.0f),
-        0.0f
-    });
+    //EntityId light2 = ctx.Instantiate("SubDirectionalLight");
+    //ctx.world.AddTransform(light2);
+    //
+    //LightComponent s2{};
+    //s2.type = LightType::Directional;
+    //s2.color = { 0.8f, 0.5f, 0.6f };
+    //s2.intensity = 1.5f;
+    //ctx.world.AddLight(light2, s2);
+    //
+    //ctx.world.SetLocalRotationEuler(light2, {
+    //    DirectX::XMConvertToRadians(0.0f),
+    //    DirectX::XMConvertToRadians(90.0f),
+    //    0.0f
+    //});
 }
 
 Result<ModelAsset> PlayScene::ImportModel(SceneContext& ctx, const std::string& path)
