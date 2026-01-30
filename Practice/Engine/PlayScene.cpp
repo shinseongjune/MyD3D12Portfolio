@@ -419,6 +419,165 @@ void PlayScene::OnLoad(SceneContext& ctx)
             }
         }
     }
+
+    // keys
+    {
+        texh_black_w = LoadTexture(ctx, "Assets/Texture/PlayScene/black_w.png");
+        texh_black_s = LoadTexture(ctx, "Assets/Texture/PlayScene/black_s.png");
+        texh_black_a = LoadTexture(ctx, "Assets/Texture/PlayScene/black_a.png");
+        texh_black_d = LoadTexture(ctx, "Assets/Texture/PlayScene/black_d.png");
+        texh_black_8 = LoadTexture(ctx, "Assets/Texture/PlayScene/black_8.png");
+        texh_black_2 = LoadTexture(ctx, "Assets/Texture/PlayScene/black_2.png");
+        texh_black_4 = LoadTexture(ctx, "Assets/Texture/PlayScene/black_4.png");
+        texh_black_6 = LoadTexture(ctx, "Assets/Texture/PlayScene/black_6.png");
+        texh_black_up = LoadTexture(ctx, "Assets/Texture/PlayScene/black_up.png");
+        texh_black_down = LoadTexture(ctx, "Assets/Texture/PlayScene/black_down.png");
+        texh_black_left = LoadTexture(ctx, "Assets/Texture/PlayScene/black_left.png");
+        texh_black_right = LoadTexture(ctx, "Assets/Texture/PlayScene/black_right.png");
+        texh_black_space = LoadTexture(ctx, "Assets/Texture/PlayScene/black_space.png");
+        texh_black_ctrl = LoadTexture(ctx, "Assets/Texture/PlayScene/black_ctrl.png");
+
+        texh_white_w = LoadTexture(ctx, "Assets/Texture/PlayScene/white_w.png");
+        texh_white_s = LoadTexture(ctx, "Assets/Texture/PlayScene/white_s.png");
+        texh_white_a = LoadTexture(ctx, "Assets/Texture/PlayScene/white_a.png");
+        texh_white_d = LoadTexture(ctx, "Assets/Texture/PlayScene/white_d.png");
+        texh_white_8 = LoadTexture(ctx, "Assets/Texture/PlayScene/white_8.png");
+        texh_white_2 = LoadTexture(ctx, "Assets/Texture/PlayScene/white_2.png");
+        texh_white_4 = LoadTexture(ctx, "Assets/Texture/PlayScene/white_4.png");
+        texh_white_6 = LoadTexture(ctx, "Assets/Texture/PlayScene/white_6.png");
+        texh_white_up = LoadTexture(ctx, "Assets/Texture/PlayScene/white_up.png");
+        texh_white_down = LoadTexture(ctx, "Assets/Texture/PlayScene/white_down.png");
+        texh_white_left = LoadTexture(ctx, "Assets/Texture/PlayScene/white_left.png");
+        texh_white_right = LoadTexture(ctx, "Assets/Texture/PlayScene/white_right.png");
+        texh_white_space = LoadTexture(ctx, "Assets/Texture/PlayScene/white_space.png");
+        texh_white_ctrl = LoadTexture(ctx, "Assets/Texture/PlayScene/white_ctrl.png");
+
+        {
+            key_w = ctx.Instantiate("key_w");
+            UIElementComponent image;
+            image.texture = texh_white_w;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 10, 504 };
+            ctx.world.AddUIElement(key_w, image);
+        }
+
+        {
+            key_s = ctx.Instantiate("key_s");
+            UIElementComponent image;
+            image.texture = texh_white_s;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 34, 504 };
+            ctx.world.AddUIElement(key_s, image);
+        }
+
+        {
+            key_a = ctx.Instantiate("key_a");
+            UIElementComponent image;
+            image.texture = texh_white_a;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 10, 528 };
+            ctx.world.AddUIElement(key_a, image);
+        }
+
+        {
+            key_d = ctx.Instantiate("key_d");
+            UIElementComponent image;
+            image.texture = texh_white_d;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 34, 528 };
+            ctx.world.AddUIElement(key_d, image);
+        }
+
+        {
+            key_8 = ctx.Instantiate("key_8");
+            UIElementComponent image;
+            image.texture = texh_white_8;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 10, 552 };
+            ctx.world.AddUIElement(key_8, image);
+        }
+
+        {
+            key_2 = ctx.Instantiate("key_2");
+            UIElementComponent image;
+            image.texture = texh_white_2;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 34, 552 };
+            ctx.world.AddUIElement(key_2, image);
+        }
+
+        {
+            key_4 = ctx.Instantiate("key_4");
+            UIElementComponent image;
+            image.texture = texh_white_4;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 10, 576 };
+            ctx.world.AddUIElement(key_4, image);
+        }
+
+        {
+            key_6 = ctx.Instantiate("key_6");
+            UIElementComponent image;
+            image.texture = texh_white_6;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 34, 576 };
+            ctx.world.AddUIElement(key_6, image);
+        }
+
+        {
+            key_up = ctx.Instantiate("key_up");
+            UIElementComponent image;
+            image.texture = texh_white_up;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 140, 528 };
+            ctx.world.AddUIElement(key_up, image);
+        }
+
+        {
+            key_down = ctx.Instantiate("key_down");
+            UIElementComponent image;
+            image.texture = texh_white_down;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 164, 528 };
+            ctx.world.AddUIElement(key_down, image);
+        }
+
+        {
+            key_left = ctx.Instantiate("key_left");
+            UIElementComponent image;
+            image.texture = texh_white_left;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 188, 528 };
+            ctx.world.AddUIElement(key_left, image);
+        }
+
+        {
+            key_right = ctx.Instantiate("key_right");
+            UIElementComponent image;
+            image.texture = texh_white_right;
+            image.sizePx = { 24, 24 };
+            image.anchoredPosPx = { 212, 528 };
+            ctx.world.AddUIElement(key_right, image);
+        }
+
+        {
+            key_space = ctx.Instantiate("key_space");
+            UIElementComponent image;
+            image.texture = texh_white_space;
+            image.sizePx = { 96, 24 };
+            image.anchoredPosPx = { 140, 552 };
+            ctx.world.AddUIElement(key_space, image);
+        }
+
+        {
+            key_ctrl = ctx.Instantiate("key_ctrl");
+            UIElementComponent image;
+            image.texture = texh_white_ctrl;
+            image.sizePx = { 48, 24 };
+            image.anchoredPosPx = { 140, 576 };
+            ctx.world.AddUIElement(key_ctrl, image);
+        }
+    }
 }
 
 void PlayScene::OnUnload(SceneContext& ctx)
@@ -440,6 +599,14 @@ void PlayScene::OnUpdate(SceneContext& ctx)
         ctx.RequestLoadScene(SceneId::Result);
         return;
     }
+
+    ctx.DrawWText(58, 504, L"속도변경", 18.0f, { 1, 1, 1, 1 });
+    ctx.DrawWText(58, 528, L"좌우회전", 18.0f, { 1, 1, 1, 1 });
+    ctx.DrawWText(58, 552, L"상하회전", 18.0f, { 1, 1, 1, 1 });
+    ctx.DrawWText(58, 576, L"뱅크회전", 18.0f, { 1, 1, 1, 1 });
+    ctx.DrawWText(240, 528, L"카메라조작", 18.0f, { 1, 1, 1, 1 });
+    ctx.DrawWText(240, 552, L"기총발사", 18.0f, { 1, 1, 1, 1 });
+    ctx.DrawWText(190, 576, L"미사일발사", 18.0f, { 1, 1, 1, 1 });
 
     DisplayDefaultHUD(ctx);
 
@@ -470,6 +637,205 @@ void PlayScene::OnUpdate(SceneContext& ctx)
     BuildShooterCommands(ctx.input, m_cmds);
 
     ExecuteCommand(ctx);
+
+    // keys
+    {
+        // w
+        {
+            if (ctx.input.IsKeyPressed(Key::W))
+            {
+                auto& image = ctx.world.GetUIElement(key_w);
+                image.texture = texh_black_w;
+            }
+            else if (ctx.input.IsKeyReleased(Key::W))
+            {
+                auto& image = ctx.world.GetUIElement(key_w);
+                image.texture = texh_white_w;
+            }
+        }
+
+        // s
+        {
+            if (ctx.input.IsKeyPressed(Key::S))
+            {
+                auto& image = ctx.world.GetUIElement(key_s);
+                image.texture = texh_black_s;
+            }
+            else if (ctx.input.IsKeyReleased(Key::S))
+            {
+                auto& image = ctx.world.GetUIElement(key_s);
+                image.texture = texh_white_s;
+            }
+        }
+
+        // a
+        {
+            if (ctx.input.IsKeyPressed(Key::A))
+            {
+                auto& image = ctx.world.GetUIElement(key_a);
+                image.texture = texh_black_a;
+            }
+            else if (ctx.input.IsKeyReleased(Key::A))
+            {
+                auto& image = ctx.world.GetUIElement(key_a);
+                image.texture = texh_white_a;
+            }
+        }
+
+        // d
+        {
+            if (ctx.input.IsKeyPressed(Key::D))
+            {
+                auto& image = ctx.world.GetUIElement(key_d);
+                image.texture = texh_black_d;
+            }
+            else if (ctx.input.IsKeyReleased(Key::D))
+            {
+                auto& image = ctx.world.GetUIElement(key_d);
+                image.texture = texh_white_d;
+            }
+        }
+
+        // 8
+        {
+            if (ctx.input.IsKeyPressed(Key::NumPad8))
+            {
+                auto& image = ctx.world.GetUIElement(key_8);
+                image.texture = texh_black_8;
+            }
+            else if (ctx.input.IsKeyReleased(Key::NumPad8))
+            {
+                auto& image = ctx.world.GetUIElement(key_8);
+                image.texture = texh_white_8;
+            }
+        }
+
+        // 2
+        {
+            if (ctx.input.IsKeyPressed(Key::NumPad2))
+            {
+                auto& image = ctx.world.GetUIElement(key_2);
+                image.texture = texh_black_2;
+            }
+            else if (ctx.input.IsKeyReleased(Key::NumPad2))
+            {
+                auto& image = ctx.world.GetUIElement(key_2);
+                image.texture = texh_white_2;
+            }
+        }
+
+        // 4
+        {
+            if (ctx.input.IsKeyPressed(Key::NumPad4))
+            {
+                auto& image = ctx.world.GetUIElement(key_4);
+                image.texture = texh_black_4;
+            }
+            else if (ctx.input.IsKeyReleased(Key::NumPad4))
+            {
+                auto& image = ctx.world.GetUIElement(key_4);
+                image.texture = texh_white_4;
+            }
+        }
+
+        // 6
+        {
+            if (ctx.input.IsKeyPressed(Key::NumPad6))
+            {
+                auto& image = ctx.world.GetUIElement(key_6);
+                image.texture = texh_black_6;
+            }
+            else if (ctx.input.IsKeyReleased(Key::NumPad6))
+            {
+                auto& image = ctx.world.GetUIElement(key_6);
+                image.texture = texh_white_6;
+            }
+        }
+
+        // up
+        {
+            if (ctx.input.IsKeyPressed(Key::Up))
+            {
+                auto& image = ctx.world.GetUIElement(key_up);
+                image.texture = texh_black_up;
+            }
+            else if (ctx.input.IsKeyReleased(Key::Up))
+            {
+                auto& image = ctx.world.GetUIElement(key_up);
+                image.texture = texh_white_up;
+            }
+        }
+
+        // down
+        {
+            if (ctx.input.IsKeyPressed(Key::Down))
+            {
+                auto& image = ctx.world.GetUIElement(key_down);
+                image.texture = texh_black_down;
+            }
+            else if (ctx.input.IsKeyReleased(Key::Down))
+            {
+                auto& image = ctx.world.GetUIElement(key_down);
+                image.texture = texh_white_down;
+            }
+        }
+
+        // left
+        {
+            if (ctx.input.IsKeyPressed(Key::Left))
+            {
+                auto& image = ctx.world.GetUIElement(key_left);
+                image.texture = texh_black_left;
+            }
+            else if (ctx.input.IsKeyReleased(Key::Left))
+            {
+                auto& image = ctx.world.GetUIElement(key_left);
+                image.texture = texh_white_left;
+            }
+        }
+
+        // right
+        {
+            if (ctx.input.IsKeyPressed(Key::Right))
+            {
+                auto& image = ctx.world.GetUIElement(key_right);
+                image.texture = texh_black_right;
+            }
+            else if (ctx.input.IsKeyReleased(Key::Right))
+            {
+                auto& image = ctx.world.GetUIElement(key_right);
+                image.texture = texh_white_right;
+            }
+        }
+
+        // space
+        {
+            if (ctx.input.IsKeyPressed(Key::Space))
+            {
+                auto& image = ctx.world.GetUIElement(key_space);
+                image.texture = texh_black_space;
+            }
+            else if (ctx.input.IsKeyReleased(Key::Space))
+            {
+                auto& image = ctx.world.GetUIElement(key_space);
+                image.texture = texh_white_space;
+            }
+        }
+
+        // ctrl
+        {
+            if (ctx.input.IsKeyPressed(Key::Ctrl))
+            {
+                auto& image = ctx.world.GetUIElement(key_ctrl);
+                image.texture = texh_black_ctrl;
+            }
+            else if (ctx.input.IsKeyReleased(Key::Ctrl))
+            {
+                auto& image = ctx.world.GetUIElement(key_ctrl);
+                image.texture = texh_white_ctrl;
+            }
+        }
+    }
 }
 
 FlightRigComponent* PlayScene::GetFlightRig(SceneContext& ctx)
@@ -873,11 +1239,11 @@ void PlayScene::DisplayDefaultHUD(SceneContext& ctx)
     if (!stats) return;
 
     auto buf = std::format(L"HP : {}", stats->CurrentHp());
-    ctx.DrawWText(40, 440, buf, 24, {0.2f, 1, 0.35f, 1});
+    ctx.DrawWText(40, 430, buf, 24, {0.2f, 1, 0.35f, 1});
 
     auto missileLauncher = ctx.world.GetScriptAs<MissileLauncherComponent>(m_player);
     buf = std::format(L"missile : {}", missileLauncher->m_missileCount);
-    ctx.DrawWText(40, 480, buf, 24, {0.2f, 1, 0.35f, 1});
+    ctx.DrawWText(40, 460, buf, 24, {0.2f, 1, 0.35f, 1});
 
     buf = std::format(L"웨이브 {}", m_waveManager.GetCurrentWaveIndex() + 1);
     ctx.DrawWText(40, 40, buf, 24, { 1, 1, 1, 1 });

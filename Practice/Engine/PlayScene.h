@@ -180,4 +180,50 @@ private:
     std::vector<EntityId> m_minimapEnemyMarkers;
     void UpdateMinimap(SceneContext& ctx);
 
+    // keys
+    TextureHandle texh_black_w;
+    TextureHandle texh_black_s;
+    TextureHandle texh_black_a;
+    TextureHandle texh_black_d;
+    TextureHandle texh_black_8;
+    TextureHandle texh_black_2;
+    TextureHandle texh_black_4;
+    TextureHandle texh_black_6;
+    TextureHandle texh_black_up;
+    TextureHandle texh_black_down;
+    TextureHandle texh_black_left;
+    TextureHandle texh_black_right;
+    TextureHandle texh_black_space;
+    TextureHandle texh_black_ctrl;
+
+    TextureHandle texh_white_w;
+    TextureHandle texh_white_s;
+    TextureHandle texh_white_a;
+    TextureHandle texh_white_d;
+    TextureHandle texh_white_8;
+    TextureHandle texh_white_2;
+    TextureHandle texh_white_4;
+    TextureHandle texh_white_6;
+    TextureHandle texh_white_up;
+    TextureHandle texh_white_down;
+    TextureHandle texh_white_left;
+    TextureHandle texh_white_right;
+    TextureHandle texh_white_space;
+    TextureHandle texh_white_ctrl;
+
+    EntityId key_w;
+    EntityId key_s;
+    EntityId key_a;
+    EntityId key_d;
+    EntityId key_8;
+    EntityId key_2;
+    EntityId key_4;
+    EntityId key_6;
+    EntityId key_up;
+    EntityId key_down;
+    EntityId key_left;
+    EntityId key_right;
+    EntityId key_space;
+    EntityId key_ctrl;
+
 };
